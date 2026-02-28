@@ -2,12 +2,19 @@ package domain
 
 import "time"
 
+const (
+	UserRoleAdmin   = "admin"
+	UserRoleStudent = "student"
+)
+
 type User struct {
-	ID           string
-	Name         string
-	Email        string
-	PasswordHash string
-	Role         string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              string
+	Email           string
+	PasswordHash     string
+	Name            string
+	Role            string
+	AvatarURL       *string
+	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

@@ -1,5 +1,3 @@
-# Env: production secrets (do not commit)
+# Env files (do not commit secrets)
 .env
-
-# Optional: uncomment to also ignore dev env
-# .env.dev
+.env.dev

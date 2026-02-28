@@ -29,6 +29,18 @@ go run ./cmd/api
 
 **Production (pakai `.env`):** Set `ENV=production` dan isi `.env`, lalu jalankan (mis. di Docker/host).
 
+## Database & migrasi
+
+Skema PostgreSQL ada di `internal/db/migrations/001_init.sql` (users, tryout_sessions, questions, attempts, attempt_answers, attempt_feedback, courses, course_enrollments, certificates, password_reset_tokens).
+
+Jalankan migrasi sekali (pastikan `DATABASE_URL` sudah benar di `.env` atau `.env.dev`):
+
+```bash
+go run ./cmd/migrate
+```
+
+Jangan jalankan ulang setelah skema sudah ada (DDL tidak idempotent).
+
 ## Endpoints (MVP)
 
 - `GET /v1/health`
