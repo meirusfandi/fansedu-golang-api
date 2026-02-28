@@ -17,7 +17,7 @@ Aplikasi memuat env dari file:
 | `development`  | Opsional     | Default boleh (warning) |
 | `production`   | **Wajib**    | **Wajib**, harus kuat (bukan default) |
 
-`.env` ada di `.gitignore` (jangan commit secret production).
+**Jangan commit `.env` atau `.env.dev`** — keduanya ada di `.gitignore`. Pakai `.env.development.example` sebagai template: salin ke `.env.dev`, lalu isi `JWT_SECRET` sendiri (mis. `openssl rand -base64 32`). Jika `.env.dev` pernah ikut ter-commit, untrack dengan: `git rm --cached .env.dev`.
 
 ## Run (local)
 
@@ -41,10 +41,48 @@ go run ./cmd/migrate
 
 Jangan jalankan ulang setelah skema sudah ada (DDL tidak idempotent).
 
-## Endpoints (MVP)
+## Endpoints
 
+**Health**
 - `GET /v1/health`
-- `POST /v1/auth/register` (stub)
-- `POST /v1/auth/login` (stub)
+
+**Auth**
+- `POST /v1/auth/register` — Body: `{ "name", "email", "password" }` → `{ "user", "token" }`
+- `POST /v1/auth/login` — Body: `{ "email", "password" }` → `{ "user", "token" }`
+- `POST /v1/auth/logout` — Bearer required
+- `POST /v1/auth/forgot-password` — Body: `{ "email" }` (stub)
+- `POST /v1/auth/reset-password` — Body: `{ "token", "new_password" }` (stub)
+
+**Tryouts (public/student)**
+- `GET /v1/tryouts/open` — Daftar tryout yang buka
+- `GET /v1/tryouts/{tryoutId}` — Detail tryout
+- `POST /v1/tryouts/{tryoutId}/start` — Bearer required → `{ "attempt_id", "expires_at", "time_left_seconds" }`
+
+**Attempts (Bearer required)**
+- `GET /v1/attempts/{attemptId}/questions` — Soal untuk attempt (tanpa kunci jawaban)
+- `PUT /v1/attempts/{attemptId}/answers/{questionId}` — Submit jawaban
+- `POST /v1/attempts/{attemptId}/submit` — Akhiri attempt, hitung skor, feedback
+
+**Student (Bearer required)**
+- `GET /v1/student/dashboard` — Ringkasan, open tryouts, recent attempts, strength/improvement
+- `GET /v1/student/attempts` — Riwayat attempt
+- `GET /v1/student/attempts/{attemptId}` — Detail attempt
+- `GET /v1/student/certificates` — Daftar sertifikat
+
+**Courses**
+- `GET /v1/courses` — Daftar kursus
+- `POST /v1/courses/{courseId}/enroll` — Bearer required — Daftar kelas
+
+**Admin (Bearer + role admin)**
+- `GET /v1/admin/overview` — Statistik
+- `POST /v1/admin/tryouts` — Buat tryout
+- `PUT /v1/admin/tryouts/{tryoutId}` — Update tryout
+- `DELETE /v1/admin/tryouts/{tryoutId}` — Hapus tryout
+- `POST /v1/admin/tryouts/{tryoutId}/questions` — Tambah soal
+- `PUT /v1/admin/questions/{questionId}` — Update soal
+- `DELETE /v1/admin/questions/{questionId}` — Hapus soal
+- `POST /v1/admin/courses` — Buat kursus
+- `GET /v1/admin/courses/{courseId}/enrollments` — Daftar enrollment
+- `POST /v1/admin/certificates` — Terbitkan sertifikat
 
 # fansedu-golang-api

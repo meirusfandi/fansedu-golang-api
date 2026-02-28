@@ -10,13 +10,16 @@ import (
 	"time"
 
 	httpapi "github.com/meirusfandi/fansedu-golang-api/internal/app/http"
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/handlers"
 	"github.com/meirusfandi/fansedu-golang-api/internal/config"
 	"github.com/meirusfandi/fansedu-golang-api/internal/db"
+	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
+	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	config.LoadEnvFile() // .env for production, .env.dev for development
+	config.LoadEnvFile()
 	cfg := config.Load()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -34,10 +37,13 @@ func main() {
 		log.Fatal("production: DATABASE_URL is required")
 	}
 
-	router := httpapi.NewRouter(httpapi.Deps{
-		DB:        pool,
-		JWTSecret: []byte(cfg.JWTSecret),
-	})
+	var router http.Handler
+	if pool == nil {
+		router = httpapi.NewRouter(nil)
+	} else {
+		deps := buildDeps(pool, []byte(cfg.JWTSecret))
+		router = httpapi.NewRouter(deps)
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr(),
@@ -57,4 +63,42 @@ func main() {
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
 	log.Printf("shutdown complete")
+}
+
+func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
+	userRepo := repo.NewUserRepo(pool)
+	tryoutRepo := repo.NewTryoutRepo(pool)
+	questionRepo := repo.NewQuestionRepo(pool)
+	attemptRepo := repo.NewAttemptRepo(pool)
+	attemptAnswerRepo := repo.NewAttemptAnswerRepo(pool)
+	feedbackRepo := repo.NewFeedbackRepo(pool)
+	courseRepo := repo.NewCourseRepo(pool)
+	enrollmentRepo := repo.NewEnrollmentRepo(pool)
+	certificateRepo := repo.NewCertificateRepo(pool)
+
+	authService := service.NewAuthService(userRepo, jwtSecret)
+	tryoutService := service.NewTryoutService(tryoutRepo)
+	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo)
+	dashboardService := service.NewDashboardService(attemptRepo, tryoutRepo, feedbackRepo)
+	adminService := service.NewAdminService(
+		tryoutRepo, questionRepo, courseRepo, enrollmentRepo, certificateRepo,
+		func(ctx context.Context) (int, error) { return userRepo.CountByRole(ctx, "student") },
+		attemptRepo.AvgScoreSubmitted,
+		certificateRepo.Count,
+	)
+	courseService := service.NewCourseService(courseRepo, enrollmentRepo)
+
+	return &handlers.Deps{
+		DB:                 pool,
+		JWTSecret:          jwtSecret,
+		AuthService:        authService,
+		TryoutService:      tryoutService,
+		AttemptService:     attemptService,
+		DashboardService:   dashboardService,
+		AdminService:       adminService,
+		CourseService:      courseService,
+		QuestionRepo:       questionRepo,
+		AttemptAnswerRepo:  attemptAnswerRepo,
+		CertificateRepo:    certificateRepo,
+	}
 }

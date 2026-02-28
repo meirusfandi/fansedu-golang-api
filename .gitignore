@@ -1,3 +1,4 @@
-# Env files (do not commit secrets)
+# Env files — never commit; contain secrets (use .env.development.example as template)
 .env
 .env.dev
+.env*.local

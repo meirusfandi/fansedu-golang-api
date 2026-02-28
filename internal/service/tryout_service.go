@@ -1,0 +1,15 @@
+package service
+
+import (
+	"context"
+
+	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+)
+
+type TryoutService interface {
+	ListOpen(ctx context.Context) ([]domain.TryoutSession, error)
+	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
+	Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
+	Update(ctx context.Context, t domain.TryoutSession) error
+	Delete(ctx context.Context, id string) error
+}
