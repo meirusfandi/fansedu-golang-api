@@ -6,7 +6,7 @@ COPY go.mod ./
 RUN go mod download
 
 COPY . .
-RUN go build -o main
+RUN go build -o main ./cmd/api
 EXPOSE 8080
 
 CMD ["./main"]
