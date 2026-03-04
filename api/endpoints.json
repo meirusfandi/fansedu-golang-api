@@ -1,0 +1,771 @@
+{
+  "basePath": "/api/v1",
+  "auth": {
+    "type": "jwt",
+    "header": "Authorization",
+    "format": "Bearer <token>",
+    "roles": ["student", "admin"]
+  },
+  "endpoints": [
+    {
+      "name": "Health Check",
+      "method": "GET",
+      "path": "/health",
+      "summary": "Service liveness check",
+      "auth": "none",
+      "requestExample": null,
+      "responseExample": {
+        "200": {
+          "body": {
+            "status": "ok",
+            "time": "2025-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+
+    {
+      "name": "Register",
+      "method": "POST",
+      "path": "/auth/register",
+      "summary": "Register new student account",
+      "auth": "none",
+      "requestExample": {
+        "body": {
+          "name": "Jane Doe",
+          "email": "jane@example.com",
+          "password": "StrongP@ssw0rd"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "user": {
+              "id": "uuid",
+              "name": "Jane Doe",
+              "email": "jane@example.com",
+              "role": "student",
+              "avatar_url": null
+            },
+            "token": "jwt-token-here"
+          }
+        }
+      }
+    },
+    {
+      "name": "Login",
+      "method": "POST",
+      "path": "/auth/login",
+      "summary": "Login with email & password",
+      "auth": "none",
+      "requestExample": {
+        "body": {
+          "email": "jane@example.com",
+          "password": "StrongP@ssw0rd"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "user": {
+              "id": "uuid",
+              "name": "Jane Doe",
+              "email": "jane@example.com",
+              "role": "student"
+            },
+            "token": "jwt-token-here"
+          }
+        },
+        "401": {
+          "body": {
+            "error": "invalid email or password"
+          }
+        }
+      }
+    },
+    {
+      "name": "Logout",
+      "method": "POST",
+      "path": "/auth/logout",
+      "summary": "Logout current session (JWT client-side)",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "ok": true
+          }
+        }
+      }
+    },
+    {
+      "name": "Forgot Password",
+      "method": "POST",
+      "path": "/auth/forgot-password",
+      "summary": "Request password reset email (stub)",
+      "auth": "none",
+      "requestExample": {
+        "body": {
+          "email": "jane@example.com"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "ok": true
+          }
+        }
+      }
+    },
+    {
+      "name": "Reset Password",
+      "method": "POST",
+      "path": "/auth/reset-password",
+      "summary": "Reset password with token (stub)",
+      "auth": "none",
+      "requestExample": {
+        "body": {
+          "token": "reset-token",
+          "new_password": "NewStrongP@ssw0rd"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "ok": true
+          }
+        }
+      }
+    },
+
+    {
+      "name": "List Open Tryouts",
+      "method": "GET",
+      "path": "/tryouts/open",
+      "summary": "List all open tryout sessions",
+      "auth": "none",
+      "requestExample": null,
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "title": "Simulasi OSN Informatika 2025",
+              "short_title": "OSN 2025-1",
+              "description": "Latihan simulasi OSN Informatika.",
+              "duration_minutes": 90,
+              "questions_count": 25,
+              "level": "medium",
+              "opens_at": "2025-01-01T00:00:00Z",
+              "closes_at": "2025-01-02T00:00:00Z",
+              "max_participants": 200,
+              "status": "open"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Tryout Detail",
+      "method": "GET",
+      "path": "/tryouts/{tryoutId}",
+      "summary": "Get detail for a specific tryout",
+      "auth": "none",
+      "requestExample": {
+        "pathParams": {
+          "tryoutId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "id": "uuid",
+            "title": "Simulasi OSN Informatika 2025",
+            "short_title": "OSN 2025-1",
+            "description": "Latihan simulasi OSN Informatika.",
+            "duration_minutes": 90,
+            "questions_count": 25,
+            "level": "medium",
+            "opens_at": "2025-01-01T00:00:00Z",
+            "closes_at": "2025-01-02T00:00:00Z",
+            "max_participants": 200,
+            "status": "open"
+          }
+        }
+      }
+    },
+    {
+      "name": "Start Tryout",
+      "method": "POST",
+      "path": "/tryouts/{tryoutId}/start",
+      "summary": "Create or resume an attempt for a tryout",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid"
+        },
+        "body": null
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "attempt_id": "uuid",
+            "expires_at": "2025-01-01T01:30:00Z",
+            "time_left_seconds": 5400
+          }
+        }
+      }
+    },
+
+    {
+      "name": "Get Attempt Questions",
+      "method": "GET",
+      "path": "/attempts/{attemptId}/questions",
+      "summary": "Get all questions for an attempt",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "attemptId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "tryout_session_id": "uuid",
+              "sort_order": 1,
+              "type": "multiple_choice",
+              "body": "Berapa kompleksitas waktu binary search?",
+              "options": [
+                "O(1)",
+                "O(log n)",
+                "O(n)",
+                "O(n log n)"
+              ],
+              "max_score": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Put Attempt Answer",
+      "method": "PUT",
+      "path": "/attempts/{attemptId}/answers/{questionId}",
+      "summary": "Submit or update answer for one question",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "attemptId": "uuid",
+          "questionId": "uuid"
+        },
+        "body": {
+          "answer_text": "O(log n)",
+          "selected_option": "B",
+          "is_marked": true
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {}
+        }
+      }
+    },
+    {
+      "name": "Submit Attempt",
+      "method": "POST",
+      "path": "/attempts/{attemptId}/submit",
+      "summary": "Submit attempt, compute score & feedback",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "attemptId": "uuid"
+        },
+        "body": null
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "attempt_id": "uuid",
+            "score": 68.0,
+            "percentile": 78.0,
+            "feedback": {
+              "summary": "Kinerja Anda sudah baik.",
+              "recap": "Skor Anda 68 dari 100.",
+              "strength_areas": ["Algoritma dasar"],
+              "improvement_areas": ["Dynamic Programming"],
+              "recommendation_text": "Fokus latihan DP dan graf."
+            }
+          }
+        }
+      }
+    },
+
+    {
+      "name": "Student Dashboard",
+      "method": "GET",
+      "path": "/student/dashboard",
+      "summary": "Get student dashboard summary & recommendations",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "summary": {
+              "total_attempts": 2,
+              "avg_score": 70,
+              "avg_percentile": 80
+            },
+            "open_tryouts": [],
+            "recent_attempts": [],
+            "strength_areas": [],
+            "improvement_areas": [],
+            "recommendation": "Mulai tryout untuk melihat rekomendasi."
+          }
+        }
+      }
+    },
+    {
+      "name": "Student Attempts List",
+      "method": "GET",
+      "path": "/student/attempts",
+      "summary": "List attempts for current student",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "user_id": "uuid",
+              "tryout_session_id": "uuid",
+              "started_at": "2025-01-01T00:00:00Z",
+              "submitted_at": "2025-01-01T01:30:00Z",
+              "status": "submitted",
+              "score": 68.0,
+              "max_score": 100.0,
+              "percentile": 78.0,
+              "time_seconds_spent": 5400
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Student Attempt Detail",
+      "method": "GET",
+      "path": "/student/attempts/{attemptId}",
+      "summary": "Get detail for one attempt",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "attemptId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "id": "uuid",
+            "user_id": "uuid",
+            "tryout_session_id": "uuid",
+            "started_at": "2025-01-01T00:00:00Z",
+            "submitted_at": "2025-01-01T01:30:00Z",
+            "status": "submitted",
+            "score": 68.0,
+            "max_score": 100.0,
+            "percentile": 78.0,
+            "time_seconds_spent": 5400
+          }
+        }
+      }
+    },
+    {
+      "name": "Student Certificates",
+      "method": "GET",
+      "path": "/student/certificates",
+      "summary": "List certificates for current student",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "user_id": "uuid",
+              "tryout_session_id": "uuid",
+              "course_id": null,
+              "issued_at": "2025-01-01T00:00:00Z"
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "name": "Courses List",
+      "method": "GET",
+      "path": "/courses/",
+      "summary": "List all courses",
+      "auth": "none",
+      "requestExample": null,
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "title": "Pembinaan OSN Informatika",
+              "description": "Kelas intensif persiapan OSN Informatika.",
+              "created_by": "uuid"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Enroll Course",
+      "method": "POST",
+      "path": "/courses/{courseId}/enroll",
+      "summary": "Enroll current student into course",
+      "auth": "user",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <jwt>"
+        },
+        "pathParams": {
+          "courseId": "uuid"
+        },
+        "body": null
+      },
+      "responseExample": {
+        "201": {
+          "body": {
+            "id": "uuid",
+            "user_id": "uuid",
+            "course_id": "uuid",
+            "status": "enrolled",
+            "enrolled_at": "2025-01-01T00:00:00Z"
+          }
+        }
+      }
+    },
+
+    {
+      "name": "Admin Overview",
+      "method": "GET",
+      "path": "/admin/overview",
+      "summary": "Admin statistics overview",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "total_students": 120,
+            "active_tryouts": 3,
+            "avg_score": 72.5,
+            "total_certificates": 40
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin Create Tryout",
+      "method": "POST",
+      "path": "/admin/tryouts",
+      "summary": "Create new tryout session",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "body": {
+          "title": "Simulasi OSN Informatika 2025",
+          "short_title": "OSN 2025-1",
+          "description": "Latihan simulasi OSN.",
+          "duration_minutes": 90,
+          "questions_count": 25,
+          "level": "medium",
+          "opens_at": "2025-01-01T00:00:00Z",
+          "closes_at": "2025-01-02T00:00:00Z",
+          "max_participants": 200,
+          "status": "open"
+        }
+      },
+      "responseExample": {
+        "201": {
+          "body": {
+            "id": "uuid",
+            "title": "Simulasi OSN Informatika 2025",
+            "short_title": "OSN 2025-1",
+            "description": "Latihan simulasi OSN.",
+            "duration_minutes": 90,
+            "questions_count": 25,
+            "level": "medium",
+            "opens_at": "2025-01-01T00:00:00Z",
+            "closes_at": "2025-01-02T00:00:00Z",
+            "max_participants": 200,
+            "status": "open"
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin Update Tryout",
+      "method": "PUT",
+      "path": "/admin/tryouts/{tryoutId}",
+      "summary": "Update existing tryout session",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid"
+        },
+        "body": {
+          "title": "Updated title",
+          "short_title": "Updated short",
+          "description": "Updated description",
+          "duration_minutes": 100,
+          "questions_count": 30,
+          "level": "hard",
+          "opens_at": "2025-01-01T00:00:00Z",
+          "closes_at": "2025-01-02T00:00:00Z",
+          "max_participants": 250,
+          "status": "open"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {}
+        }
+      }
+    },
+    {
+      "name": "Admin Delete Tryout",
+      "method": "DELETE",
+      "path": "/admin/tryouts/{tryoutId}",
+      "summary": "Delete tryout session",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid"
+        }
+      },
+      "responseExample": {
+        "204": {
+          "body": {}
+        }
+      }
+    },
+    {
+      "name": "Admin Create Question",
+      "method": "POST",
+      "path": "/admin/tryouts/{tryoutId}/questions",
+      "summary": "Create question for tryout",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid"
+        },
+        "body": {
+          "sort_order": 1,
+          "type": "multiple_choice",
+          "body": "Berapa kompleksitas waktu binary search?",
+          "options": [
+            "O(1)",
+            "O(log n)",
+            "O(n)",
+            "O(n log n)"
+          ],
+          "max_score": 1
+        }
+      },
+      "responseExample": {
+        "201": {
+          "body": {
+            "id": "uuid",
+            "tryout_session_id": "uuid",
+            "sort_order": 1,
+            "type": "multiple_choice",
+            "body": "Berapa kompleksitas waktu binary search?",
+            "options": [
+              "O(1)",
+              "O(log n)",
+              "O(n)",
+              "O(n log n)"
+            ],
+            "max_score": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin Update Question",
+      "method": "PUT",
+      "path": "/admin/questions/{questionId}",
+      "summary": "Update question",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "questionId": "uuid"
+        },
+        "body": {
+          "body": "Updated question",
+          "max_score": 2
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {}
+        }
+      }
+    },
+    {
+      "name": "Admin Delete Question",
+      "method": "DELETE",
+      "path": "/admin/questions/{questionId}",
+      "summary": "Delete question",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "questionId": "uuid"
+        }
+      },
+      "responseExample": {
+        "204": {
+          "body": {}
+        }
+      }
+    },
+    {
+      "name": "Admin Create Course",
+      "method": "POST",
+      "path": "/admin/courses",
+      "summary": "Create new course",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "body": {
+          "title": "Pembinaan OSN Informatika",
+          "description": "Kelas intensif persiapan OSN."
+        }
+      },
+      "responseExample": {
+        "201": {
+          "body": {
+            "id": "uuid",
+            "title": "Pembinaan OSN Informatika",
+            "description": "Kelas intensif persiapan OSN.",
+            "created_by": "uuid"
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin List Course Enrollments",
+      "method": "GET",
+      "path": "/admin/courses/{courseId}/enrollments",
+      "summary": "List enrollments for a course",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "courseId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "user_id": "uuid",
+              "course_id": "uuid",
+              "status": "enrolled",
+              "enrolled_at": "2025-01-01T00:00:00Z",
+              "completed_at": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Admin Issue Certificate",
+      "method": "POST",
+      "path": "/admin/certificates",
+      "summary": "Issue certificate for tryout or course",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "body": {
+          "user_id": "uuid",
+          "tryout_session_id": "uuid",
+          "course_id": null
+        }
+      },
+      "responseExample": {
+        "201": {
+          "body": {
+            "id": "uuid",
+            "user_id": "uuid",
+            "issued_at": "2025-01-01T00:00:00Z"
+          }
+        }
+      }
+    }
+  ]
+}
+

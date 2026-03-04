@@ -79,3 +79,45 @@ func (r *userRepo) CountByRole(ctx context.Context, role string) (int, error) {
 	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = $1::user_role`, role).Scan(&n)
 	return n, err
 }
+
+func (r *userRepo) Count(ctx context.Context) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
+	return n, err
+}
+
+func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error) {
+	query := `SELECT id, email, password_hash, name, role, avatar_url, email_verified_at, created_at, updated_at FROM users`
+	args := []interface{}{}
+	if role != "" {
+		query += ` WHERE role = $1::user_role`
+		args = append(args, role)
+	}
+	query += ` ORDER BY created_at DESC`
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.User
+	for rows.Next() {
+		var u domain.User
+		var avatarURL *string
+		var emailVerifiedAt *time.Time
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &avatarURL, &emailVerifiedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		u.AvatarURL = avatarURL
+		u.EmailVerifiedAt = emailVerifiedAt
+		list = append(list, u)
+	}
+	return list, rows.Err()
+}
+
+func (r *userRepo) Update(ctx context.Context, u domain.User) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE users SET name = $2, email = $3, role = $4::user_role, avatar_url = $5, password_hash = $6, updated_at = NOW()
+		WHERE id = $1::uuid
+	`, u.ID, u.Name, u.Email, u.Role, u.AvatarURL, u.PasswordHash)
+	return err
+}

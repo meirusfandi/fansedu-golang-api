@@ -15,6 +15,7 @@ type CourseRepo interface {
 	List(ctx context.Context) ([]domain.Course, error)
 	Update(ctx context.Context, c domain.Course) error
 	Delete(ctx context.Context, id string) error
+	Count(ctx context.Context) (int, error)
 }
 
 type courseRepo struct{ pool *pgxpool.Pool }
@@ -63,6 +64,12 @@ func (r *courseRepo) List(ctx context.Context) ([]domain.Course, error) {
 		list = append(list, c)
 	}
 	return list, rows.Err()
+}
+
+func (r *courseRepo) Count(ctx context.Context) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM courses`).Scan(&n)
+	return n, err
 }
 
 func (r *courseRepo) Update(ctx context.Context, c domain.Course) error {

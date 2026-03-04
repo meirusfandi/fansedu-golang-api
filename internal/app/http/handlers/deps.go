@@ -21,4 +21,11 @@ type Deps struct {
 	QuestionRepo      repo.QuestionRepo
 	AttemptAnswerRepo repo.AttemptAnswerRepo
 	CertificateRepo   repo.CertificateRepo
+
+	RoleRepo    repo.RoleRepo
+	SchoolRepo  repo.SchoolRepo
+	SettingRepo repo.SettingRepo
+	EventRepo   repo.EventRepo
+	SubjectRepo repo.SubjectRepo
+	LevelRepo   repo.LevelRepo
 }

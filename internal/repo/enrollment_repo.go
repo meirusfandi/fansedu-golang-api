@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,8 @@ type EnrollmentRepo interface {
 	ListByUserID(ctx context.Context, userID string) ([]domain.CourseEnrollment, error)
 	ListByCourseID(ctx context.Context, courseID string) ([]domain.CourseEnrollment, error)
 	Update(ctx context.Context, e domain.CourseEnrollment) error
+	Count(ctx context.Context) (int, error)
+	CountEnrolledInMonth(ctx context.Context, year, month int) (int, error)
 }
 
 type enrollmentRepo struct{ pool *pgxpool.Pool }
@@ -90,4 +93,18 @@ func (r *enrollmentRepo) Update(ctx context.Context, e domain.CourseEnrollment) 
 		UPDATE course_enrollments SET status=$2::enrollment_status, completed_at=$3 WHERE id = $1::uuid
 	`, e.ID, e.Status, e.CompletedAt)
 	return err
+}
+
+func (r *enrollmentRepo) Count(ctx context.Context) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM course_enrollments`).Scan(&n)
+	return n, err
+}
+
+func (r *enrollmentRepo) CountEnrolledInMonth(ctx context.Context, year, month int) (int, error) {
+	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0)
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM course_enrollments WHERE enrolled_at >= $1 AND enrolled_at < $2`, start, end).Scan(&n)
+	return n, err
 }

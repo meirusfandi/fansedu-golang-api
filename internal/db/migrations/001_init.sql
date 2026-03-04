@@ -5,9 +5,14 @@
 -- 1. USERS & AUTH
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE user_role AS ENUM ('admin', 'student');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE user_role AS ENUM ('admin', 'student');
+  END IF;
+END $$;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email             VARCHAR(255) NOT NULL UNIQUE,
   password_hash     VARCHAR(255) NOT NULL,
@@ -19,11 +24,11 @@ CREATE TABLE users (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_email ON users (email);
-CREATE INDEX idx_users_role ON users (role);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
 
 -- Forgot password
-CREATE TABLE password_reset_tokens (
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   token_hash VARCHAR(255) NOT NULL,
@@ -32,17 +37,24 @@ CREATE TABLE password_reset_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens (user_id);
-CREATE INDEX idx_password_reset_tokens_expires ON password_reset_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens (expires_at);
 
 -- ---------------------------------------------------------------------------
 -- 2. TRYOUT SESSIONS (Event / Jadwal simulasi OSN)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE tryout_level AS ENUM ('easy', 'medium', 'hard');
-CREATE TYPE tryout_status AS ENUM ('draft', 'open', 'closed');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tryout_level') THEN
+    CREATE TYPE tryout_level AS ENUM ('easy', 'medium', 'hard');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tryout_status') THEN
+    CREATE TYPE tryout_status AS ENUM ('draft', 'open', 'closed');
+  END IF;
+END $$;
 
-CREATE TABLE tryout_sessions (
+CREATE TABLE IF NOT EXISTS tryout_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title              VARCHAR(500) NOT NULL,
   short_title        VARCHAR(100),
@@ -59,16 +71,21 @@ CREATE TABLE tryout_sessions (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_tryout_sessions_status ON tryout_sessions (status);
-CREATE INDEX idx_tryout_sessions_opens_closes ON tryout_sessions (opens_at, closes_at);
+CREATE INDEX IF NOT EXISTS idx_tryout_sessions_status ON tryout_sessions (status);
+CREATE INDEX IF NOT EXISTS idx_tryout_sessions_opens_closes ON tryout_sessions (opens_at, closes_at);
 
 -- ---------------------------------------------------------------------------
 -- 3. QUESTIONS (Soal per tryout)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE question_type AS ENUM ('short', 'multiple_choice', 'true_false');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_type') THEN
+    CREATE TYPE question_type AS ENUM ('short', 'multiple_choice', 'true_false');
+  END IF;
+END $$;
 
-CREATE TABLE questions (
+CREATE TABLE IF NOT EXISTS questions (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_session_id   UUID NOT NULL REFERENCES tryout_sessions (id) ON DELETE CASCADE,
   sort_order          INTEGER NOT NULL,
@@ -79,15 +96,20 @@ CREATE TABLE questions (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_questions_tryout_session ON questions (tryout_session_id);
+CREATE INDEX IF NOT EXISTS idx_questions_tryout_session ON questions (tryout_session_id);
 
 -- ---------------------------------------------------------------------------
 -- 4. ATTEMPTS (Siswa mengerjakan satu tryout)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE attempt_status AS ENUM ('in_progress', 'submitted', 'expired');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attempt_status') THEN
+    CREATE TYPE attempt_status AS ENUM ('in_progress', 'submitted', 'expired');
+  END IF;
+END $$;
 
-CREATE TABLE attempts (
+CREATE TABLE IF NOT EXISTS attempts (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   tryout_session_id   UUID NOT NULL REFERENCES tryout_sessions (id) ON DELETE CASCADE,
@@ -103,15 +125,15 @@ CREATE TABLE attempts (
   UNIQUE (user_id, tryout_session_id)
 );
 
-CREATE INDEX idx_attempts_user ON attempts (user_id);
-CREATE INDEX idx_attempts_tryout_session ON attempts (tryout_session_id);
-CREATE INDEX idx_attempts_status ON attempts (status);
+CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts (user_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_tryout_session ON attempts (tryout_session_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_status ON attempts (status);
 
 -- ---------------------------------------------------------------------------
 -- 5. ATTEMPT ANSWERS (Jawaban per soal per attempt)
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE attempt_answers (
+CREATE TABLE IF NOT EXISTS attempt_answers (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   attempt_id       UUID NOT NULL REFERENCES attempts (id) ON DELETE CASCADE,
   question_id      UUID NOT NULL REFERENCES questions (id) ON DELETE CASCADE,
@@ -123,13 +145,13 @@ CREATE TABLE attempt_answers (
   UNIQUE (attempt_id, question_id)
 );
 
-CREATE INDEX idx_attempt_answers_attempt ON attempt_answers (attempt_id);
+CREATE INDEX IF NOT EXISTS idx_attempt_answers_attempt ON attempt_answers (attempt_id);
 
 -- ---------------------------------------------------------------------------
 -- 6. ATTEMPT FEEDBACK (Ringkasan & rangkuman per attempt - bisa dari AI)
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE attempt_feedback (
+CREATE TABLE IF NOT EXISTS attempt_feedback (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   attempt_id         UUID NOT NULL REFERENCES attempts (id) ON DELETE CASCADE UNIQUE,
   summary            TEXT,
@@ -145,7 +167,7 @@ CREATE TABLE attempt_feedback (
 -- 7. COURSES / KELAS PEMBINAAN
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE courses (
+CREATE TABLE IF NOT EXISTS courses (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title       VARCHAR(500) NOT NULL,
   description TEXT,
@@ -158,9 +180,14 @@ CREATE TABLE courses (
 -- 8. COURSE ENROLLMENTS
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE enrollment_status AS ENUM ('enrolled', 'in_progress', 'completed');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enrollment_status') THEN
+    CREATE TYPE enrollment_status AS ENUM ('enrolled', 'in_progress', 'completed');
+  END IF;
+END $$;
 
-CREATE TABLE course_enrollments (
+CREATE TABLE IF NOT EXISTS course_enrollments (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   course_id   UUID NOT NULL REFERENCES courses (id) ON DELETE CASCADE,
@@ -171,14 +198,14 @@ CREATE TABLE course_enrollments (
   UNIQUE (user_id, course_id)
 );
 
-CREATE INDEX idx_course_enrollments_user ON course_enrollments (user_id);
-CREATE INDEX idx_course_enrollments_course ON course_enrollments (course_id);
+CREATE INDEX IF NOT EXISTS idx_course_enrollments_user ON course_enrollments (user_id);
+CREATE INDEX IF NOT EXISTS idx_course_enrollments_course ON course_enrollments (course_id);
 
 -- ---------------------------------------------------------------------------
 -- 9. CERTIFICATES
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE certificates (
+CREATE TABLE IF NOT EXISTS certificates (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   tryout_session_id   UUID REFERENCES tryout_sessions (id) ON DELETE SET NULL,
@@ -191,7 +218,7 @@ CREATE TABLE certificates (
   )
 );
 
-CREATE INDEX idx_certificates_user ON certificates (user_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates (user_id);
 
 -- ---------------------------------------------------------------------------
 -- Trigger: updated_at
@@ -205,15 +232,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS users_updated_at ON users;
 CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS tryout_sessions_updated_at ON tryout_sessions;
 CREATE TRIGGER tryout_sessions_updated_at BEFORE UPDATE ON tryout_sessions
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS attempts_updated_at ON attempts;
 CREATE TRIGGER attempts_updated_at BEFORE UPDATE ON attempts
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS attempt_answers_updated_at ON attempt_answers;
 CREATE TRIGGER attempt_answers_updated_at BEFORE UPDATE ON attempt_answers
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS attempt_feedback_updated_at ON attempt_feedback;
 CREATE TRIGGER attempt_feedback_updated_at BEFORE UPDATE ON attempt_feedback
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS courses_updated_at ON courses;
 CREATE TRIGGER courses_updated_at BEFORE UPDATE ON courses
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();

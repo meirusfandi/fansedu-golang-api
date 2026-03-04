@@ -31,58 +31,84 @@ go run ./cmd/api
 
 ## Database & migrasi
 
-Skema PostgreSQL ada di `internal/db/migrations/001_init.sql` (users, tryout_sessions, questions, attempts, attempt_answers, attempt_feedback, courses, course_enrollments, certificates, password_reset_tokens).
+Skema PostgreSQL:
+- `001_init.sql` — users, tryout_sessions, questions, attempts, courses, course_enrollments, certificates, dll.
+- `002_course_content_payments.sql` — course_contents (modul/quiz/test per kelas), payments.
 
-Jalankan migrasi sekali (pastikan `DATABASE_URL` sudah benar di `.env` atau `.env.dev`):
+Jalankan migrasi (pastikan `DATABASE_URL` sudah benar di `.env` atau `.env.dev`):
 
 ```bash
 go run ./cmd/migrate
 ```
 
-Jangan jalankan ulang setelah skema sudah ada (DDL tidak idempotent).
+002 idempotent (aman dijalankan ulang). 001 hanya jalankan sekali untuk DB baru.
 
-## Endpoints
+## Endpoints (base path: `/api/v1`)
 
 **Health**
-- `GET /v1/health`
+- `GET /api/v1/health`
 
 **Auth**
-- `POST /v1/auth/register` — Body: `{ "name", "email", "password" }` → `{ "user", "token" }`
-- `POST /v1/auth/login` — Body: `{ "email", "password" }` → `{ "user", "token" }`
-- `POST /v1/auth/logout` — Bearer required
-- `POST /v1/auth/forgot-password` — Body: `{ "email" }` (stub)
-- `POST /v1/auth/reset-password` — Body: `{ "token", "new_password" }` (stub)
+- `POST /api/v1/auth/register` — Body: `{ "name", "email", "password" }` → `{ "user", "token" }`
+- `POST /api/v1/auth/login` — Body: `{ "email", "password" }` → `{ "user", "token" }`
+- `POST /api/v1/auth/logout` — Bearer required
+- `POST /api/v1/auth/forgot-password` — Body: `{ "email" }` (stub)
+- `POST /api/v1/auth/reset-password` — Body: `{ "token", "new_password" }` (stub)
 
 **Tryouts (public/student)**
-- `GET /v1/tryouts/open` — Daftar tryout yang buka
-- `GET /v1/tryouts/{tryoutId}` — Detail tryout
-- `POST /v1/tryouts/{tryoutId}/start` — Bearer required → `{ "attempt_id", "expires_at", "time_left_seconds" }`
+- `GET /api/v1/tryouts/open` — Daftar tryout yang buka
+- `GET /api/v1/tryouts/{tryoutId}` — Detail tryout
+- `POST /api/v1/tryouts/{tryoutId}/start` — Bearer required → `{ "attempt_id", "expires_at", "time_left_seconds" }`
 
 **Attempts (Bearer required)**
-- `GET /v1/attempts/{attemptId}/questions` — Soal untuk attempt (tanpa kunci jawaban)
-- `PUT /v1/attempts/{attemptId}/answers/{questionId}` — Submit jawaban
-- `POST /v1/attempts/{attemptId}/submit` — Akhiri attempt, hitung skor, feedback
+- `GET /api/v1/attempts/{attemptId}/questions` — Soal untuk attempt (tanpa kunci jawaban)
+- `PUT /api/v1/attempts/{attemptId}/answers/{questionId}` — Submit jawaban
+- `POST /api/v1/attempts/{attemptId}/submit` — Akhiri attempt, hitung skor, feedback
 
 **Student (Bearer required)**
-- `GET /v1/student/dashboard` — Ringkasan, open tryouts, recent attempts, strength/improvement
-- `GET /v1/student/attempts` — Riwayat attempt
-- `GET /v1/student/attempts/{attemptId}` — Detail attempt
-- `GET /v1/student/certificates` — Daftar sertifikat
+- `GET /api/v1/student/dashboard` — Ringkasan, open tryouts, recent attempts, strength/improvement
+- `GET /api/v1/student/attempts` — Riwayat attempt
+- `GET /api/v1/student/attempts/{attemptId}` — Detail attempt
+- `GET /api/v1/student/certificates` — Daftar sertifikat
 
 **Courses**
-- `GET /v1/courses` — Daftar kursus
-- `POST /v1/courses/{courseId}/enroll` — Bearer required — Daftar kelas
+- `GET /api/v1/courses` — Daftar kursus
+- `POST /api/v1/courses/{courseId}/enroll` — Bearer required — Daftar kelas
+
+**Levels (jenjang pendidikan: SD, SMP, SMA)**
+- `GET /api/v1/levels` — Daftar jenjang
+- `GET /api/v1/levels/{id}` — Detail jenjang beserta daftar bidang/mata pelajaran
 
 **Admin (Bearer + role admin)**
-- `GET /v1/admin/overview` — Statistik
-- `POST /v1/admin/tryouts` — Buat tryout
-- `PUT /v1/admin/tryouts/{tryoutId}` — Update tryout
-- `DELETE /v1/admin/tryouts/{tryoutId}` — Hapus tryout
-- `POST /v1/admin/tryouts/{tryoutId}/questions` — Tambah soal
-- `PUT /v1/admin/questions/{questionId}` — Update soal
-- `DELETE /v1/admin/questions/{questionId}` — Hapus soal
-- `POST /v1/admin/courses` — Buat kursus
-- `GET /v1/admin/courses/{courseId}/enrollments` — Daftar enrollment
-- `POST /v1/admin/certificates` — Terbitkan sertifikat
+
+- **Dashboard overview:** `GET /api/v1/admin/overview` — total_students, total_users, active_tryouts, total_courses, total_enrollments, avg_score, total_certificates
+- **Manajemen user:**  
+  - `GET /api/v1/admin/users` — Daftar user (query: `?role=student|admin`)  
+  - `GET /api/v1/admin/users/{userId}` — Detail user  
+  - `POST /api/v1/admin/users` — Tambah user (body: email, password, name, role, avatar_url)  
+  - `PUT /api/v1/admin/users/{userId}` — Edit user (body: name, email, role, avatar_url, password opsional)
+- **Manajemen kelas (courses):**  
+  - `GET /api/v1/admin/courses` — Daftar kelas  
+  - `GET /api/v1/admin/courses/{courseId}` — Detail kelas  
+  - `POST /api/v1/admin/courses` — Buat kelas (body: title, description)  
+  - `PUT /api/v1/admin/courses/{courseId}` — Edit kelas  
+  - `GET /api/v1/admin/courses/{courseId}/enrollments` — Daftar enrollment  
+  - `GET /api/v1/admin/courses/{courseId}/contents` — Daftar konten (modul/quiz/test)  
+  - `POST /api/v1/admin/courses/{courseId}/contents` — Tambah konten (body: title, description, sort_order, type: module|quiz|test, content)  
+  - `PUT /api/v1/admin/courses/{courseId}/contents/{contentId}` — Edit konten  
+  - `DELETE /api/v1/admin/courses/{courseId}/contents/{contentId}` — Hapus konten
+- **Payment (placeholder):**  
+  - `GET /api/v1/admin/payments` — Daftar pembayaran (query: `?limit=50`)  
+  - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount_cents, currency, type, reference_id, description, status)
+- **Report bulanan:**  
+  - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue_cents
+- **Tryout & soal:**  
+  - `POST /api/v1/admin/tryouts` — Buat tryout  
+  - `PUT /api/v1/admin/tryouts/{tryoutId}` — Update tryout  
+  - `DELETE /api/v1/admin/tryouts/{tryoutId}` — Hapus tryout  
+  - `POST /api/v1/admin/tryouts/{tryoutId}/questions` — Tambah soal  
+  - `PUT /api/v1/admin/questions/{questionId}` — Update soal  
+  - `DELETE /api/v1/admin/questions/{questionId}` — Hapus soal  
+- `POST /api/v1/admin/certificates` — Terbitkan sertifikat
 
 # fansedu-golang-api

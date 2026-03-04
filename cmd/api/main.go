@@ -75,13 +75,24 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 	courseRepo := repo.NewCourseRepo(pool)
 	enrollmentRepo := repo.NewEnrollmentRepo(pool)
 	certificateRepo := repo.NewCertificateRepo(pool)
+	courseContentRepo := repo.NewCourseContentRepo(pool)
+	paymentRepo := repo.NewPaymentRepo(pool)
+	roleRepo := repo.NewRoleRepo(pool)
+	schoolRepo := repo.NewSchoolRepo(pool)
+	settingRepo := repo.NewSettingRepo(pool)
+	eventRepo := repo.NewEventRepo(pool)
+	subjectRepo := repo.NewSubjectRepo(pool)
+	levelRepo := repo.NewLevelRepo(pool)
 
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	tryoutService := service.NewTryoutService(tryoutRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo)
 	dashboardService := service.NewDashboardService(attemptRepo, tryoutRepo, feedbackRepo)
 	adminService := service.NewAdminService(
-		tryoutRepo, questionRepo, courseRepo, enrollmentRepo, certificateRepo,
+		userRepo,
+		tryoutRepo, questionRepo, courseRepo, enrollmentRepo,
+		courseContentRepo, paymentRepo,
+		certificateRepo,
 		func(ctx context.Context) (int, error) { return userRepo.CountByRole(ctx, "student") },
 		attemptRepo.AvgScoreSubmitted,
 		certificateRepo.Count,
@@ -100,5 +111,11 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 		QuestionRepo:       questionRepo,
 		AttemptAnswerRepo:  attemptAnswerRepo,
 		CertificateRepo:    certificateRepo,
+		RoleRepo:           roleRepo,
+		SchoolRepo:         schoolRepo,
+		SettingRepo:        settingRepo,
+		EventRepo:          eventRepo,
+		SubjectRepo:        subjectRepo,
+		LevelRepo:          levelRepo,
 	}
 }
