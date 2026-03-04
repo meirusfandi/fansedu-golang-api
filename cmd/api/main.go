@@ -83,9 +83,10 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 	eventRepo := repo.NewEventRepo(pool)
 	subjectRepo := repo.NewSubjectRepo(pool)
 	levelRepo := repo.NewLevelRepo(pool)
+	tryoutRegistrationRepo := repo.NewTryoutRegistrationRepo(pool)
 
 	authService := service.NewAuthService(userRepo, jwtSecret)
-	tryoutService := service.NewTryoutService(tryoutRepo)
+	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo)
 	adminService := service.NewAdminService(
@@ -116,7 +117,8 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 		SchoolRepo:         schoolRepo,
 		SettingRepo:        settingRepo,
 		EventRepo:          eventRepo,
-		SubjectRepo:        subjectRepo,
-		LevelRepo:          levelRepo,
+		SubjectRepo:            subjectRepo,
+		LevelRepo:              levelRepo,
+		TryoutRegistrationRepo: tryoutRegistrationRepo,
 	}
 }

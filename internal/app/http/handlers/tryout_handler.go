@@ -111,6 +111,65 @@ func TryoutGetByID(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// TryoutRegister mendaftarkan siswa ke tryout (masuk ke leaderboard). Auth required.
+func TryoutRegister(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if tryoutID == "" {
+			http.Error(w, "tryout id required", http.StatusBadRequest)
+			return
+		}
+		t, err := deps.TryoutService.GetByID(r.Context(), tryoutID)
+		if err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+			if t.SubjectID != nil && *t.SubjectID != "" {
+				u, err := deps.UserRepo.FindByID(r.Context(), userID)
+				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+					http.Error(w, "tryout not found", http.StatusNotFound)
+					return
+				}
+			}
+		}
+		if err := deps.TryoutService.Register(r.Context(), userID, tryoutID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "registered"})
+	}
+}
+
+// TryoutLeaderboard mengembalikan leaderboard tryout: urutan nama (belum mengerjakan), lalu nilai tertinggi, waktu tercepat, nama.
+func TryoutLeaderboard(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		if tryoutID == "" {
+			http.Error(w, "tryout id required", http.StatusBadRequest)
+			return
+		}
+		if _, err := deps.TryoutService.GetByID(r.Context(), tryoutID); err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		list, err := deps.TryoutService.GetLeaderboard(r.Context(), tryoutID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(list)
+	}
+}
+
 func TryoutStart(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tryoutID := chi.URLParam(r, "tryoutId")
@@ -133,6 +192,8 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 				}
 			}
 		}
+		// Auto-register ke tryout agar masuk leaderboard bila belum terdaftar
+		_ = deps.TryoutRegistrationRepo.Register(r.Context(), userID, tryoutID)
 		attempt, err := deps.AttemptService.Start(r.Context(), userID, tryoutID)
 		if err != nil {
 			if err == service.ErrAlreadySubmitted {

@@ -32,6 +32,9 @@ curl -s http://localhost:8080/api/v1/tryouts/open
 # Tryout detail (ganti TRYYOUT_UUID)
 curl -s http://localhost:8080/api/v1/tryouts/TRYYOUT_UUID
 
+# Leaderboard tryout (ganti TRYYOUT_UUID dengan id tryout)
+curl -s http://localhost:8080/api/v1/tryouts/TRYYOUT_UUID/leaderboard
+
 # Daftar kursus
 curl -s http://localhost:8080/api/v1/courses/
 ```

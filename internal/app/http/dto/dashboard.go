@@ -14,3 +14,14 @@ type DashboardResponse struct {
 	ImprovementAreas []string         `json:"improvement_areas"`
 	Recommendation   string           `json:"recommendation"`
 }
+
+// GeneralDashboardResponse untuk GET /dashboard (umum, tanpa auth)
+type GeneralDashboardResponse struct {
+	SiteName        string `json:"site_name"`
+	OpenTryouts     int    `json:"open_tryouts"`
+	TotalCourses    int    `json:"total_courses"`
+	TotalLevels     int    `json:"total_levels"`
+	TotalSubjects   int    `json:"total_subjects"`
+	TotalSchools    int    `json:"total_schools"`
+	TotalStudents   int    `json:"total_students,omitempty"`
+}

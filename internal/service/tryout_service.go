@@ -14,4 +14,6 @@ type TryoutService interface {
 	Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error
 	Delete(ctx context.Context, id string) error
+	Register(ctx context.Context, userID, tryoutID string) error
+	GetLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error)
 }

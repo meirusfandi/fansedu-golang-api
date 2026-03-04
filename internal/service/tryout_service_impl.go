@@ -8,7 +8,8 @@ import (
 )
 
 type tryoutService struct {
-	tryoutRepo TryoutRepo
+	tryoutRepo   TryoutRepo
+	registration TryoutRegistrationRepo
 }
 
 type TryoutRepo interface {
@@ -21,8 +22,15 @@ type TryoutRepo interface {
 	Delete(ctx context.Context, id string) error
 }
 
-func NewTryoutService(tryoutRepo TryoutRepo) TryoutService {
-	return &tryoutService{tryoutRepo: tryoutRepo}
+type TryoutRegistrationRepo interface {
+	Register(ctx context.Context, userID, tryoutID string) error
+	ListLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error)
+	EnsureAllStudentsForTryout(ctx context.Context, tryoutID string) error
+	EnsureStudentForAllOpenTryouts(ctx context.Context, userID string) error
+}
+
+func NewTryoutService(tryoutRepo TryoutRepo, registration TryoutRegistrationRepo) TryoutService {
+	return &tryoutService{tryoutRepo: tryoutRepo, registration: registration}
 }
 
 func (s *tryoutService) ListOpen(ctx context.Context) ([]domain.TryoutSession, error) {
@@ -51,4 +59,12 @@ func (s *tryoutService) Update(ctx context.Context, t domain.TryoutSession) erro
 
 func (s *tryoutService) Delete(ctx context.Context, id string) error {
 	return s.tryoutRepo.Delete(ctx, id)
+}
+
+func (s *tryoutService) Register(ctx context.Context, userID, tryoutID string) error {
+	return s.registration.Register(ctx, userID, tryoutID)
+}
+
+func (s *tryoutService) GetLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error) {
+	return s.registration.ListLeaderboard(ctx, tryoutID)
 }

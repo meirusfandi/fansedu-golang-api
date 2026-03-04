@@ -29,6 +29,10 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Auto-daftarkan siswa ke semua tryout yang akan datang (bukan draft)
+		if u.Role == "student" {
+			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), u.ID)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
 			User:  userToMap(u),

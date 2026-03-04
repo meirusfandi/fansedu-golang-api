@@ -251,6 +251,8 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Auto-daftarkan semua siswa ke tryout yang baru dibuat
+		_ = deps.TryoutRegistrationRepo.EnsureAllStudentsForTryout(r.Context(), created.ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(tryoutToDTO(created))

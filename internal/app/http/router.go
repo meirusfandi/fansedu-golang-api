@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -10,9 +11,17 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 )
 
+func getEnv(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
 func NewRouter(deps *handlers.Deps) http.Handler {
 	r := chi.NewRouter()
 
+	r.Use(middleware.CORS(getEnv("CORS_ORIGINS", "*")))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recover())
 	r.Use(chimw.RealIP)
@@ -31,6 +40,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			})
 		})
 		r.Get("/health", handlers.Health())
+		r.Get("/dashboard", handlers.DashboardGeneral(deps))
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
@@ -43,6 +53,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/tryouts", func(r chi.Router) {
 			r.Get("/open", handlers.TryoutListOpen(deps))
 			r.Get("/{tryoutId}", handlers.TryoutGetByID(deps))
+			r.Get("/{tryoutId}/leaderboard", handlers.TryoutLeaderboard(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/{tryoutId}/register", handlers.TryoutRegister(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{tryoutId}/start", handlers.TryoutStart(deps))
 		})
 
