@@ -49,6 +49,8 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 				Name:      list[i].Name,
 				Role:      list[i].Role,
 				AvatarURL: list[i].AvatarURL,
+				SchoolID:  list[i].SchoolID,
+				SubjectID: list[i].SubjectID,
 				CreatedAt: list[i].CreatedAt.Format(time.RFC3339),
 			}
 		}
@@ -65,16 +67,37 @@ func AdminGetUser(deps *Deps) http.HandlerFunc {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.UserDetailResponse{
+		resp := dto.UserDetailResponse{
 			ID:        u.ID,
 			Email:     u.Email,
 			Name:      u.Name,
 			Role:      u.Role,
 			AvatarURL: u.AvatarURL,
+			SchoolID:  u.SchoolID,
+			SubjectID: u.SubjectID,
 			CreatedAt: u.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: u.UpdatedAt.Format(time.RFC3339),
-		})
+		}
+		if u.SchoolID != nil && *u.SchoolID != "" {
+			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
+				resp.School = &dto.SchoolResponse{
+					ID: school.ID, Name: school.Name, Slug: school.Slug,
+					Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
+					CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
+				}
+			}
+		}
+		if u.SubjectID != nil && *u.SubjectID != "" {
+			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *u.SubjectID); err == nil {
+				resp.Subject = &dto.SubjectResponse{
+					ID: subj.ID, Name: subj.Name, Slug: subj.Slug,
+					Description: subj.Description, IconURL: subj.IconURL, SortOrder: subj.SortOrder,
+					CreatedAt: subj.CreatedAt.Format(time.RFC3339), UpdatedAt: subj.UpdatedAt.Format(time.RFC3339),
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -96,23 +119,44 @@ func AdminCreateUser(deps *Deps) http.HandlerFunc {
 		if role != domain.UserRoleStudent && role != domain.UserRoleAdmin {
 			role = domain.UserRoleStudent
 		}
-		u := domain.User{Email: req.Email, Name: req.Name, Role: role, AvatarURL: req.AvatarURL}
+		u := domain.User{Email: req.Email, Name: req.Name, Role: role, AvatarURL: req.AvatarURL, SchoolID: req.SchoolID, SubjectID: req.SubjectID}
 		created, err := deps.AdminService.CreateUser(r.Context(), u, req.Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(dto.UserDetailResponse{
+		resp := dto.UserDetailResponse{
 			ID:        created.ID,
 			Email:     created.Email,
 			Name:      created.Name,
 			Role:      created.Role,
 			AvatarURL: created.AvatarURL,
+			SchoolID:  created.SchoolID,
+			SubjectID: created.SubjectID,
 			CreatedAt: created.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: created.UpdatedAt.Format(time.RFC3339),
-		})
+		}
+		if created.SchoolID != nil && *created.SchoolID != "" {
+			if school, err := deps.SchoolRepo.GetByID(r.Context(), *created.SchoolID); err == nil {
+				resp.School = &dto.SchoolResponse{
+					ID: school.ID, Name: school.Name, Slug: school.Slug,
+					Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
+					CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
+				}
+			}
+		}
+		if created.SubjectID != nil && *created.SubjectID != "" {
+			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *created.SubjectID); err == nil {
+				resp.Subject = &dto.SubjectResponse{
+					ID: subj.ID, Name: subj.Name, Slug: subj.Slug,
+					Description: subj.Description, IconURL: subj.IconURL, SortOrder: subj.SortOrder,
+					CreatedAt: subj.CreatedAt.Format(time.RFC3339), UpdatedAt: subj.UpdatedAt.Format(time.RFC3339),
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -140,6 +184,20 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 		}
 		if req.AvatarURL != nil {
 			u.AvatarURL = req.AvatarURL
+		}
+		if req.SchoolID != nil {
+			if *req.SchoolID == "" {
+				u.SchoolID = nil
+			} else {
+				u.SchoolID = req.SchoolID
+			}
+		}
+		if req.SubjectID != nil {
+			if *req.SubjectID == "" {
+				u.SubjectID = nil
+			} else {
+				u.SubjectID = req.SubjectID
+			}
 		}
 		if err := deps.AdminService.UpdateUser(r.Context(), u, req.Password); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

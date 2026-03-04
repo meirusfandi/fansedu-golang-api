@@ -97,6 +97,16 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/schools/{id}", handlers.AdminGetSchool(deps))
 			r.Put("/schools/{id}", handlers.AdminUpdateSchool(deps))
 			r.Delete("/schools/{id}", handlers.AdminDeleteSchool(deps))
+			// Alias for frontend master-data UI: /api/v1/admin/master-data/sekolah
+			r.Route("/master-data", func(r chi.Router) {
+				r.Route("/sekolah", func(r chi.Router) {
+					r.Get("/", handlers.AdminListSchools(deps))
+					r.Post("/", handlers.AdminCreateSchool(deps))
+					r.Get("/{id}", handlers.AdminGetSchool(deps))
+					r.Put("/{id}", handlers.AdminUpdateSchool(deps))
+					r.Delete("/{id}", handlers.AdminDeleteSchool(deps))
+				})
+			})
 			r.Get("/settings", handlers.AdminListSettings(deps))
 			r.Post("/settings", handlers.AdminCreateSetting(deps))
 			r.Get("/settings/{id}", handlers.AdminGetSetting(deps))

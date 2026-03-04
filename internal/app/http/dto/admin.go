@@ -16,33 +16,43 @@ type UserListResponse struct {
 	Name      string  `json:"name"`
 	Role      string  `json:"role"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
+	SchoolID  *string `json:"school_id,omitempty"`
+	SubjectID *string `json:"subject_id,omitempty"`
 	CreatedAt string  `json:"created_at"`
 }
 
 type UserDetailResponse struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	Name      string  `json:"name"`
-	Role      string  `json:"role"`
-	AvatarURL *string `json:"avatar_url,omitempty"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID        string           `json:"id"`
+	Email     string           `json:"email"`
+	Name      string           `json:"name"`
+	Role      string           `json:"role"`
+	AvatarURL *string          `json:"avatar_url,omitempty"`
+	SchoolID  *string          `json:"school_id,omitempty"`
+	SubjectID *string          `json:"subject_id,omitempty"`
+	School    *SchoolResponse  `json:"school,omitempty"`
+	Subject   *SubjectResponse `json:"subject,omitempty"`
+	CreatedAt string           `json:"created_at"`
+	UpdatedAt string           `json:"updated_at"`
 }
 
 type UserCreateRequest struct {
-	Email    string  `json:"email"`
-	Password string  `json:"password"`
-	Name     string  `json:"name"`
-	Role     string  `json:"role"`
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	Name      string  `json:"name"`
+	Role      string  `json:"role"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
+	SchoolID  *string `json:"school_id,omitempty"`
+	SubjectID *string `json:"subject_id,omitempty"`
 }
 
 type UserUpdateRequest struct {
-	Email    *string `json:"email,omitempty"`
-	Name     *string `json:"name,omitempty"`
-	Role     *string `json:"role,omitempty"`
+	Email     *string `json:"email,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Role      *string `json:"role,omitempty"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
-	Password *string `json:"password,omitempty"`
+	SchoolID  *string `json:"school_id,omitempty"`
+	SubjectID *string `json:"subject_id,omitempty"`
+	Password  *string `json:"password,omitempty"`
 }
 
 type QuestionCreateRequest struct {
