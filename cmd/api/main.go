@@ -87,7 +87,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	tryoutService := service.NewTryoutService(tryoutRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo)
-	dashboardService := service.NewDashboardService(attemptRepo, tryoutRepo, feedbackRepo)
+	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo)
 	adminService := service.NewAdminService(
 		userRepo,
 		tryoutRepo, questionRepo, courseRepo, enrollmentRepo,
@@ -108,6 +108,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 		DashboardService:   dashboardService,
 		AdminService:       adminService,
 		CourseService:      courseService,
+		UserRepo:           userRepo,
 		QuestionRepo:       questionRepo,
 		AttemptAnswerRepo:  attemptAnswerRepo,
 		CertificateRepo:    certificateRepo,

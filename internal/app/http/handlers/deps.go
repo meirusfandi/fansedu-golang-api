@@ -18,6 +18,7 @@ type Deps struct {
 	AdminService     service.AdminService
 	CourseService    service.CourseService
 
+	UserRepo          repo.UserRepo
 	QuestionRepo      repo.QuestionRepo
 	AttemptAnswerRepo repo.AttemptAnswerRepo
 	CertificateRepo   repo.CertificateRepo

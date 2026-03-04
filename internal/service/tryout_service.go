@@ -8,6 +8,8 @@ import (
 
 type TryoutService interface {
 	ListOpen(ctx context.Context) ([]domain.TryoutSession, error)
+	ListOpenForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error)
+	ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error)
 	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
 	Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error

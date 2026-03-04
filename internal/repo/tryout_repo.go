@@ -14,6 +14,8 @@ type TryoutRepo interface {
 	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
 	List(ctx context.Context) ([]domain.TryoutSession, error)
 	ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
+	ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
+	ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error
 	Delete(ctx context.Context, id string) error
 }
@@ -25,10 +27,10 @@ func NewTryoutRepo(pool *pgxpool.Pool) TryoutRepo { return &tryoutRepo{pool: poo
 func (r *tryoutRepo) Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error) {
 	var id string
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO tryout_sessions (title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6::tryout_level, $7, $8, $9, $10::tryout_status, $11::uuid)
+		INSERT INTO tryout_sessions (title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6::tryout_level, $7::uuid, $8, $9, $10, $11::tryout_status, $12::uuid)
 		RETURNING id
-	`, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, t.CreatedBy).Scan(&id)
+	`, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, t.CreatedBy).Scan(&id)
 	if err != nil {
 		return domain.TryoutSession{}, err
 	}
@@ -38,17 +40,19 @@ func (r *tryoutRepo) Create(ctx context.Context, t domain.TryoutSession) (domain
 
 func (r *tryoutRepo) GetByID(ctx context.Context, id string) (domain.TryoutSession, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
 		FROM tryout_sessions WHERE id = $1::uuid
 	`, id)
 	var t domain.TryoutSession
-	err := row.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	var subjectID *string
+	err := row.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	t.SubjectID = subjectID
 	return t, err
 }
 
 func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
 		FROM tryout_sessions ORDER BY opens_at DESC, created_at DESC
 	`)
 	if err != nil {
@@ -58,9 +62,11 @@ func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 	var list []domain.TryoutSession
 	for rows.Next() {
 		var t domain.TryoutSession
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var subjectID *string
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
+		t.SubjectID = subjectID
 		list = append(list, t)
 	}
 	return list, rows.Err()
@@ -68,7 +74,7 @@ func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 
 func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
 		FROM tryout_sessions WHERE status = 'open' AND opens_at <= $1 AND closes_at >= $1
 		ORDER BY opens_at
 	`, now)
@@ -79,9 +85,73 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 	var list []domain.TryoutSession
 	for rows.Next() {
 		var t domain.TryoutSession
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var subjectID *string
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
+		t.SubjectID = subjectID
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error) {
+	query := `
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		FROM tryout_sessions
+		WHERE status = 'open' AND opens_at <= $1 AND closes_at >= $1
+		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
+		ORDER BY opens_at
+	`
+	var subj interface{}
+	if subjectID != nil && *subjectID != "" {
+		subj = *subjectID
+	}
+	rows, err := r.pool.Query(ctx, query, now, subj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.TryoutSession
+	for rows.Next() {
+		var t domain.TryoutSession
+		var sid *string
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		t.SubjectID = sid
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
+// ListForStudent returns all tryouts for the student's subject (subject_id IS NULL or = subjectID), excluding draft.
+// Status open/closed included; frontend can separate by status or opens_at/closes_at.
+func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
+	query := `
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		FROM tryout_sessions
+		WHERE status != 'draft'
+		AND (subject_id IS NULL OR ($1::text IS NOT NULL AND subject_id = $1::uuid))
+		ORDER BY opens_at DESC, created_at DESC
+	`
+	var subj interface{}
+	if subjectID != nil && *subjectID != "" {
+		subj = *subjectID
+	}
+	rows, err := r.pool.Query(ctx, query, subj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.TryoutSession
+	for rows.Next() {
+		var t domain.TryoutSession
+		var sid *string
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		t.SubjectID = sid
 		list = append(list, t)
 	}
 	return list, rows.Err()
@@ -89,9 +159,9 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 
 func (r *tryoutRepo) Update(ctx context.Context, t domain.TryoutSession) error {
 	_, err := r.pool.Exec(ctx, `
-		UPDATE tryout_sessions SET title=$2, short_title=$3, description=$4, duration_minutes=$5, questions_count=$6, level=$7::tryout_level, opens_at=$8, closes_at=$9, max_participants=$10, status=$11::tryout_status
+		UPDATE tryout_sessions SET title=$2, short_title=$3, description=$4, duration_minutes=$5, questions_count=$6, level=$7::tryout_level, subject_id=$8::uuid, opens_at=$9, closes_at=$10, max_participants=$11, status=$12::tryout_status
 		WHERE id = $1::uuid
-	`, t.ID, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status)
+	`, t.ID, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status)
 	return err
 }
 

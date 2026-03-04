@@ -9,11 +9,14 @@ import (
 )
 
 type dashboardService struct {
-	attemptRepo  interface {
+	userRepo interface {
+		FindByID(ctx context.Context, id string) (domain.User, error)
+	}
+	attemptRepo interface {
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 	}
 	tryoutRepo interface {
-		ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
+		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
 	}
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
@@ -21,25 +24,33 @@ type dashboardService struct {
 }
 
 func NewDashboardService(
+	userRepo interface {
+		FindByID(ctx context.Context, id string) (domain.User, error)
+	},
 	attemptRepo interface {
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 	},
 	tryoutRepo interface {
-		ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
+		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
 	},
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
 	},
 ) DashboardService {
 	return &dashboardService{
-		attemptRepo:  attemptRepo,
-		tryoutRepo:   tryoutRepo,
+		userRepo:    userRepo,
+		attemptRepo: attemptRepo,
+		tryoutRepo:  tryoutRepo,
 		feedbackRepo: feedbackRepo,
 	}
 }
 
 func (s *dashboardService) GetStudentDashboard(ctx context.Context, userID string) (*DashboardResponse, error) {
-	openTryouts, _ := s.tryoutRepo.ListOpen(ctx, time.Now())
+	var subjectID *string
+	if u, err := s.userRepo.FindByID(ctx, userID); err == nil {
+		subjectID = u.SubjectID
+	}
+	openTryouts, _ := s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID)
 	attempts, _ := s.attemptRepo.ListByUserID(ctx, userID)
 	if attempts == nil {
 		attempts = []domain.Attempt{}

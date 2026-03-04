@@ -13,6 +13,8 @@ type tryoutService struct {
 
 type TryoutRepo interface {
 	ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
+	ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
+	ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error)
 	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
 	Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error
@@ -25,6 +27,14 @@ func NewTryoutService(tryoutRepo TryoutRepo) TryoutService {
 
 func (s *tryoutService) ListOpen(ctx context.Context) ([]domain.TryoutSession, error) {
 	return s.tryoutRepo.ListOpen(ctx, time.Now())
+}
+
+func (s *tryoutService) ListOpenForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID)
+}
+
+func (s *tryoutService) ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.ListForStudent(ctx, subjectID)
 }
 
 func (s *tryoutService) GetByID(ctx context.Context, id string) (domain.TryoutSession, error) {
