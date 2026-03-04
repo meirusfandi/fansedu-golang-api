@@ -1,0 +1,31 @@
+-- Seed: daftar sekolah (data dari berbagai sumber, idempotent)
+
+INSERT INTO schools (name, slug, description, address) VALUES
+  ('SMAN 1 Solok', 'sman-1-solok', 'SMA Negeri 1 Solok, sekolah menengah atas negeri di Kota Solok, Sumatera Barat. Berdiri dengan fasilitas lengkap: ruang kelas, perpustakaan, masjid, lapangan olahraga.', 'Jl. KH. Dewantoro No. 30, Tanah Garam, Kota Solok, Sumatera Barat'),
+  ('SMK Negeri 2 Klaten', 'smk-negeri-2-klaten', 'SMK Negeri 2 Klaten, sekolah menengah kejuruan negeri di Klaten, Jawa Tengah. Berdiri sejak 1965, akreditasi A, program keahlian: SIJA, TMPO, TTL, TEDK, DPIB, dan lainnya.', 'Jl. Senden, Ngawen, Klaten, Jawa Tengah'),
+  ('SMAN 1 Samboja', 'sman-1-samboja', 'SMA Negeri 1 Samboja, sekolah menengah atas negeri di Kecamatan Samboja, Kabupaten Kutai Kartanegara, Kalimantan Timur.', 'Samboja, Kabupaten Kutai Kartanegara, Kalimantan Timur'),
+  ('SMAN 39 Jakarta', 'sman-39-jakarta', 'SMA Negeri 39 Jakarta, sekolah menengah atas negeri di Jakarta Timur. Menyediakan program akademik dan ekstrakurikuler olahraga serta seni.', 'Jl. RA Fadillah Cijantung, Pasar Rebo, Jakarta Timur, DKI Jakarta 13780'),
+  ('MAN Sidoarjo', 'man-sidoarjo', 'Madrasah Aliyah Negeri Sidoarjo, sekolah menengah atas Islam negeri di bawah Kementerian Agama. Terakreditasi A, visi: lulusan berilmu, berkarakter, unggul prestasi.', 'Jl. Stadion No. 02, Siwalan Panji, Kec. Buduran, Kab. Sidoarjo, Jawa Timur'),
+  ('SMAN 1 Gadingrejo', 'sman-1-gadingrejo', 'SMA Negeri 1 Gadingrejo, sekolah menengah atas negeri di Kecamatan Gadingrejo, Kabupaten Pringsewu, Lampung.', 'Gadingrejo, Kabupaten Pringsewu, Lampung'),
+  ('SMAN 4 Denpasar', 'sman-4-denpasar', 'SMA Negeri 4 Denpasar, sekolah menengah atas negeri di Denpasar, Bali. Didirikan 1982, akreditasi A, peminatan MIA dan IIS, berbagai ekstrakurikuler akademik dan seni.', 'Jl. Gunung Rinjani, Denpasar, Bali'),
+  ('SMAN 1 Sragen', 'sman-1-sragen', 'SMA Negeri 1 Sragen (SMANSA), sekolah menengah atas negeri di Sragen, Jawa Tengah. Didirikan 1961, terakreditasi A.', 'Jl. Perintis Kemerdekaan No. 16, Sragen Wetan, Kec. Sragen, Kab. Sragen, Jawa Tengah 57214'),
+  ('SMAN 8 Medan', 'sman-8-medan', 'SMA Negeri 8 Medan, sekolah menengah atas negeri di Kota Medan, Sumatera Utara.', 'Kota Medan, Sumatera Utara'),
+  ('SMAS Sinar Dharma', 'smas-sinar-dharma', 'SMA Swasta Sinar Dharma, sekolah menengah atas swasta.', NULL),
+  ('SMA 2 Lumajang', 'sma-2-lumajang', 'SMA Negeri 2 Lumajang, sekolah menengah atas negeri di Kabupaten Lumajang, Jawa Timur.', 'Kabupaten Lumajang, Jawa Timur'),
+  ('SMAN 1 Indralaya', 'sman-1-indralaya', 'SMA Negeri 1 Indralaya, sekolah menengah atas negeri di Kecamatan Indralaya, Kabupaten Ogan Ilir, Sumatera Selatan.', 'Indralaya, Kabupaten Ogan Ilir, Sumatera Selatan'),
+  ('SMAN Sumatera Selatan', 'sman-sumatera-selatan', 'SMA Negeri Sumatera Selatan, sekolah menengah atas negeri di Provinsi Sumatera Selatan.', 'Sumatera Selatan'),
+  ('SMAN 1 Jonggol', 'sman-1-jonggol', 'SMA Negeri 1 Jonggol, sekolah menengah atas negeri di Kecamatan Jonggol, Kabupaten Bogor, Jawa Barat.', 'Jonggol, Kabupaten Bogor, Jawa Barat'),
+  ('SMP Karya Yosep Senakin', 'smp-karya-yosep-senakin', 'SMP Karya Yosep Senakin, sekolah menengah pertama.', NULL),
+  ('SMAN 1 Bukittinggi', 'sman-1-bukittinggi', 'SMA Negeri 1 Bukittinggi, sekolah menengah atas negeri di Kota Bukittinggi, Sumatera Barat.', 'Kota Bukittinggi, Sumatera Barat'),
+  ('SMAN Ngoro Jombang', 'sman-ngoro-jombang', 'SMA Negeri Ngoro Jombang, sekolah menengah atas negeri di Kecamatan Ngoro, Kabupaten Jombang, Jawa Timur.', 'Ngoro, Kabupaten Jombang, Jawa Timur'),
+  ('SMA Kuntum Cemerlang', 'sma-kuntum-cemerlang', 'SMA Swasta Kuntum Cemerlang, sekolah menengah atas swasta.', NULL),
+  ('SMAN MT Madani Palu', 'sman-mt-madani-palu', 'SMA Negeri MT Madani Palu, sekolah menengah atas di Kota Palu, Sulawesi Tengah.', 'Kota Palu, Sulawesi Tengah'),
+  ('SMAN 1 Karangan', 'sman-1-karangan', 'SMA Negeri 1 Karangan, sekolah menengah atas negeri di Kecamatan Karangan, Kabupaten Trenggalek, Jawa Timur.', 'Karangan, Kabupaten Trenggalek, Jawa Timur'),
+  ('SMAIT Al-Fityan Medan', 'smait-al-fityan-medan', 'SMA Islam Terpadu Al-Fityan Medan, sekolah menengah atas Islam terpadu di Medan, Sumatera Utara.', 'Kota Medan, Sumatera Utara'),
+  ('SMA Negeri 3 Surakarta', 'sma-negeri-3-surakarta', 'SMA Negeri 3 Surakarta, sekolah menengah atas negeri di Kota Surakarta, Jawa Tengah.', 'Kota Surakarta, Jawa Tengah'),
+  ('SMK Telkom Sidoarjo', 'smk-telkom-sidoarjo', 'SMK Telkom Sidoarjo, sekolah menengah kejuruan di bawah Yayasan Pendidikan Telkom, fokus teknologi informasi dan telekomunikasi.', 'Kabupaten Sidoarjo, Jawa Timur'),
+  ('SMAN 2 Jombang', 'sman-2-jombang', 'SMA Negeri 2 Jombang, sekolah menengah atas negeri di Kabupaten Jombang, Jawa Timur.', 'Kabupaten Jombang, Jawa Timur'),
+  ('SMKS Koperasi Yogyakarta', 'smks-koperasi-yogyakarta', 'SMK Swasta Koperasi Yogyakarta, sekolah menengah kejuruan swasta di Yogyakarta.', 'Yogyakarta'),
+  ('SMAS Bukit Barisan', 'smas-bukit-barisan', 'SMA Swasta Bukit Barisan, sekolah menengah atas swasta.', NULL),
+  ('SMAN 1 Balikpapan', 'sman-1-balikpapan', 'SMA Negeri 1 Balikpapan, sekolah menengah atas negeri di Kota Balikpapan, Kalimantan Timur.', 'Kota Balikpapan, Kalimantan Timur')
+ON CONFLICT (slug) DO NOTHING;

@@ -27,6 +27,8 @@ type adminService struct {
 	}
 	questionRepo interface {
 		Create(ctx context.Context, q domain.Question) (domain.Question, error)
+		GetByID(ctx context.Context, id string) (domain.Question, error)
+		ListByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Question, error)
 		Update(ctx context.Context, q domain.Question) error
 		Delete(ctx context.Context, id string) error
 	}
@@ -81,6 +83,8 @@ func NewAdminService(
 	},
 	questionRepo interface {
 		Create(ctx context.Context, q domain.Question) (domain.Question, error)
+		GetByID(ctx context.Context, id string) (domain.Question, error)
+		ListByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Question, error)
 		Update(ctx context.Context, q domain.Question) error
 		Delete(ctx context.Context, id string) error
 	},
@@ -207,6 +211,14 @@ func (s *adminService) UpdateTryout(ctx context.Context, t domain.TryoutSession)
 
 func (s *adminService) DeleteTryout(ctx context.Context, id string) error {
 	return s.tryoutRepo.Delete(ctx, id)
+}
+
+func (s *adminService) ListQuestions(ctx context.Context, tryoutID string) ([]domain.Question, error) {
+	return s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+}
+
+func (s *adminService) GetQuestion(ctx context.Context, questionID string) (domain.Question, error) {
+	return s.questionRepo.GetByID(ctx, questionID)
 }
 
 func (s *adminService) CreateQuestion(ctx context.Context, q domain.Question) (domain.Question, error) {

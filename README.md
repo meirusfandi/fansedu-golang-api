@@ -102,13 +102,16 @@ go run ./cmd/migrate
   - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount_cents, currency, type, reference_id, description, status)
 - **Report bulanan:**  
   - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue_cents
-- **Tryout & soal:**  
-  - `POST /api/v1/admin/tryouts` — Buat tryout  
+- **Tryout & soal (event/quiz):**  
+  - `GET /api/v1/admin/tryouts` — Daftar semua tryout/quiz  
+  - `POST /api/v1/admin/tryouts` — Buat tryout (body: title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status)  
   - `PUT /api/v1/admin/tryouts/{tryoutId}` — Update tryout  
   - `DELETE /api/v1/admin/tryouts/{tryoutId}` — Hapus tryout  
-  - `POST /api/v1/admin/tryouts/{tryoutId}/questions` — Tambah soal  
-  - `PUT /api/v1/admin/questions/{questionId}` — Update soal  
-  - `DELETE /api/v1/admin/questions/{questionId}` — Hapus soal  
+  - `GET /api/v1/admin/tryouts/{tryoutId}/questions` — Daftar soal tryout/quiz  
+  - `GET /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Detail satu soal  
+  - `POST /api/v1/admin/tryouts/{tryoutId}/questions` — Tambah soal (body: sort_order, type, body, options, max_score; type: short | multiple_choice | true_false)  
+  - `PUT /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Update soal  
+  - `DELETE /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Hapus soal  
 - `POST /api/v1/admin/certificates` — Terbitkan sertifikat
 
 # fansedu-golang-api

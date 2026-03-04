@@ -504,6 +504,35 @@
       }
     },
     {
+      "name": "Admin List Tryouts",
+      "method": "GET",
+      "path": "/admin/tryouts",
+      "summary": "List all tryout sessions",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "title": "Simulasi OSN 2025",
+              "short_title": "OSN 2025-1",
+              "duration_minutes": 90,
+              "questions_count": 25,
+              "level": "medium",
+              "opens_at": "2025-01-01T00:00:00Z",
+              "closes_at": "2025-01-02T00:00:00Z",
+              "status": "open"
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "Admin Create Tryout",
       "method": "POST",
       "path": "/admin/tryouts",
@@ -597,10 +626,69 @@
       }
     },
     {
+      "name": "Admin List Questions",
+      "method": "GET",
+      "path": "/admin/tryouts/{tryoutId}/questions",
+      "summary": "List all questions for a tryout/quiz",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": [
+            {
+              "id": "uuid",
+              "tryout_session_id": "uuid",
+              "sort_order": 1,
+              "type": "multiple_choice",
+              "body": "Berapa kompleksitas waktu binary search?",
+              "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+              "max_score": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Admin Get Question",
+      "method": "GET",
+      "path": "/admin/tryouts/{tryoutId}/questions/{questionId}",
+      "summary": "Get one question by id",
+      "auth": "admin",
+      "requestExample": {
+        "headers": {
+          "Authorization": "Bearer <admin-jwt>"
+        },
+        "pathParams": {
+          "tryoutId": "uuid",
+          "questionId": "uuid"
+        }
+      },
+      "responseExample": {
+        "200": {
+          "body": {
+            "id": "uuid",
+            "tryout_session_id": "uuid",
+            "sort_order": 1,
+            "type": "multiple_choice",
+            "body": "Berapa kompleksitas waktu binary search?",
+            "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+            "max_score": 1
+          }
+        }
+      }
+    },
+    {
       "name": "Admin Create Question",
       "method": "POST",
       "path": "/admin/tryouts/{tryoutId}/questions",
-      "summary": "Create question for tryout",
+      "summary": "Create question for tryout/quiz",
       "auth": "admin",
       "requestExample": {
         "headers": {
@@ -644,7 +732,7 @@
     {
       "name": "Admin Update Question",
       "method": "PUT",
-      "path": "/admin/questions/{questionId}",
+      "path": "/admin/tryouts/{tryoutId}/questions/{questionId}",
       "summary": "Update question",
       "auth": "admin",
       "requestExample": {
@@ -652,23 +740,35 @@
           "Authorization": "Bearer <admin-jwt>"
         },
         "pathParams": {
+          "tryoutId": "uuid",
           "questionId": "uuid"
         },
         "body": {
-          "body": "Updated question",
+          "sort_order": 2,
+          "type": "short",
+          "body": "Updated question text",
+          "options": null,
           "max_score": 2
         }
       },
       "responseExample": {
         "200": {
-          "body": {}
+          "body": {
+            "id": "uuid",
+            "tryout_session_id": "uuid",
+            "sort_order": 2,
+            "type": "short",
+            "body": "Updated question text",
+            "options": null,
+            "max_score": 2
+          }
         }
       }
     },
     {
       "name": "Admin Delete Question",
       "method": "DELETE",
-      "path": "/admin/questions/{questionId}",
+      "path": "/admin/tryouts/{tryoutId}/questions/{questionId}",
       "summary": "Delete question",
       "auth": "admin",
       "requestExample": {
@@ -676,6 +776,7 @@
           "Authorization": "Bearer <admin-jwt>"
         },
         "pathParams": {
+          "tryoutId": "uuid",
           "questionId": "uuid"
         }
       },

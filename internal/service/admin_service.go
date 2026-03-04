@@ -29,6 +29,8 @@ type AdminService interface {
 	CreateTryout(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	UpdateTryout(ctx context.Context, t domain.TryoutSession) error
 	DeleteTryout(ctx context.Context, id string) error
+	ListQuestions(ctx context.Context, tryoutID string) ([]domain.Question, error)
+	GetQuestion(ctx context.Context, questionID string) (domain.Question, error)
 	CreateQuestion(ctx context.Context, q domain.Question) (domain.Question, error)
 	UpdateQuestion(ctx context.Context, q domain.Question) error
 	DeleteQuestion(ctx context.Context, id string) error

@@ -238,6 +238,41 @@ func AdminDeleteTryout(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func AdminListQuestions(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		list, err := deps.AdminService.ListQuestions(r.Context(), tryoutID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.QuestionResponse, len(list))
+		for i := range list {
+			out[i] = questionToDTO(list[i])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+func AdminGetQuestion(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		questionID := chi.URLParam(r, "questionId")
+		q, err := deps.AdminService.GetQuestion(r.Context(), questionID)
+		if err != nil {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
+		if q.TryoutSessionID != tryoutID {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(questionToDTO(q))
+	}
+}
+
 func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tryoutID := chi.URLParam(r, "tryoutId")
@@ -271,15 +306,19 @@ func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 
 func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
 		questionID := chi.URLParam(r, "questionId")
 		var req dto.QuestionUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		// Load existing then apply patch
 		q, err := deps.QuestionRepo.GetByID(r.Context(), questionID)
 		if err != nil {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
+		if q.TryoutSessionID != tryoutID {
 			http.Error(w, "question not found", http.StatusNotFound)
 			return
 		}
@@ -303,13 +342,25 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(questionToDTO(q))
 	}
 }
 
 func AdminDeleteQuestion(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
 		questionID := chi.URLParam(r, "questionId")
+		q, err := deps.AdminService.GetQuestion(r.Context(), questionID)
+		if err != nil {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
+		if q.TryoutSessionID != tryoutID {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
 		if err := deps.AdminService.DeleteQuestion(r.Context(), questionID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
