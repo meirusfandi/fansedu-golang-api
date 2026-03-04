@@ -149,6 +149,22 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func AdminListTryouts(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := deps.AdminService.ListTryouts(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.TryoutResponse, len(list))
+		for i := range list {
+			out[i] = tryoutToDTO(list[i])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
 func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.TryoutCreateRequest

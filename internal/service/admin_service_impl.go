@@ -20,6 +20,7 @@ type adminService struct {
 	tryoutRepo interface {
 		Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 		GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
+		List(ctx context.Context) ([]domain.TryoutSession, error)
 		ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
 		Update(ctx context.Context, t domain.TryoutSession) error
 		Delete(ctx context.Context, id string) error
@@ -73,6 +74,7 @@ func NewAdminService(
 	tryoutRepo interface {
 		Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 		GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
+		List(ctx context.Context) ([]domain.TryoutSession, error)
 		ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
 		Update(ctx context.Context, t domain.TryoutSession) error
 		Delete(ctx context.Context, id string) error
@@ -189,6 +191,10 @@ func (s *adminService) GetCourseByID(ctx context.Context, id string) (domain.Cou
 
 func (s *adminService) UpdateCourse(ctx context.Context, c domain.Course) error {
 	return s.courseRepo.Update(ctx, c)
+}
+
+func (s *adminService) ListTryouts(ctx context.Context) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.List(ctx)
 }
 
 func (s *adminService) CreateTryout(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error) {

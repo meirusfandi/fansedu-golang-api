@@ -12,6 +12,7 @@ import (
 type TryoutRepo interface {
 	Create(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
+	List(ctx context.Context) ([]domain.TryoutSession, error)
 	ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error
 	Delete(ctx context.Context, id string) error
@@ -43,6 +44,26 @@ func (r *tryoutRepo) GetByID(ctx context.Context, id string) (domain.TryoutSessi
 	var t domain.TryoutSession
 	err := row.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
 	return t, err
+}
+
+func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
+		FROM tryout_sessions ORDER BY opens_at DESC, created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.TryoutSession
+	for rows.Next() {
+		var t domain.TryoutSession
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
 }
 
 func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error) {

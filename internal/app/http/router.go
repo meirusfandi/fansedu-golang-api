@@ -120,6 +120,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 				r.Put("/{id}", handlers.AdminUpdateLevel(deps))
 				r.Delete("/{id}", handlers.AdminDeleteLevel(deps))
 			})
+			r.Get("/tryouts", handlers.AdminListTryouts(deps))
 			r.Post("/tryouts", handlers.AdminCreateTryout(deps))
 			r.Put("/tryouts/{tryoutId}", handlers.AdminUpdateTryout(deps))
 			r.Delete("/tryouts/{tryoutId}", handlers.AdminDeleteTryout(deps))

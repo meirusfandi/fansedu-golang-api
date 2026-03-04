@@ -25,6 +25,7 @@ type AdminService interface {
 	ListCourses(ctx context.Context) ([]domain.Course, error)
 	GetCourseByID(ctx context.Context, id string) (domain.Course, error)
 	UpdateCourse(ctx context.Context, c domain.Course) error
+	ListTryouts(ctx context.Context) ([]domain.TryoutSession, error)
 	CreateTryout(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	UpdateTryout(ctx context.Context, t domain.TryoutSession) error
 	DeleteTryout(ctx context.Context, id string) error
