@@ -140,12 +140,9 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		score, maxScore, percentile := 0.0, 0.0, 0.0
+		score, percentile := 0.0, 0.0
 		if a.Score != nil {
 			score = *a.Score
-		}
-		if a.MaxScore != nil {
-			maxScore = *a.MaxScore
 		}
 		if a.Percentile != nil {
 			percentile = *a.Percentile
