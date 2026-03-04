@@ -111,6 +111,39 @@ func TryoutGetByID(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// StudentTryoutGetByID detail tryout untuk siswa. Auth wajib; hanya tryout yang sesuai subject siswa.
+// Dipanggil dari halaman student/tryouts/:id (frontend route student/tryouts/id).
+func StudentTryoutGetByID(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if tryoutID == "" {
+			http.Error(w, "tryout id required", http.StatusBadRequest)
+			return
+		}
+		t, err := deps.TryoutService.GetByID(r.Context(), tryoutID)
+		if err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+			if t.SubjectID != nil && *t.SubjectID != "" {
+				u, err := deps.UserRepo.FindByID(r.Context(), userID)
+				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+					http.Error(w, "tryout not found", http.StatusNotFound)
+					return
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tryoutToDTO(t))
+	}
+}
+
 // TryoutRegister mendaftarkan siswa ke tryout (masuk ke leaderboard). Auth required.
 func TryoutRegister(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

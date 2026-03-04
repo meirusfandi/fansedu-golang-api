@@ -6,13 +6,27 @@ type DashboardSummary struct {
 	AvgPercentile  float64 `json:"avg_percentile"`
 }
 
+// DashboardUser data user untuk dashboard siswa
+type DashboardUser struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Email       string  `json:"email"`
+	Role        string  `json:"role"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
+	SchoolID    *string `json:"school_id,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	SchoolName  *string `json:"school_name,omitempty"`
+	SubjectName *string `json:"subject_name,omitempty"`
+}
+
 type DashboardResponse struct {
-	Summary          DashboardSummary `json:"summary"`
-	OpenTryouts      []interface{}    `json:"open_tryouts"`
-	RecentAttempts   []interface{}    `json:"recent_attempts"`
-	StrengthAreas    []string         `json:"strength_areas"`
-	ImprovementAreas []string         `json:"improvement_areas"`
-	Recommendation   string           `json:"recommendation"`
+	User              DashboardUser   `json:"user"`
+	Summary           DashboardSummary `json:"summary"`
+	OpenTryouts       []interface{}   `json:"open_tryouts"`
+	RecentAttempts    []interface{}  `json:"recent_attempts"`
+	StrengthAreas     []string        `json:"strength_areas"`
+	ImprovementAreas  []string        `json:"improvement_areas"`
+	Recommendation    string          `json:"recommendation"`
 }
 
 // GeneralDashboardResponse untuk GET /dashboard (umum, tanpa auth)

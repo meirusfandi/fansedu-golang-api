@@ -65,12 +65,14 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		})
 
 		r.Route("/student", func(r chi.Router) {
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/dashboard", handlers.DashboardStudent(deps))
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/tryouts", handlers.StudentTryoutList(deps))
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/tryouts/open", handlers.StudentTryoutListOpen(deps))
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/attempts", handlers.AttemptListByUser(deps))
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/attempts/{attemptId}", handlers.AttemptGetByID(deps))
-			r.With(middleware.Auth(deps.JWTSecret)).Get("/certificates", handlers.CertificateList(deps))
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Get("/dashboard", handlers.DashboardStudent(deps))
+			r.Get("/tryouts", handlers.StudentTryoutList(deps))
+			r.Get("/tryouts/open", handlers.StudentTryoutListOpen(deps))
+			r.Get("/tryouts/{tryoutId}", handlers.StudentTryoutGetByID(deps))
+			r.Get("/attempts", handlers.AttemptListByUser(deps))
+			r.Get("/attempts/{attemptId}", handlers.AttemptGetByID(deps))
+			r.Get("/certificates", handlers.CertificateList(deps))
 		})
 
 		r.Route("/courses", func(r chi.Router) {

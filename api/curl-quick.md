@@ -32,7 +32,7 @@ curl -s http://localhost:8080/api/v1/tryouts/open
 # Tryout detail (ganti TRYYOUT_UUID)
 curl -s http://localhost:8080/api/v1/tryouts/TRYYOUT_UUID
 
-# Leaderboard tryout (ganti TRYYOUT_UUID dengan id tryout)
+# Leaderboard tryout (umum & dari halaman detail tryout — response sama)
 curl -s http://localhost:8080/api/v1/tryouts/TRYYOUT_UUID/leaderboard
 
 # Daftar kursus
@@ -64,6 +64,9 @@ curl -s -X POST http://localhost:8080/api/v1/attempts/ATTEMPT_UUID/submit -H "Au
 
 # Dashboard siswa
 curl -s http://localhost:8080/api/v1/student/dashboard -H "Authorization: Bearer $TOKEN"
+
+# Detail tryout siswa (untuk halaman student/tryouts/:id, ganti TRYOUT_UUID)
+curl -s http://localhost:8080/api/v1/student/tryouts/TRYOUT_UUID -H "Authorization: Bearer $TOKEN"
 
 # Riwayat attempt
 curl -s http://localhost:8080/api/v1/student/attempts -H "Authorization: Bearer $TOKEN"

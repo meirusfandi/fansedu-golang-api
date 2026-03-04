@@ -42,6 +42,30 @@ func DashboardStudent(deps *Deps) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		userDTO := dto.DashboardUser{
+			ID:        u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Role:      u.Role,
+			AvatarURL: u.AvatarURL,
+			SchoolID:  u.SchoolID,
+			SubjectID: u.SubjectID,
+		}
+		if u.SchoolID != nil && *u.SchoolID != "" {
+			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
+				userDTO.SchoolName = &school.Name
+			}
+		}
+		if u.SubjectID != nil && *u.SubjectID != "" {
+			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *u.SubjectID); err == nil {
+				userDTO.SubjectName = &subj.Name
+			}
+		}
 		resp, err := deps.DashboardService.GetStudentDashboard(r.Context(), userID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -56,6 +80,7 @@ func DashboardStudent(deps *Deps) http.HandlerFunc {
 			recentAttempts = append(recentAttempts, attemptToDTO(a))
 		}
 		out := dto.DashboardResponse{
+			User: userDTO,
 			Summary: dto.DashboardSummary{
 				TotalAttempts:  resp.Summary.TotalAttempts,
 				AvgScore:       resp.Summary.AvgScore,
