@@ -9,13 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	httpapi "github.com/meirusfandi/fansedu-golang-api/internal/app/http"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/handlers"
+	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/config"
 	"github.com/meirusfandi/fansedu-golang-api/internal/db"
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -41,7 +43,7 @@ func main() {
 	if pool == nil {
 		router = httpapi.NewRouter(nil)
 	} else {
-		deps := buildDeps(pool, []byte(cfg.JWTSecret))
+		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey)
 		router = httpapi.NewRouter(deps)
 	}
 
@@ -65,7 +67,7 @@ func main() {
 	log.Printf("shutdown complete")
 }
 
-func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
+func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handlers.Deps {
 	userRepo := repo.NewUserRepo(pool)
 	tryoutRepo := repo.NewTryoutRepo(pool)
 	questionRepo := repo.NewQuestionRepo(pool)
@@ -85,9 +87,16 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte) *handlers.Deps {
 	levelRepo := repo.NewLevelRepo(pool)
 	tryoutRegistrationRepo := repo.NewTryoutRegistrationRepo(pool)
 
+	var feedbackGen ai.FeedbackGenerator
+	if openAIAPIKey != "" {
+		feedbackGen = ai.NewOpenAIFeedbackGenerator(openAIAPIKey)
+	} else {
+		feedbackGen = ai.NewFallbackFeedbackGenerator()
+	}
+
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
-	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo)
+	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo, feedbackGen)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo, questionRepo, attemptAnswerRepo)
 	adminService := service.NewAdminService(
 		userRepo,

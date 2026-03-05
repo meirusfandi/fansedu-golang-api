@@ -17,10 +17,11 @@ const (
 const defaultDevJWTSecret = "dev-secret-change-me"
 
 type Config struct {
-	Env         string // "development" | "production"
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
+	Env           string // "development" | "production"
+	Port          string
+	DatabaseURL   string
+	JWTSecret     string
+	OpenAIAPIKey  string // opsional: untuk generate feedback dengan AI saat submit tryout
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -44,10 +45,11 @@ func Load() Config {
 	}
 
 	cfg := Config{
-		Env:         env,
-		Port:        getenv("PORT", "8080"),
-		DatabaseURL: getenv("DATABASE_URL", ""),
-		JWTSecret:   getenv("JWT_SECRET", defaultDevJWTSecret),
+		Env:          env,
+		Port:         getenv("PORT", "8080"),
+		DatabaseURL:  getenv("DATABASE_URL", ""),
+		JWTSecret:    getenv("JWT_SECRET", defaultDevJWTSecret),
+		OpenAIAPIKey: getenv("OPENAI_API_KEY", ""),
 	}
 
 	if cfg.Env == EnvProduction {

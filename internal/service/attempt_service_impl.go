@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
 var (
-	ErrAttemptNotFound = errors.New("attempt not found")
-	ErrNotYourAttempt  = errors.New("attempt does not belong to you")
-	ErrAlreadySubmitted = errors.New("attempt already submitted")
+	ErrAttemptNotFound   = errors.New("attempt not found")
+	ErrNotYourAttempt    = errors.New("attempt does not belong to you")
+	ErrAlreadySubmitted  = errors.New("attempt already submitted")
 )
 
 type attemptService struct {
-	attemptRepo  AttemptRepo
-	answerRepo   AttemptAnswerRepo
-	feedbackRepo FeedbackRepo
-	questionRepo QuestionRepo
-	tryoutRepo   TryoutRepo
+	attemptRepo       AttemptRepo
+	answerRepo        AttemptAnswerRepo
+	feedbackRepo      FeedbackRepo
+	questionRepo      QuestionRepo
+	tryoutRepo        TryoutRepo
+	feedbackGenerator ai.FeedbackGenerator
 }
 
 type AttemptRepo interface {
@@ -47,13 +49,17 @@ type QuestionRepo interface {
 	GetByID(ctx context.Context, id string) (domain.Question, error)
 }
 
-func NewAttemptService(attemptRepo AttemptRepo, answerRepo AttemptAnswerRepo, feedbackRepo FeedbackRepo, questionRepo QuestionRepo, tryoutRepo TryoutRepo) AttemptService {
+func NewAttemptService(attemptRepo AttemptRepo, answerRepo AttemptAnswerRepo, feedbackRepo FeedbackRepo, questionRepo QuestionRepo, tryoutRepo TryoutRepo, feedbackGenerator ai.FeedbackGenerator) AttemptService {
+	if feedbackGenerator == nil {
+		feedbackGenerator = ai.NewFallbackFeedbackGenerator()
+	}
 	return &attemptService{
-		attemptRepo:  attemptRepo,
-		answerRepo:   answerRepo,
-		feedbackRepo: feedbackRepo,
-		questionRepo: questionRepo,
-		tryoutRepo:   tryoutRepo,
+		attemptRepo:       attemptRepo,
+		answerRepo:        answerRepo,
+		feedbackRepo:      feedbackRepo,
+		questionRepo:      questionRepo,
+		tryoutRepo:        tryoutRepo,
+		feedbackGenerator: feedbackGenerator,
 	}
 }
 
@@ -121,16 +127,31 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	if err := s.attemptRepo.Update(ctx, a); err != nil {
 		return domain.Attempt{}, nil, err
 	}
-	strength, _ := json.Marshal([]string{})
-	improvement, _ := json.Marshal([]string{})
-	rec := "Lanjutkan berlatih."
+	// Generate feedback berdasarkan jawaban (AI atau fallback), lalu simpan ke attempt_feedback
+	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
+		Questions: questions,
+		Answers:   answers,
+		Score:     score,
+		MaxScore:  maxScore,
+	})
+	if err != nil {
+		gen = &ai.GeneratedFeedback{
+			Summary:          "Tryout selesai.",
+			Recap:            "Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + ".",
+			StrengthAreas:    []string{},
+			ImprovementAreas: []string{"Lanjutkan berlatih."},
+			Recommendation:   "Lanjutkan berlatih dan perbaiki area yang masih lemah.",
+		}
+	}
+	strength, _ := json.Marshal(gen.StrengthAreas)
+	improvement, _ := json.Marshal(gen.ImprovementAreas)
 	fb := domain.AttemptFeedback{
 		AttemptID:          attemptID,
-		Summary:            strPtr("Tryout selesai."),
-		Recap:              strPtr("Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + "."),
+		Summary:            &gen.Summary,
+		Recap:              &gen.Recap,
 		StrengthAreas:      strength,
 		ImprovementAreas:   improvement,
-		RecommendationText: &rec,
+		RecommendationText: &gen.Recommendation,
 	}
 	fb, err = s.feedbackRepo.Create(ctx, fb)
 	if err != nil {
