@@ -48,14 +48,21 @@ Semua CRUD soal di bawah **`/tryouts/{tryoutId}/questions`**.
 - `multiple_choice` — pilihan ganda (options: array string)
 - `true_false` — benar/salah (options: ["Benar", "Salah"] atau serupa)
 
-**Body POST soal (contoh):**
+**Body soal:**
+- **`body`** — Isi soal. Boleh **plain text** atau **HTML** (rich text). Bisa berisi tag HTML dan `<img src="...">` untuk menyisipkan gambar di dalam teks.
+- **`image_url`** — (opsional) Satu URL gambar utama untuk soal.
+- **`image_urls`** — (opsional) Array URL gambar tambahan, contoh: `["https://...", "https://..."]`. Berguna untuk form yang mengizinkan banyak gambar.
+
+**Body POST soal (contoh — teks + HTML + gambar):**
 ```json
 {
   "sort_order": 1,
   "type": "multiple_choice",
-  "body": "Berapa kompleksitas waktu binary search?",
-  "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
-  "max_score": 1
+  "body": "<p>Perhatikan gambar berikut.</p><p>Nilai <strong>x</strong> adalah ...</p>",
+  "image_url": "https://cdn.example.com/soal1.png",
+  "image_urls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
+  "options": ["10", "12", "15", "20"],
+  "max_score": 5
 }
 ```
 
@@ -64,7 +71,9 @@ Semua CRUD soal di bawah **`/tryouts/{tryoutId}/questions`**.
 {
   "sort_order": 2,
   "type": "short",
-  "body": "Updated question text",
+  "body": "<p>Updated question with <em>HTML</em>.</p>",
+  "image_url": "https://...",
+  "image_urls": ["https://..."],
   "options": null,
   "max_score": 2
 }
@@ -77,9 +86,11 @@ Semua CRUD soal di bawah **`/tryouts/{tryoutId}/questions`**.
   "tryout_session_id": "uuid",
   "sort_order": 1,
   "type": "multiple_choice",
-  "body": "Berapa kompleksitas waktu binary search?",
-  "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
-  "max_score": 1
+  "body": "<p>Perhatikan gambar berikut.</p><p>Nilai <strong>x</strong> adalah ...</p>",
+  "image_url": "https://cdn.example.com/soal1.png",
+  "image_urls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
+  "options": ["10", "12", "15", "20"],
+  "max_score": 5
 }
 ```
 

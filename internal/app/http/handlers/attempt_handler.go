@@ -184,12 +184,18 @@ func questionToDTO(q domain.Question) dto.QuestionResponse {
 	if len(q.Options) > 0 {
 		_ = json.Unmarshal(q.Options, &opts)
 	}
+	var imageURLs []string
+	if len(q.ImageURLs) > 0 {
+		_ = json.Unmarshal(q.ImageURLs, &imageURLs)
+	}
 	return dto.QuestionResponse{
 		ID:               q.ID,
 		TryoutSessionID:  q.TryoutSessionID,
 		SortOrder:        q.SortOrder,
 		Type:             q.Type,
 		Body:             q.Body,
+		ImageURL:         q.ImageURL,
+		ImageURLs:        imageURLs,
 		Options:          opts,
 		MaxScore:         q.MaxScore,
 	}

@@ -56,20 +56,24 @@ type UserUpdateRequest struct {
 }
 
 type QuestionCreateRequest struct {
-	TryoutSessionID string      `json:"tryout_session_id"`
-	SortOrder       int         `json:"sort_order"`
-	Type            string      `json:"type"`
-	Body            string      `json:"body"`
+	TryoutSessionID string   `json:"tryout_session_id"`
+	SortOrder       int      `json:"sort_order"`
+	Type            string   `json:"type"`
+	Body            string   `json:"body"`             // Teks atau HTML isi soal (boleh berisi HTML + <img>)
+	ImageURL        *string  `json:"image_url,omitempty"`
+	ImageURLs       []string `json:"image_urls,omitempty"` // Array URL gambar tambahan
 	Options         interface{} `json:"options,omitempty"`
-	MaxScore        float64     `json:"max_score"`
+	MaxScore        float64  `json:"max_score"`
 }
 
 type QuestionUpdateRequest struct {
-	SortOrder *int     `json:"sort_order,omitempty"`
-	Type      *string  `json:"type,omitempty"`
-	Body      *string  `json:"body,omitempty"`
-	Options   *interface{} `json:"options,omitempty"`
-	MaxScore  *float64 `json:"max_score,omitempty"`
+	SortOrder  *int      `json:"sort_order,omitempty"`
+	Type       *string   `json:"type,omitempty"`
+	Body       *string   `json:"body,omitempty"`        // Teks atau HTML isi soal
+	ImageURL   *string   `json:"image_url,omitempty"`
+	ImageURLs  *[]string `json:"image_urls,omitempty"` // Array URL gambar (kirim null/omit untuk tidak ubah)
+	Options    *interface{} `json:"options,omitempty"`
+	MaxScore   *float64  `json:"max_score,omitempty"`
 }
 
 type CourseCreateRequest struct {

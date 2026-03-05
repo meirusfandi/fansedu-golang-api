@@ -37,11 +37,13 @@ type FeedbackResponse struct {
 }
 
 type QuestionResponse struct {
-	ID              string          `json:"id"`
-	TryoutSessionID string          `json:"tryout_session_id"`
-	SortOrder       int             `json:"sort_order"`
-	Type            string          `json:"type"`
-	Body            string          `json:"body"`
-	Options         interface{}     `json:"options,omitempty"`
-	MaxScore        float64         `json:"max_score"`
+	ID              string   `json:"id"`
+	TryoutSessionID string   `json:"tryout_session_id"`
+	SortOrder       int      `json:"sort_order"`
+	Type            string   `json:"type"`
+	Body            string   `json:"body"`               // Teks atau HTML isi soal
+	ImageURL        *string  `json:"image_url,omitempty"`
+	ImageURLs       []string `json:"image_urls,omitempty"` // Array URL gambar
+	Options         interface{} `json:"options,omitempty"`
+	MaxScore        float64  `json:"max_score"`
 }

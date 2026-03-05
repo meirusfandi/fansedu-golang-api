@@ -16,7 +16,9 @@ type Question struct {
 	TryoutSessionID  string
 	SortOrder        int
 	Type             string
-	Body             string
+	Body             string          // Teks atau HTML isi soal (boleh berisi HTML dan <img>)
+	ImageURL         *string         // URL gambar utama (opsional, backward compatible)
+	ImageURLs        json.RawMessage // JSONB array URL gambar: ["url1", "url2"]
 	Options          json.RawMessage // JSONB: ["A","B","C","D"] or [{"key":"A","label":"..."}]
 	MaxScore         float64
 	CreatedAt        time.Time

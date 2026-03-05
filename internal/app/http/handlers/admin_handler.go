@@ -344,11 +344,17 @@ func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 			return
 		}
 		opts, _ := json.Marshal(req.Options)
+		imageURLs := []byte("[]")
+		if len(req.ImageURLs) > 0 {
+			imageURLs, _ = json.Marshal(req.ImageURLs)
+		}
 		q := domain.Question{
 			TryoutSessionID: tryoutID,
 			SortOrder:        req.SortOrder,
 			Type:             req.Type,
 			Body:             req.Body,
+			ImageURL:         req.ImageURL,
+			ImageURLs:        imageURLs,
 			Options:          opts,
 			MaxScore:         req.MaxScore,
 		}
@@ -392,6 +398,13 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 		}
 		if req.Body != nil {
 			q.Body = *req.Body
+		}
+		if req.ImageURL != nil {
+			q.ImageURL = req.ImageURL
+		}
+		if req.ImageURLs != nil {
+			imageURLs, _ := json.Marshal(*req.ImageURLs)
+			q.ImageURLs = imageURLs
 		}
 		if req.Options != nil {
 			opts, _ := json.Marshal(req.Options)
