@@ -21,6 +21,12 @@ type dashboardService struct {
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
 	}
+	questionRepo interface {
+		ListByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Question, error)
+	}
+	answerRepo interface {
+		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+	}
 }
 
 func NewDashboardService(
@@ -36,12 +42,20 @@ func NewDashboardService(
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
 	},
+	questionRepo interface {
+		ListByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Question, error)
+	},
+	answerRepo interface {
+		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+	},
 ) DashboardService {
 	return &dashboardService{
-		userRepo:    userRepo,
-		attemptRepo: attemptRepo,
-		tryoutRepo:  tryoutRepo,
+		userRepo:     userRepo,
+		attemptRepo:  attemptRepo,
+		tryoutRepo:   tryoutRepo,
 		feedbackRepo: feedbackRepo,
+		questionRepo: questionRepo,
+		answerRepo:   answerRepo,
 	}
 }
 
@@ -86,16 +100,46 @@ func (s *dashboardService) GetStudentDashboard(ctx context.Context, userID strin
 	if n > 0 {
 		rec = "Lanjutkan berlatih dan perbaiki area yang masih lemah."
 	}
-	return &DashboardResponse{
+	resp := &DashboardResponse{
 		Summary: DashboardSummary{
-			TotalAttempts:  n,
-			AvgScore:       avgScore,
-			AvgPercentile:  avgPct,
+			TotalAttempts: n,
+			AvgScore:      avgScore,
+			AvgPercentile: avgPct,
 		},
 		OpenTryouts:      openTryouts,
 		RecentAttempts:   attempts,
 		StrengthAreas:    strengthAreas,
 		ImprovementAreas: improvementAreas,
 		Recommendation:   rec,
-	}, nil
+	}
+	// Detail penilaian + rekomendasi dari attempt terakhir yang sudah submit
+	var lastSubmitted *domain.Attempt
+	for i := range attempts {
+		if attempts[i].Status == domain.AttemptStatusSubmitted {
+			lastSubmitted = &attempts[i]
+			break
+		}
+	}
+	if lastSubmitted != nil {
+		questions, _ := s.questionRepo.ListByTryoutSessionID(ctx, lastSubmitted.TryoutSessionID)
+		answers, _ := s.answerRepo.ListByAttemptID(ctx, lastSubmitted.ID)
+		if len(questions) > 0 {
+			eval := EvaluateAttemptAnswers(questions, answers)
+			eval.AttemptID = lastSubmitted.ID
+			// Gabung dengan feedback yang sudah ada jika ada
+			if len(eval.StrengthAreas) > 0 {
+				strengthAreas = eval.StrengthAreas
+			}
+			if len(eval.ImprovementAreas) > 0 {
+				improvementAreas = eval.ImprovementAreas
+			}
+			if eval.Recommendation != "" {
+				resp.Recommendation = eval.Recommendation
+			}
+			resp.StrengthAreas = strengthAreas
+			resp.ImprovementAreas = improvementAreas
+			resp.LearningEvaluation = &eval
+		}
+	}
+	return resp, nil
 }

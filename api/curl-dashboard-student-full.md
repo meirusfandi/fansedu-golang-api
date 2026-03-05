@@ -1,63 +1,38 @@
-# Curl — Dashboard (Request & Response)
+# Curl — Dashboard Siswa (lengkap dengan detail penilaian & rekomendasi)
 
 Base URL: `http://localhost:8080/api/v1`
 
 ---
 
-## 1. Dashboard Umum (tanpa auth)
-
-**Method:** `GET`  
-**Request body:** Tidak ada (GET tidak punya body)
-
-### Request
+## Request
 
 ```bash
-curl -s -X GET "http://localhost:8080/api/v1/dashboard" \
-  -H "Content-Type: application/json"
-```
+# 1. Login dulu untuk dapat token (ganti email/password sesuai user siswa)
+curl -s -X POST "http://localhost:8080/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"ahmad@example.com","password":"password123"}'
 
-### Response (200 OK)
-
-```json
-{
-  "site_name": "FansEdu LMS",
-  "open_tryouts": 2,
-  "total_courses": 5,
-  "total_levels": 3,
-  "total_subjects": 9,
-  "total_schools": 27,
-  "total_students": 150
-}
-```
-
----
-
-## 2. Dashboard Siswa (perlu login)
-
-**Method:** `GET`  
-**Request body:** Tidak ada (GET tidak punya body)  
-**Header:** `Authorization: Bearer <token>` (wajib)
-
-### Request
-
-```bash
-# Simpan token dulu (dari response login)
-export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# 2. Simpan token dari response, lalu panggil dashboard
+export TOKEN="<paste_token_dari_response_login>"
 
 curl -s -X GET "http://localhost:8080/api/v1/student/dashboard" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Atau token langsung:
+Satu baris (ganti `$TOKEN`):
 
 ```bash
 curl -s -X GET "http://localhost:8080/api/v1/student/dashboard" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-### Response (200 OK)
+---
+
+## Response (200 OK) — contoh lengkap
+
+Termasuk **detail penilaian attempt** (`answer_breakdown`), **rekomendasi belajar**, dan **bagian yang perlu ditingkatkan** (`improvement_areas` / `strength_areas`).
 
 ```json
 {
@@ -107,8 +82,12 @@ curl -s -X GET "http://localhost:8080/api/v1/student/dashboard" \
       "time_seconds_spent": 5100
     }
   ],
-  "strength_areas": ["Pilihan Ganda"],
-  "improvement_areas": ["Isian Singkat"],
+  "strength_areas": [
+    "Pilihan Ganda"
+  ],
+  "improvement_areas": [
+    "Isian Singkat"
+  ],
   "recommendation": "Skor keseluruhan: 75.5% dari total. Fokus perbaiki: Isian Singkat. Rekomendasi: perbanyak latihan soal tipe tersebut dan ulangi materi terkait.",
   "learning_evaluation": {
     "attempt_id": "990e8400-e29b-41d4-a716-446655440004",
@@ -126,34 +105,44 @@ curl -s -X GET "http://localhost:8080/api/v1/student/dashboard" \
         "max_score": 5,
         "score_got": 2.5,
         "status": "partial"
+      },
+      {
+        "question_id": "q-uuid-3",
+        "question_type": "true_false",
+        "max_score": 5,
+        "score_got": 0,
+        "status": "wrong"
       }
     ],
-    "strength_areas": ["Pilihan Ganda"],
-    "improvement_areas": ["Isian Singkat"],
+    "strength_areas": [
+      "Pilihan Ganda"
+    ],
+    "improvement_areas": [
+      "Isian Singkat"
+    ],
     "recommendation": "Skor keseluruhan: 75.5% dari total. Fokus perbaiki: Isian Singkat. Rekomendasi: perbanyak latihan soal tipe tersebut dan ulangi materi terkait."
   }
 }
 ```
 
-### Response jika tidak ada token (401 Unauthorized)
-
-```json
-unauthorized
-```
-
-### Response jika token invalid/expired (401)
-
-```
-Unauthorized
-```
-
 ---
 
-## Ringkasan
+## Penjelasan field yang diminta
 
-| Endpoint                    | Method | Auth   | Body |
-|----------------------------|--------|--------|------|
-| `/api/v1/dashboard`        | GET    | Tidak  | -    |
-| `/api/v1/student/dashboard`| GET    | Bearer | -    |
+| Field | Keterangan |
+|-------|-------------|
+| **user** | Data user siswa (nama, email, sekolah, bidang/subject). |
+| **summary** | Ringkasan: total attempt, rata-rata skor, rata-rata percentile. |
+| **open_tryouts** | Daftar tryout yang sedang buka. |
+| **recent_attempts** | Riwayat attempt terbaru (id, skor, status, waktu). |
+| **strength_areas** | Area kuat (dari analisis jawaban, mis. "Pilihan Ganda"). |
+| **improvement_areas** | Bagian yang perlu ditingkatkan (mis. "Isian Singkat"). |
+| **recommendation** | Rekomendasi belajar (teks) untuk siswa. |
+| **learning_evaluation** | Detail penilaian per attempt terakhir yang sudah submit. |
+| **learning_evaluation.attempt_id** | ID attempt yang dianalisis. |
+| **learning_evaluation.answer_breakdown** | Detail per soal: `question_id`, `question_type`, `max_score`, `score_got`, `status` (`correct` / `partial` / `wrong` / `unanswered`). |
+| **learning_evaluation.strength_areas** | Area kuat dari attempt tersebut. |
+| **learning_evaluation.improvement_areas** | Bagian yang perlu dikembangkan dari attempt tersebut. |
+| **learning_evaluation.recommendation** | Rekomendasi belajar berdasarkan attempt tersebut. |
 
-Kedua endpoint **tidak memakai request body** karena method-nya GET. Data dikirim hanya lewat URL dan header (termasuk `Authorization` untuk dashboard siswa).
+**Catatan:** `learning_evaluation` hanya ada jika siswa punya minimal satu attempt dengan status `submitted`. Jika belum pernah submit tryout, field ini tidak muncul (atau `null`).

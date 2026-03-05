@@ -198,7 +198,10 @@ func TryoutLeaderboard(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
+		if list == nil {
+			list = []domain.LeaderboardEntry{}
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(list)
 	}
 }

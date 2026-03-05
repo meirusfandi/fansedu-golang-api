@@ -79,18 +79,39 @@ func DashboardStudent(deps *Deps) http.HandlerFunc {
 		for _, a := range resp.RecentAttempts {
 			recentAttempts = append(recentAttempts, attemptToDTO(a))
 		}
+		var learningEval *dto.LearningEvaluationDTO
+		if resp.LearningEvaluation != nil {
+			breakdown := make([]dto.QuestionScoreDetail, 0, len(resp.LearningEvaluation.AnswerBreakdown))
+			for _, b := range resp.LearningEvaluation.AnswerBreakdown {
+				breakdown = append(breakdown, dto.QuestionScoreDetail{
+					QuestionID:   b.QuestionID,
+					QuestionType: b.QuestionType,
+					MaxScore:     b.MaxScore,
+					ScoreGot:     b.ScoreGot,
+					Status:       b.Status,
+				})
+			}
+			learningEval = &dto.LearningEvaluationDTO{
+				AttemptID:       resp.LearningEvaluation.AttemptID,
+				AnswerBreakdown: breakdown,
+				StrengthAreas:   resp.LearningEvaluation.StrengthAreas,
+				ImprovementAreas: resp.LearningEvaluation.ImprovementAreas,
+				Recommendation:  resp.LearningEvaluation.Recommendation,
+			}
+		}
 		out := dto.DashboardResponse{
-			User: userDTO,
+			User:               userDTO,
 			Summary: dto.DashboardSummary{
 				TotalAttempts:  resp.Summary.TotalAttempts,
 				AvgScore:       resp.Summary.AvgScore,
 				AvgPercentile:  resp.Summary.AvgPercentile,
 			},
-			OpenTryouts:      openTryouts,
-			RecentAttempts:   recentAttempts,
-			StrengthAreas:    resp.StrengthAreas,
-			ImprovementAreas: resp.ImprovementAreas,
-			Recommendation:   resp.Recommendation,
+			OpenTryouts:        openTryouts,
+			RecentAttempts:     recentAttempts,
+			StrengthAreas:      resp.StrengthAreas,
+			ImprovementAreas:   resp.ImprovementAreas,
+			Recommendation:     resp.Recommendation,
+			LearningEvaluation: learningEval,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)

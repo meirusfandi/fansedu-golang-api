@@ -48,6 +48,7 @@ func (r *tryoutRegistrationRepo) IsRegistered(ctx context.Context, userID, tryou
 }
 
 // ListLeaderboard: nama siswa, sekolah, nilai. Urutan: nilai tertinggi DESC, waktu tercepat ASC, nama ASC; belum mengerjakan = nama ASC di akhir.
+// Nilai diambil dari database (attempts.score); semua attempt submitted termasuk (COALESCE score untuk urutan).
 func (r *tryoutRegistrationRepo) ListLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error) {
 	query := `
 		WITH best_attempt AS (
@@ -56,8 +57,8 @@ func (r *tryoutRegistrationRepo) ListLeaderboard(ctx context.Context, tryoutID s
 				a.score AS best_score,
 				a.time_seconds_spent AS best_time_seconds
 			FROM attempts a
-			WHERE a.tryout_session_id = $1::uuid AND a.status = 'submitted' AND a.score IS NOT NULL
-			ORDER BY a.user_id, a.score DESC, a.time_seconds_spent ASC NULLS LAST
+			WHERE a.tryout_session_id = $1::uuid AND a.status = 'submitted'
+			ORDER BY a.user_id, COALESCE(a.score, 0) DESC, a.time_seconds_spent ASC NULLS LAST
 		)
 		SELECT
 			u.id AS user_id,
@@ -70,14 +71,14 @@ func (r *tryoutRegistrationRepo) ListLeaderboard(ctx context.Context, tryoutID s
 		LEFT JOIN schools s ON s.id = u.school_id
 		LEFT JOIN best_attempt b ON b.user_id = r.user_id
 		WHERE r.tryout_session_id = $1::uuid
-		ORDER BY b.best_score DESC NULLS LAST, b.best_time_seconds ASC NULLS LAST, u.name ASC
+		ORDER BY COALESCE(b.best_score, 0) DESC, b.best_time_seconds ASC NULLS LAST, u.name ASC
 	`
 	rows, err := r.pool.Query(ctx, query, tryoutID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []domain.LeaderboardEntry
+	list := make([]domain.LeaderboardEntry, 0)
 	var rank int
 	for rows.Next() {
 		var e domain.LeaderboardEntry

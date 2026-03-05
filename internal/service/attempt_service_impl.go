@@ -114,6 +114,10 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	a.Score = &score
 	a.MaxScore = &maxScore
 	a.Percentile = &percentile
+	// Waktu pengerjaan (detik) untuk leaderboard
+	if sec := int(now.Sub(a.StartedAt).Seconds()); sec >= 0 {
+		a.TimeSecondsSpent = &sec
+	}
 	if err := s.attemptRepo.Update(ctx, a); err != nil {
 		return domain.Attempt{}, nil, err
 	}

@@ -13,12 +13,13 @@ type DashboardSummary struct {
 }
 
 type DashboardResponse struct {
-	Summary          DashboardSummary       `json:"summary"`
-	OpenTryouts      []domain.TryoutSession `json:"open_tryouts"`
-	RecentAttempts   []domain.Attempt       `json:"recent_attempts"`
-	StrengthAreas    []string               `json:"strength_areas"`
-	ImprovementAreas []string               `json:"improvement_areas"`
-	Recommendation   string                 `json:"recommendation"`
+	Summary            DashboardSummary       `json:"summary"`
+	OpenTryouts        []domain.TryoutSession `json:"open_tryouts"`
+	RecentAttempts     []domain.Attempt       `json:"recent_attempts"`
+	StrengthAreas      []string               `json:"strength_areas"`
+	ImprovementAreas   []string               `json:"improvement_areas"`
+	Recommendation     string                 `json:"recommendation"`
+	LearningEvaluation *AttemptEvaluation     `json:"learning_evaluation,omitempty"`
 }
 
 type DashboardService interface {
