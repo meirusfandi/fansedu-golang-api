@@ -102,6 +102,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 	subjectRepo := repo.NewSubjectRepo(pool)
 	levelRepo := repo.NewLevelRepo(pool)
 	tryoutRegistrationRepo := repo.NewTryoutRegistrationRepo(pool)
+	trainerRepo := repo.NewTrainerRepo(pool)
 
 	var feedbackGen ai.FeedbackGenerator
 	if openAIAPIKey != "" {
@@ -126,6 +127,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		certificateRepo.Count,
 	)
 	courseService := service.NewCourseService(courseRepo, enrollmentRepo)
+	trainerService := service.NewTrainerService(userRepo, trainerRepo)
 
 	return &handlers.Deps{
 		DB:                 pool,
@@ -136,6 +138,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		DashboardService:   dashboardService,
 		AdminService:       adminService,
 		CourseService:      courseService,
+		TrainerService:     trainerService,
 		UserRepo:           userRepo,
 		QuestionRepo:       questionRepo,
 		AttemptAnswerRepo:  attemptAnswerRepo,

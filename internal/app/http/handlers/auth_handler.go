@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -20,7 +21,12 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			http.Error(w, "name, email, password required", http.StatusBadRequest)
 			return
 		}
-		u, token, err := deps.AuthService.Register(r.Context(), req.Name, req.Email, req.Password)
+		role := strings.TrimSpace(strings.ToLower(req.Role))
+		if role != "" && !isValidRegisterRole(role) {
+			http.Error(w, "role must be student (siswa) or guru", http.StatusBadRequest)
+			return
+		}
+		u, token, err := deps.AuthService.Register(r.Context(), req.Name, req.Email, req.Password, role)
 		if err != nil {
 			if err == service.ErrEmailExists {
 				http.Error(w, "email already registered", http.StatusConflict)
@@ -30,7 +36,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			return
 		}
 		// Auto-daftarkan siswa ke semua tryout yang akan datang (bukan draft)
-		if u.Role == "student" {
+		if u.Role == domain.UserRoleStudent {
 			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), u.ID)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -103,4 +109,9 @@ func userToMap(u domain.User) map[string]interface{} {
 		m["avatar_url"] = *u.AvatarURL
 	}
 	return m
+}
+
+// isValidRegisterRole: pendaftaran hanya 2 jenis — siswa (atau alias "siswa") dan guru.
+func isValidRegisterRole(role string) bool {
+	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru
 }

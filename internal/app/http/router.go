@@ -80,6 +80,16 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/enroll", handlers.CourseEnroll(deps))
 		})
 
+		r.Route("/trainer", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Use(middleware.TrainerOnly())
+			r.Get("/profile", handlers.TrainerProfileGet(deps))
+			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
+			r.Get("/status", handlers.TrainerStatus(deps))
+			r.Post("/pay", handlers.TrainerPay(deps))
+			r.Post("/students", handlers.TrainerCreateStudent(deps))
+		})
+
 		r.Get("/levels", handlers.AdminListLevels(deps))
 		r.Get("/levels/{id}", handlers.LevelWithSubjects(deps))
 

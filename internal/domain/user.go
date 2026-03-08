@@ -5,6 +5,8 @@ import "time"
 const (
 	UserRoleAdmin   = "admin"
 	UserRoleStudent = "student"
+	UserRoleGuru    = "guru"
+	UserRoleTrainer = "trainer" // nanti dibuat oleh admin
 )
 
 type User struct {

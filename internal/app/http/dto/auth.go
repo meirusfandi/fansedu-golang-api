@@ -4,6 +4,7 @@ type RegisterRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Role     string `json:"role"` // optional: "student"|"siswa" atau "guru", default "student"
 }
 
 type LoginRequest struct {

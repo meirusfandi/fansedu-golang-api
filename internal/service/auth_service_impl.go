@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -38,10 +39,14 @@ func NewAuthService(userRepo interface {
 	}
 }
 
-func (s *authService) Register(ctx context.Context, name, email, password string) (domain.User, string, error) {
+func (s *authService) Register(ctx context.Context, name, email, password, role string) (domain.User, string, error) {
 	_, err := s.userRepo.FindByEmail(ctx, email)
 	if err == nil {
 		return domain.User{}, "", ErrEmailExists
+	}
+	role = normalizeRegisterRole(role)
+	if role != domain.UserRoleStudent && role != domain.UserRoleGuru {
+		role = domain.UserRoleStudent
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
 	if err != nil {
@@ -51,7 +56,7 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 		Email:       email,
 		PasswordHash: string(hash),
 		Name:        name,
-		Role:        domain.UserRoleStudent,
+		Role:        role,
 	}
 	u, err = s.userRepo.Create(ctx, u)
 	if err != nil {
@@ -62,6 +67,17 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 		return domain.User{}, "", err
 	}
 	return u, token, nil
+}
+
+func normalizeRegisterRole(r string) string {
+	r = strings.TrimSpace(strings.ToLower(r))
+	if r == "" || r == "siswa" {
+		return domain.UserRoleStudent
+	}
+	if r == domain.UserRoleGuru {
+		return domain.UserRoleGuru
+	}
+	return r
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (domain.User, string, error) {

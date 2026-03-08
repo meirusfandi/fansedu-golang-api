@@ -60,6 +60,20 @@ func AdminOnly() func(http.Handler) http.Handler {
 	}
 }
 
+// TrainerOnly restricts access to users with role "guru" (guru pembimbing; trainer dibuat admin nanti).
+func TrainerOnly() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role, _ := GetRole(r.Context())
+			if role != "guru" {
+				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func GetUserID(ctx context.Context) (string, bool) {
 	v := ctx.Value(ctxKeyUserID{})
 	s, ok := v.(string)
