@@ -45,6 +45,8 @@ type AdminService interface {
 	ListPayments(ctx context.Context, limit int) ([]domain.Payment, error)
 	CreatePayment(ctx context.Context, p domain.Payment) (domain.Payment, error)
 	ReportMonthly(ctx context.Context, year, month int) (*MonthlyReport, error)
+	GetQuestionStats(ctx context.Context, tryoutID, questionID string) (*QuestionStats, error)
+	GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID string) (*QuestionStatsBulk, error)
 }
 
 type MonthlyReport struct {
@@ -53,4 +55,30 @@ type MonthlyReport struct {
 	NewEnrollments     int   `json:"new_enrollments"`
 	PaymentsCount      int   `json:"payments_count"`
 	TotalRevenueCents  int64 `json:"total_revenue_cents"`
+}
+
+// QuestionStats response for GET /admin/tryouts/:tryoutId/questions/:questionId/stats
+type QuestionStats struct {
+	ParticipantsCount int     `json:"participants_count"`
+	AnsweredCount     int     `json:"answered_count"`
+	CorrectCount      int     `json:"correct_count"`
+	WrongCount        int     `json:"wrong_count"`
+	CorrectPercent    float64 `json:"correct_percent"`
+	WrongPercent      float64 `json:"wrong_percent"`
+}
+
+// QuestionStatsItem one question in bulk stats
+type QuestionStatsItem struct {
+	QuestionID    string  `json:"question_id"`
+	AnsweredCount int     `json:"answered_count"`
+	CorrectCount  int     `json:"correct_count"`
+	WrongCount    int     `json:"wrong_count"`
+	CorrectPercent float64 `json:"correct_percent"`
+	WrongPercent   float64 `json:"wrong_percent"`
+}
+
+// QuestionStatsBulk response for GET /admin/tryouts/:tryoutId/questions/stats
+type QuestionStatsBulk struct {
+	ParticipantsCount int                `json:"participants_count"`
+	Questions         []QuestionStatsItem `json:"questions"`
 }

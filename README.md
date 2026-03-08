@@ -21,13 +21,27 @@ Aplikasi memuat env dari file:
 
 ## Run (local)
 
-**Development (pakai `.env.dev`):**
+Gunakan **`./cmd/api`** (dengan `./`) agar Go menjalankan paket di folder proyek, bukan di GOROOT.
+
+**Development / dev local (pakai `.env.dev`):**
 ```bash
 cp .env.development.example .env.dev   # sekali saja
 go run ./cmd/api
+go run ./cmd/api -env=dev              # atau -env=development
 ```
 
-**Production (pakai `.env`):** Set `ENV=production` dan isi `.env`, lalu jalankan (mis. di Docker/host).
+**Production (pakai `.env`, API dari server):**
+```bash
+go run ./cmd/api -env=prod             # atau -env=production
+# Atau set ENV=production dan isi .env, lalu jalankan (mis. di Docker/host).
+```
+
+Jika di `.env` Anda memakai hostname Docker (mis. `fansedu_fansedu-db`), hostname itu hanya bisa di-resolve **di dalam jaringan Docker**. Jadi:
+- **API jalan di container (Docker):** tidak masalah, DB dan API satu network.
+- **API jalan di Mac/laptop (`go run ./cmd/api -env=prod`):** override `DATABASE_URL` ke host yang bisa diakses dari mesin Anda, mis. DB di localhost (port forward) atau alamat server:
+  ```bash
+  DATABASE_URL="postgres://user:pass@localhost:5432/fansedu?sslmode=disable" go run ./cmd/api -env=prod
+  ```
 
 ## Database & migrasi
 

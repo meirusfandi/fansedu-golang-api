@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +23,20 @@ import (
 )
 
 func main() {
+	envFlag := flag.String("env", "", "environment: dev|development (local), prod|production (server). Overrides ENV.")
+	flag.Parse()
+
+	if v := strings.TrimSpace(*envFlag); v != "" {
+		switch strings.ToLower(v) {
+		case "dev", "development":
+			os.Setenv("ENV", config.EnvDevelopment)
+		case "prod", "production":
+			os.Setenv("ENV", config.EnvProduction)
+		default:
+			log.Fatalf("invalid -env=%q: use dev|development or prod|production", v)
+		}
+	}
+
 	config.LoadEnvFile()
 	cfg := config.Load()
 
@@ -103,6 +119,8 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		tryoutRepo, questionRepo, courseRepo, enrollmentRepo,
 		courseContentRepo, paymentRepo,
 		certificateRepo,
+		attemptRepo,
+		attemptAnswerRepo,
 		func(ctx context.Context) (int, error) { return userRepo.CountByRole(ctx, "student") },
 		attemptRepo.AvgScoreSubmitted,
 		certificateRepo.Count,

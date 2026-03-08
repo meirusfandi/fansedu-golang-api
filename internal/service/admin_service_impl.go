@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -60,6 +61,13 @@ type adminService struct {
 	certificateRepo interface {
 		Create(ctx context.Context, c domain.Certificate) (domain.Certificate, error)
 	}
+	attemptRepo interface {
+		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
+	}
+	attemptAnswerRepo interface {
+		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
+		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
+	}
 	userCount  func(ctx context.Context) (int, error)
 	attemptAvg func(ctx context.Context) (float64, error)
 	certCount  func(ctx context.Context) (int, error)
@@ -116,6 +124,13 @@ func NewAdminService(
 	certificateRepo interface {
 		Create(ctx context.Context, c domain.Certificate) (domain.Certificate, error)
 	},
+	attemptRepo interface {
+		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
+	},
+	attemptAnswerRepo interface {
+		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
+		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
+	},
 	userCount func(ctx context.Context) (int, error),
 	attemptAvg func(ctx context.Context) (float64, error),
 	certCount func(ctx context.Context) (int, error),
@@ -129,6 +144,8 @@ func NewAdminService(
 		courseContentRepo: courseContentRepo,
 		paymentRepo:      paymentRepo,
 		certificateRepo:  certificateRepo,
+		attemptRepo:      attemptRepo,
+		attemptAnswerRepo: attemptAnswerRepo,
 		userCount:        userCount,
 		attemptAvg:       attemptAvg,
 		certCount:        certCount,
@@ -284,4 +301,101 @@ func (s *adminService) ReportMonthly(ctx context.Context, year, month int) (*Mon
 		PaymentsCount:     paymentsCount,
 		TotalRevenueCents: revenue,
 	}, nil
+}
+
+func (s *adminService) GetQuestionStats(ctx context.Context, tryoutID, questionID string) (*QuestionStats, error) {
+	q, err := s.questionRepo.GetByID(ctx, questionID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if q.TryoutSessionID != tryoutID {
+		return nil, ErrNotFound
+	}
+	participantsCount, _ := s.attemptRepo.ParticipantsCountByTryout(ctx, tryoutID)
+	answers, err := s.attemptAnswerRepo.ListByQuestionFromSubmittedAttempts(ctx, tryoutID, questionID)
+	if err != nil {
+		return nil, err
+	}
+	answeredCount := len(answers)
+	var correctCount, wrongCount int
+	for i := range answers {
+		score := ComputeQuestionScore(q, &answers[i])
+		if score > 0 {
+			correctCount++
+		} else {
+			wrongCount++
+		}
+	}
+	total := correctCount + wrongCount
+	var correctPercent, wrongPercent float64
+	if total > 0 {
+		correctPercent = float64(correctCount) / float64(total) * 100
+		wrongPercent = float64(wrongCount) / float64(total) * 100
+	}
+	return &QuestionStats{
+		ParticipantsCount: participantsCount,
+		AnsweredCount:     answeredCount,
+		CorrectCount:      correctCount,
+		WrongCount:        wrongCount,
+		CorrectPercent:    roundTwo(correctPercent),
+		WrongPercent:      roundTwo(wrongPercent),
+	}, nil
+}
+
+func (s *adminService) GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID string) (*QuestionStatsBulk, error) {
+	if _, err := s.tryoutRepo.GetByID(ctx, tryoutID); err != nil {
+		return nil, ErrNotFound
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	participantsCount, _ := s.attemptRepo.ParticipantsCountByTryout(ctx, tryoutID)
+	allAnswers, err := s.attemptAnswerRepo.ListByTryoutFromSubmittedAttempts(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	byQuestion := make(map[string][]domain.AttemptAnswer)
+	for _, a := range allAnswers {
+		byQuestion[a.QuestionID] = append(byQuestion[a.QuestionID], a)
+	}
+	out := make([]QuestionStatsItem, 0, len(questions))
+	for _, q := range questions {
+		answers := byQuestion[q.ID]
+		answeredCount := len(answers)
+		var correctCount, wrongCount int
+		for i := range answers {
+			score := ComputeQuestionScore(q, &answers[i])
+			if score > 0 {
+				correctCount++
+			} else {
+				wrongCount++
+			}
+		}
+		total := correctCount + wrongCount
+		var correctPercent, wrongPercent float64
+		if total > 0 {
+			correctPercent = float64(correctCount) / float64(total) * 100
+			wrongPercent = float64(wrongCount) / float64(total) * 100
+		}
+		out = append(out, QuestionStatsItem{
+			QuestionID:     q.ID,
+			AnsweredCount:  answeredCount,
+			CorrectCount:   correctCount,
+			WrongCount:     wrongCount,
+			CorrectPercent: roundTwo(correctPercent),
+			WrongPercent:   roundTwo(wrongPercent),
+		})
+	}
+	return &QuestionStatsBulk{
+		ParticipantsCount: participantsCount,
+		Questions:         out,
+	}, nil
+}
+
+// ErrNotFound is returned when a tryout or question is not found (for 404 responses).
+var ErrNotFound = errors.New("not found")
+
+func roundTwo(v float64) float64 {
+	return float64(int(v*100+0.5)) / 100
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
 func AdminOverview(deps *Deps) http.HandlerFunc {
@@ -441,6 +443,41 @@ func AdminDeleteQuestion(deps *Deps) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func AdminGetQuestionStats(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		questionID := chi.URLParam(r, "questionId")
+		stats, err := deps.AdminService.GetQuestionStats(r.Context(), tryoutID, questionID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(stats)
+	}
+}
+
+func AdminGetTryoutQuestionStatsBulk(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		stats, err := deps.AdminService.GetTryoutQuestionStatsBulk(r.Context(), tryoutID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(stats)
 	}
 }
 

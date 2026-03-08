@@ -13,6 +13,8 @@ type AttemptAnswerRepo interface {
 	Upsert(ctx context.Context, a domain.AttemptAnswer) error
 	GetByAttemptAndQuestion(ctx context.Context, attemptID, questionID string) (domain.AttemptAnswer, error)
 	ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+	ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
+	ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
 }
 
 type attemptAnswerRepo struct{ pool *pgxpool.Pool }
@@ -44,6 +46,50 @@ func (r *attemptAnswerRepo) ListByAttemptID(ctx context.Context, attemptID strin
 		SELECT id, attempt_id, question_id, answer_text, selected_option, is_marked, created_at, updated_at
 		FROM attempt_answers WHERE attempt_id = $1::uuid
 	`, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.AttemptAnswer
+	for rows.Next() {
+		var a domain.AttemptAnswer
+		if err := rows.Scan(&a.ID, &a.AttemptID, &a.QuestionID, &a.AnswerText, &a.SelectedOption, &a.IsMarked, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+func (r *attemptAnswerRepo) ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT aa.id, aa.attempt_id, aa.question_id, aa.answer_text, aa.selected_option, aa.is_marked, aa.created_at, aa.updated_at
+		FROM attempt_answers aa
+		INNER JOIN attempts a ON a.id = aa.attempt_id
+		WHERE a.tryout_session_id = $1::uuid AND a.status = 'submitted' AND aa.question_id = $2::uuid
+	`, tryoutSessionID, questionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.AttemptAnswer
+	for rows.Next() {
+		var a domain.AttemptAnswer
+		if err := rows.Scan(&a.ID, &a.AttemptID, &a.QuestionID, &a.AnswerText, &a.SelectedOption, &a.IsMarked, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+func (r *attemptAnswerRepo) ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT aa.id, aa.attempt_id, aa.question_id, aa.answer_text, aa.selected_option, aa.is_marked, aa.created_at, aa.updated_at
+		FROM attempt_answers aa
+		INNER JOIN attempts a ON a.id = aa.attempt_id
+		WHERE a.tryout_session_id = $1::uuid AND a.status = 'submitted'
+	`, tryoutSessionID)
 	if err != nil {
 		return nil, err
 	}

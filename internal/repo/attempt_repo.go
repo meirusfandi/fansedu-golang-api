@@ -16,6 +16,7 @@ type AttemptRepo interface {
 	ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 	Update(ctx context.Context, a domain.Attempt) error
 	AvgScoreSubmitted(ctx context.Context) (float64, error)
+	ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
 }
 
 type attemptRepo struct{ pool *pgxpool.Pool }
@@ -91,4 +92,13 @@ func (r *attemptRepo) Update(ctx context.Context, a domain.Attempt) error {
 		WHERE id = $1::uuid
 	`, a.ID, a.SubmittedAt, a.Status, a.Score, a.MaxScore, a.Percentile, a.TimeSecondsSpent)
 	return err
+}
+
+func (r *attemptRepo) ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT user_id) FROM attempts
+		WHERE tryout_session_id = $1::uuid AND status = 'submitted'
+	`, tryoutSessionID).Scan(&n)
+	return n, err
 }
