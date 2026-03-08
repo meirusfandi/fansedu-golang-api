@@ -42,10 +42,14 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Get("/health", handlers.Health())
 		r.Get("/dashboard", handlers.DashboardGeneral(deps))
 
+		r.Get("/roles", handlers.ListRoles(deps))
+		r.Get("/schools", handlers.ListSchools(deps))
+
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
 			r.Post("/login", handlers.AuthLogin(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/logout", handlers.AuthLogout(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/change-password", handlers.AuthChangePassword(deps))
 			r.Post("/forgot-password", handlers.AuthForgotPassword(deps))
 			r.Post("/reset-password", handlers.AuthResetPassword(deps))
 		})
@@ -67,6 +71,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/student", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
 			r.Get("/dashboard", handlers.DashboardStudent(deps))
+			r.Get("/courses", handlers.StudentCoursesList(deps))
+			r.Get("/payments", handlers.StudentPaymentsList(deps))
 			r.Get("/tryouts", handlers.StudentTryoutList(deps))
 			r.Get("/tryouts/open", handlers.StudentTryoutListOpen(deps))
 			r.Get("/tryouts/{tryoutId}", handlers.StudentTryoutGetByID(deps))
@@ -78,6 +84,29 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/courses", func(r chi.Router) {
 			r.Get("/", handlers.CourseList(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/enroll", handlers.CourseEnroll(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Get("/{courseId}/messages", handlers.CourseMessagesList(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/messages", handlers.CourseMessageCreate(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Get("/{courseId}/discussions", handlers.CourseDiscussionsList(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/discussions", handlers.CourseDiscussionCreate(deps))
+		})
+
+		r.Route("/discussions", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Get("/{discussionId}", handlers.DiscussionGet(deps))
+			r.Get("/{discussionId}/replies", handlers.DiscussionRepliesList(deps))
+			r.Post("/{discussionId}/replies", handlers.DiscussionReplyCreate(deps))
+		})
+
+		r.Route("/notifications", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Get("/", handlers.NotificationsList(deps))
+			r.Patch("/{notificationId}/read", handlers.NotificationMarkRead(deps))
+		})
+
+		r.Route("/payments", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Get("/", handlers.PaymentListMine(deps))
+			r.Post("/", handlers.PaymentCreate(deps))
 		})
 
 		r.Route("/trainer", func(r chi.Router) {
@@ -85,13 +114,17 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Use(middleware.TrainerOnly())
 			r.Get("/profile", handlers.TrainerProfileGet(deps))
 			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
+			r.Get("/courses", handlers.TrainerCoursesList(deps))
+			r.Post("/courses", handlers.TrainerCourseCreate(deps))
 			r.Get("/status", handlers.TrainerStatus(deps))
 			r.Post("/pay", handlers.TrainerPay(deps))
 			r.Post("/students", handlers.TrainerCreateStudent(deps))
 		})
 
-		r.Get("/levels", handlers.AdminListLevels(deps))
-		r.Get("/levels/{id}", handlers.LevelWithSubjects(deps))
+		r.Route("/levels", func(r chi.Router) {
+			r.Get("/", handlers.AdminListLevels(deps))
+			r.Get("/{levelId}", handlers.LevelWithSubjects(deps))
+		})
 
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
@@ -112,7 +145,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Delete("/courses/{courseId}/contents/{contentId}", handlers.AdminDeleteCourseContent(deps))
 			r.Get("/payments", handlers.AdminListPayments(deps))
 			r.Post("/payments", handlers.AdminCreatePayment(deps))
+			r.Put("/payments/{paymentId}", handlers.AdminConfirmPayment(deps))
 			r.Get("/reports/monthly", handlers.AdminReportMonthly(deps))
+			r.Get("/reports/courses/{courseId}", handlers.AdminCourseReport(deps))
 			r.Get("/roles", handlers.AdminListRoles(deps))
 			r.Post("/roles", handlers.AdminCreateRole(deps))
 			r.Get("/roles/{id}", handlers.AdminGetRole(deps))

@@ -55,6 +55,8 @@ type adminService struct {
 	paymentRepo interface {
 		Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 		List(ctx context.Context, limit int) ([]domain.Payment, error)
+		GetByID(ctx context.Context, id string) (domain.Payment, error)
+		Update(ctx context.Context, p domain.Payment) error
 		CountPaidInMonth(ctx context.Context, year, month int) (int, error)
 		TotalAmountPaidInMonth(ctx context.Context, year, month int) (int64, error)
 	}
@@ -62,6 +64,7 @@ type adminService struct {
 		Create(ctx context.Context, c domain.Certificate) (domain.Certificate, error)
 	}
 	attemptRepo interface {
+		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
 	}
 	attemptAnswerRepo interface {
@@ -118,6 +121,8 @@ func NewAdminService(
 	paymentRepo interface {
 		Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 		List(ctx context.Context, limit int) ([]domain.Payment, error)
+		GetByID(ctx context.Context, id string) (domain.Payment, error)
+		Update(ctx context.Context, p domain.Payment) error
 		CountPaidInMonth(ctx context.Context, year, month int) (int, error)
 		TotalAmountPaidInMonth(ctx context.Context, year, month int) (int64, error)
 	},
@@ -125,6 +130,7 @@ func NewAdminService(
 		Create(ctx context.Context, c domain.Certificate) (domain.Certificate, error)
 	},
 	attemptRepo interface {
+		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
 	},
 	attemptAnswerRepo interface {
@@ -290,6 +296,27 @@ func (s *adminService) CreatePayment(ctx context.Context, p domain.Payment) (dom
 	return s.paymentRepo.Create(ctx, p)
 }
 
+func (s *adminService) ConfirmPayment(ctx context.Context, paymentID string, confirmed bool, adminID string, rejectionNote *string) error {
+	p, err := s.paymentRepo.GetByID(ctx, paymentID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if confirmed {
+		p.Status = domain.PaymentStatusPaid
+		p.PaidAt = &now
+		p.ConfirmedBy = &adminID
+		p.ConfirmedAt = &now
+		p.RejectionNote = nil
+	} else {
+		p.Status = domain.PaymentStatusFailed
+		p.ConfirmedBy = &adminID
+		p.ConfirmedAt = &now
+		p.RejectionNote = rejectionNote
+	}
+	return s.paymentRepo.Update(ctx, p)
+}
+
 func (s *adminService) ReportMonthly(ctx context.Context, year, month int) (*MonthlyReport, error) {
 	enrollments, _ := s.enrollmentRepo.CountEnrolledInMonth(ctx, year, month)
 	paymentsCount, _ := s.paymentRepo.CountPaidInMonth(ctx, year, month)
@@ -391,6 +418,75 @@ func (s *adminService) GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID 
 		ParticipantsCount: participantsCount,
 		Questions:         out,
 	}, nil
+}
+
+func (s *adminService) GetCourseReport(ctx context.Context, courseID string) (*CourseReport, error) {
+	course, err := s.courseRepo.GetByID(ctx, courseID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	enrollments, err := s.enrollmentRepo.ListByCourseID(ctx, courseID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	report := &CourseReport{
+		Course: CourseReportCourse{
+			ID:          course.ID,
+			Title:       course.Title,
+			Description: course.Description,
+		},
+		GeneratedAt: now,
+		Students:    make([]CourseReportStudent, 0, len(enrollments)),
+	}
+	for _, e := range enrollments {
+		u, err := s.userRepo.FindByID(ctx, e.UserID)
+		if err != nil {
+			continue
+		}
+		attempts, _ := s.attemptRepo.ListByUserID(ctx, e.UserID)
+		tryoutScores := make([]CourseReportTryoutScore, 0)
+		var lastActivity *time.Time
+		for _, a := range attempts {
+			if a.Status != domain.AttemptStatusSubmitted {
+				continue
+			}
+			if a.SubmittedAt != nil && (lastActivity == nil || lastActivity.Before(*a.SubmittedAt)) {
+				t := *a.SubmittedAt
+				lastActivity = &t
+			}
+			tryoutTitle := ""
+			if t, err := s.tryoutRepo.GetByID(ctx, a.TryoutSessionID); err == nil {
+				tryoutTitle = t.Title
+			}
+			tryoutScores = append(tryoutScores, CourseReportTryoutScore{
+				TryoutID:    a.TryoutSessionID,
+				TryoutTitle: tryoutTitle,
+				AttemptID:   a.ID,
+				Score:       a.Score,
+				MaxScore:    a.MaxScore,
+				Percentile:  a.Percentile,
+				SubmittedAt: a.SubmittedAt,
+			})
+		}
+		report.Students = append(report.Students, CourseReportStudent{
+			StudentID:        u.ID,
+			StudentName:      u.Name,
+			StudentEmail:     u.Email,
+			EnrolledAt:       e.EnrolledAt,
+			EnrollmentStatus: e.Status,
+			Progress: CourseReportStudentProgress{
+				Status:      e.Status,
+				CompletedAt: e.CompletedAt,
+			},
+			TryoutScores: tryoutScores,
+			Attendance: CourseReportStudentAttendance{
+				TryoutsParticipated: len(tryoutScores),
+				LastActivityAt:      lastActivity,
+			},
+		})
+	}
+	return report, nil
 }
 
 // ErrNotFound is returned when a tryout or question is not found (for 404 responses).

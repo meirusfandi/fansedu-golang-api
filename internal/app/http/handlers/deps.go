@@ -25,6 +25,14 @@ type Deps struct {
 	CertificateRepo          repo.CertificateRepo
 	TryoutRegistrationRepo   repo.TryoutRegistrationRepo
 
+	EnrollmentRepo            repo.EnrollmentRepo
+	CourseRepo                repo.CourseRepo
+	PaymentRepo               repo.PaymentRepo
+	NotificationRepo          repo.NotificationRepo
+	CourseMessageRepo         repo.CourseMessageRepo
+	CourseDiscussionRepo      repo.CourseDiscussionRepo
+	CourseDiscussionReplyRepo repo.CourseDiscussionReplyRepo
+
 	RoleRepo    repo.RoleRepo
 	SchoolRepo  repo.SchoolRepo
 	SettingRepo repo.SettingRepo

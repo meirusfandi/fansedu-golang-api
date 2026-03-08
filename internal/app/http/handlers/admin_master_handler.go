@@ -655,7 +655,10 @@ func levelToResp(e domain.Level) dto.LevelResponse {
 // LevelWithSubjects returns level dengan daftar bidang/mata pelajaran (public atau admin).
 func LevelWithSubjects(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
+		id := chi.URLParam(r, "levelId")
+		if id == "" {
+			id = chi.URLParam(r, "id")
+		}
 		level, err := deps.LevelRepo.GetByID(r.Context(), id)
 		if err != nil {
 			http.Error(w, "level not found", http.StatusNotFound)

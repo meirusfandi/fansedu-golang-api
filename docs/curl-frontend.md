@@ -9,6 +9,19 @@ TOKEN="<ganti-dengan-jwt-dari-login-atau-register>"
 
 ---
 
+## Public (tanpa auth)
+
+```bash
+curl -s "$BASE/roles"
+curl -s "$BASE/schools"
+curl -s "$BASE/health"
+curl -s "$BASE/dashboard"
+curl -s "$BASE/tryouts/open"
+curl -s "$BASE/levels"
+```
+
+---
+
 ## Auth
 
 ```bash
@@ -30,6 +43,32 @@ curl -s -X POST "$BASE/auth/login" \
 # Logout
 curl -s -X POST "$BASE/auth/logout" \
   -H "Authorization: Bearer $TOKEN"
+
+# Ganti kata sandi
+curl -s -X POST "$BASE/auth/change-password" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"current_password":"rahasia123","new_password":"rahasia456"}'
+```
+
+---
+
+## Notifications
+
+```bash
+curl -s "$BASE/notifications" -H "Authorization: Bearer $TOKEN"
+curl -s -X PATCH "$BASE/notifications/<NOTIFICATION_ID>/read" -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Payments (user)
+
+```bash
+curl -s "$BASE/payments" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE/payments" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount_cents":100000,"type":"course_purchase","reference_id":"<UUID>","proof_url":"https://..."}'
 ```
 
 ---
@@ -84,17 +123,15 @@ curl -s -X POST "$BASE/trainer/students" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Anak Siswa","email":"anak@example.com","password":"rahasia123"}'
-```
 
----
+# Daftar kelas saya (trainer)
+curl -s "$BASE/trainer/courses" -H "Authorization: Bearer $TOKEN"
 
-## Public (tanpa auth)
-
-```bash
-curl -s "$BASE/health"
-curl -s "$BASE/dashboard"
-curl -s "$BASE/tryouts/open"
-curl -s "$BASE/levels"
+# Buat kelas (trainer)
+curl -s -X POST "$BASE/trainer/courses" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Kelas Baru","description":"Deskripsi"}'
 ```
 
 ---
@@ -103,10 +140,29 @@ curl -s "$BASE/levels"
 
 ```bash
 curl -s "$BASE/student/dashboard" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/student/courses" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/student/payments" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/tryouts" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/attempts" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/attempts/<ATTEMPT_ID>" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/certificates" -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Course chat & forum (user ter-enroll)
+
+```bash
+curl -s "$BASE/courses/<COURSE_ID>/messages" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE/courses/<COURSE_ID>/messages" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"message":"Pesan"}'
+curl -s "$BASE/courses/<COURSE_ID>/discussions" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE/courses/<COURSE_ID>/discussions" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"title":"Judul","body":"Isi"}'
+curl -s "$BASE/discussions/<DISCUSSION_ID>" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/discussions/<DISCUSSION_ID>/replies" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$BASE/discussions/<DISCUSSION_ID>/replies" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"body":"Balasan"}'
 ```
 
 ---
@@ -127,6 +183,27 @@ curl -s -X PUT "$BASE/attempts/<ATTEMPT_ID>/answers/<QUESTION_ID>" \
   -d '{"answer_text":"","selected_option":"A"}'
 curl -s -X POST "$BASE/attempts/<ATTEMPT_ID>/submit" -H "Authorization: Bearer $TOKEN"
 ```
+
+---
+
+## Admin — Laporan per kelas (rekap skor tryout, kehadiran, progress)
+
+**Butuh token admin.**
+
+```bash
+# Laporan satu kelas: rekap skor tryout, kehadiran, progress tiap siswa
+curl -s "$BASE/admin/reports/courses/<COURSE_ID>" -H "Authorization: Bearer $TOKEN"
+```
+
+Response berisi:
+- `course`: id, title, description kelas
+- `generated_at`: waktu generate laporan
+- `students`: array siswa di kelas, tiap item berisi:
+  - `student_id`, `student_name`, `student_email`
+  - `enrolled_at`, `enrollment_status`
+  - `progress`: status (enrolled/in_progress/completed), `completed_at`
+  - `tryout_scores`: array skor tryout (tryout_id, tryout_title, attempt_id, score, max_score, percentile, submitted_at)
+  - `attendance`: `tryouts_participated` (jumlah tryout yang diselesaikan), `last_activity_at`
 
 ---
 

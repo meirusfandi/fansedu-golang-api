@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
@@ -44,7 +45,9 @@ type AdminService interface {
 	DeleteCourseContent(ctx context.Context, id string) error
 	ListPayments(ctx context.Context, limit int) ([]domain.Payment, error)
 	CreatePayment(ctx context.Context, p domain.Payment) (domain.Payment, error)
+	ConfirmPayment(ctx context.Context, paymentID string, confirmed bool, adminID string, rejectionNote *string) error
 	ReportMonthly(ctx context.Context, year, month int) (*MonthlyReport, error)
+	GetCourseReport(ctx context.Context, courseID string) (*CourseReport, error)
 	GetQuestionStats(ctx context.Context, tryoutID, questionID string) (*QuestionStats, error)
 	GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID string) (*QuestionStatsBulk, error)
 }
@@ -81,4 +84,48 @@ type QuestionStatsItem struct {
 type QuestionStatsBulk struct {
 	ParticipantsCount int                `json:"participants_count"`
 	Questions         []QuestionStatsItem `json:"questions"`
+}
+
+// CourseReport laporan rekap skor tryout, kehadiran, progress siswa per kelas (course)
+type CourseReport struct {
+	Course      CourseReportCourse
+	GeneratedAt time.Time
+	Students    []CourseReportStudent
+}
+
+type CourseReportCourse struct {
+	ID          string
+	Title       string
+	Description *string
+}
+
+type CourseReportStudent struct {
+	StudentID        string
+	StudentName      string
+	StudentEmail     string
+	EnrolledAt       time.Time
+	EnrollmentStatus string
+	Progress         CourseReportStudentProgress
+	TryoutScores     []CourseReportTryoutScore
+	Attendance       CourseReportStudentAttendance
+}
+
+type CourseReportStudentProgress struct {
+	Status      string
+	CompletedAt *time.Time
+}
+
+type CourseReportTryoutScore struct {
+	TryoutID    string
+	TryoutTitle string
+	AttemptID   string
+	Score       *float64
+	MaxScore    *float64
+	Percentile  *float64
+	SubmittedAt *time.Time
+}
+
+type CourseReportStudentAttendance struct {
+	TryoutsParticipated int
+	LastActivityAt      *time.Time
 }

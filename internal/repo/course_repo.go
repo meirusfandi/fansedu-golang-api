@@ -13,6 +13,7 @@ type CourseRepo interface {
 	Create(ctx context.Context, c domain.Course) (domain.Course, error)
 	GetByID(ctx context.Context, id string) (domain.Course, error)
 	List(ctx context.Context) ([]domain.Course, error)
+	ListByCreatedBy(ctx context.Context, createdBy string) ([]domain.Course, error)
 	Update(ctx context.Context, c domain.Course) error
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
@@ -51,6 +52,26 @@ func (r *courseRepo) List(ctx context.Context) ([]domain.Course, error) {
 		SELECT id, title, description, created_by, created_at, updated_at
 		FROM courses ORDER BY created_at DESC
 	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.Course
+	for rows.Next() {
+		var c domain.Course
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, c)
+	}
+	return list, rows.Err()
+}
+
+func (r *courseRepo) ListByCreatedBy(ctx context.Context, createdBy string) ([]domain.Course, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, title, description, created_by, created_at, updated_at
+		FROM courses WHERE created_by = $1::uuid ORDER BY created_at DESC
+	`, createdBy)
 	if err != nil {
 		return nil, err
 	}

@@ -254,3 +254,47 @@ type LevelWithSubjectsResponse struct {
 	LevelResponse
 	Subjects []SubjectResponse `json:"subjects,omitempty"`
 }
+
+// --- Course Report (laporan rekap skor tryout, kehadiran, progress per kelas) ---
+type CourseReportResponse struct {
+	Course      CourseReportCourseInfo   `json:"course"`
+	GeneratedAt string                   `json:"generated_at"`
+	Students    []CourseReportStudentRow `json:"students"`
+}
+
+type CourseReportCourseInfo struct {
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description,omitempty"`
+}
+
+type CourseReportStudentRow struct {
+	StudentID        string                      `json:"student_id"`
+	StudentName      string                      `json:"student_name"`
+	StudentEmail     string                      `json:"student_email"`
+	EnrolledAt       string                      `json:"enrolled_at"`
+	EnrollmentStatus string                      `json:"enrollment_status"`
+	Progress         CourseReportProgress        `json:"progress"`
+	TryoutScores     []CourseReportTryoutScore    `json:"tryout_scores"`
+	Attendance       CourseReportAttendance      `json:"attendance"`
+}
+
+type CourseReportProgress struct {
+	Status      string  `json:"status"`
+	CompletedAt *string `json:"completed_at,omitempty"`
+}
+
+type CourseReportTryoutScore struct {
+	TryoutID    string   `json:"tryout_id"`
+	TryoutTitle string   `json:"tryout_title"`
+	AttemptID   string   `json:"attempt_id"`
+	Score       *float64 `json:"score,omitempty"`
+	MaxScore    *float64 `json:"max_score,omitempty"`
+	Percentile  *float64 `json:"percentile,omitempty"`
+	SubmittedAt *string `json:"submitted_at,omitempty"`
+}
+
+type CourseReportAttendance struct {
+	TryoutsParticipated int     `json:"tryouts_participated"`
+	LastActivityAt       *string `json:"last_activity_at,omitempty"`
+}

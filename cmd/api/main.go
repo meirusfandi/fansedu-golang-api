@@ -103,6 +103,10 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 	levelRepo := repo.NewLevelRepo(pool)
 	tryoutRegistrationRepo := repo.NewTryoutRegistrationRepo(pool)
 	trainerRepo := repo.NewTrainerRepo(pool)
+	notificationRepo := repo.NewNotificationRepo(pool)
+	courseMessageRepo := repo.NewCourseMessageRepo(pool)
+	courseDiscussionRepo := repo.NewCourseDiscussionRepo(pool)
+	courseDiscussionReplyRepo := repo.NewCourseDiscussionReplyRepo(pool)
 
 	var feedbackGen ai.FeedbackGenerator
 	if openAIAPIKey != "" {
@@ -142,13 +146,20 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		UserRepo:           userRepo,
 		QuestionRepo:       questionRepo,
 		AttemptAnswerRepo:  attemptAnswerRepo,
-		CertificateRepo:    certificateRepo,
-		RoleRepo:           roleRepo,
-		SchoolRepo:         schoolRepo,
-		SettingRepo:        settingRepo,
-		EventRepo:          eventRepo,
-		SubjectRepo:            subjectRepo,
-		LevelRepo:              levelRepo,
-		TryoutRegistrationRepo: tryoutRegistrationRepo,
+		CertificateRepo:          certificateRepo,
+		RoleRepo:                 roleRepo,
+		SchoolRepo:               schoolRepo,
+		SettingRepo:              settingRepo,
+		EventRepo:                eventRepo,
+		SubjectRepo:              subjectRepo,
+		LevelRepo:                levelRepo,
+		TryoutRegistrationRepo:   tryoutRegistrationRepo,
+		EnrollmentRepo:           enrollmentRepo,
+		CourseRepo:               courseRepo,
+		PaymentRepo:              paymentRepo,
+		NotificationRepo:        notificationRepo,
+		CourseMessageRepo:        courseMessageRepo,
+		CourseDiscussionRepo:      courseDiscussionRepo,
+		CourseDiscussionReplyRepo: courseDiscussionReplyRepo,
 	}
 }

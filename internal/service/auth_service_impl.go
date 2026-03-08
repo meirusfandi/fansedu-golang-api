@@ -21,6 +21,8 @@ type authService struct {
 	userRepo   interface {
 		Create(ctx context.Context, u domain.User) (domain.User, error)
 		FindByEmail(ctx context.Context, email string) (domain.User, error)
+		FindByID(ctx context.Context, id string) (domain.User, error)
+		Update(ctx context.Context, u domain.User) error
 	}
 	jwtSecret  []byte
 	jwtExpiry  time.Duration
@@ -30,6 +32,8 @@ type authService struct {
 func NewAuthService(userRepo interface {
 	Create(ctx context.Context, u domain.User) (domain.User, error)
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
+	FindByID(ctx context.Context, id string) (domain.User, error)
+	Update(ctx context.Context, u domain.User) error
 }, jwtSecret []byte) AuthService {
 	return &authService{
 		userRepo:   userRepo,
@@ -104,4 +108,20 @@ func (s *authService) signJWT(userID, role string) (string, error) {
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return t.SignedString(s.jwtSecret)
+}
+
+func (s *authService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return ErrInvalidCreds
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCreds
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.bcryptCost)
+	if err != nil {
+		return err
+	}
+	u.PasswordHash = string(hash)
+	return s.userRepo.Update(ctx, u)
 }

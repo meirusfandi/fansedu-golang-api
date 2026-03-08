@@ -844,6 +844,31 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		adminID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		paymentID := chi.URLParam(r, "paymentId")
+		var req struct {
+			Confirmed     bool    `json:"confirmed"`
+			RejectionNote *string `json:"rejection_note"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		if err := deps.AdminService.ConfirmPayment(r.Context(), paymentID, req.Confirmed, adminID, req.RejectionNote); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment updated"})
+	}
+}
+
 func AdminReportMonthly(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		year, month := time.Now().Year(), int(time.Now().Month())
@@ -869,6 +894,81 @@ func AdminReportMonthly(deps *Deps) http.HandlerFunc {
 			NewEnrollments:    report.NewEnrollments,
 			PaymentsCount:     report.PaymentsCount,
 			TotalRevenueCents: report.TotalRevenueCents,
+		})
+	}
+}
+
+func AdminCourseReport(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		courseID := chi.URLParam(r, "courseId")
+		if courseID == "" {
+			http.Error(w, "course_id required", http.StatusBadRequest)
+			return
+		}
+		report, err := deps.AdminService.GetCourseReport(r.Context(), courseID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				http.Error(w, "course not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		students := make([]dto.CourseReportStudentRow, 0, len(report.Students))
+		for _, st := range report.Students {
+			scores := make([]dto.CourseReportTryoutScore, 0, len(st.TryoutScores))
+			for _, sc := range st.TryoutScores {
+				var submittedAt *string
+				if sc.SubmittedAt != nil {
+					s := sc.SubmittedAt.Format(time.RFC3339)
+					submittedAt = &s
+				}
+				scores = append(scores, dto.CourseReportTryoutScore{
+					TryoutID:    sc.TryoutID,
+					TryoutTitle: sc.TryoutTitle,
+					AttemptID:   sc.AttemptID,
+					Score:       sc.Score,
+					MaxScore:    sc.MaxScore,
+					Percentile:  sc.Percentile,
+					SubmittedAt: submittedAt,
+				})
+			}
+			var completedAt *string
+			if st.Progress.CompletedAt != nil {
+				s := st.Progress.CompletedAt.Format(time.RFC3339)
+				completedAt = &s
+			}
+			var lastActivityAt *string
+			if st.Attendance.LastActivityAt != nil {
+				s := st.Attendance.LastActivityAt.Format(time.RFC3339)
+				lastActivityAt = &s
+			}
+			students = append(students, dto.CourseReportStudentRow{
+				StudentID:        st.StudentID,
+				StudentName:      st.StudentName,
+				StudentEmail:     st.StudentEmail,
+				EnrolledAt:       st.EnrolledAt.Format(time.RFC3339),
+				EnrollmentStatus: st.EnrollmentStatus,
+				Progress: dto.CourseReportProgress{
+					Status:      st.Progress.Status,
+					CompletedAt: completedAt,
+				},
+				TryoutScores: scores,
+				Attendance: dto.CourseReportAttendance{
+					TryoutsParticipated: st.Attendance.TryoutsParticipated,
+					LastActivityAt:      lastActivityAt,
+				},
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.CourseReportResponse{
+			Course: dto.CourseReportCourseInfo{
+				ID:          report.Course.ID,
+				Title:       report.Course.Title,
+				Description: report.Course.Description,
+			},
+			GeneratedAt: report.GeneratedAt.Format(time.RFC3339),
+			Students:    students,
 		})
 	}
 }
