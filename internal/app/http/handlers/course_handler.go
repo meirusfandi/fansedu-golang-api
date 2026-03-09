@@ -23,12 +23,43 @@ func CourseList(deps *Deps) http.HandlerFunc {
 			out[i] = dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
+				Slug:        list[i].Slug,
 				Description: list[i].Description,
+				PriceCents:  list[i].PriceCents,
+				Thumbnail:   list[i].Thumbnail,
+				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// CourseGetBySlug returns a single course by slug (public). GET /api/v1/courses/slug/{slug}
+func CourseGetBySlug(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+		if slug == "" {
+			http.Error(w, "slug required", http.StatusBadRequest)
+			return
+		}
+		c, err := deps.CourseRepo.GetBySlug(r.Context(), slug)
+		if err != nil {
+			http.Error(w, "course not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
+			ID:          c.ID,
+			Title:       c.Title,
+			Slug:        c.Slug,
+			Description: c.Description,
+			PriceCents:  c.PriceCents,
+			Thumbnail:   c.Thumbnail,
+			SubjectID:   c.SubjectID,
+			CreatedBy:   c.CreatedBy,
+		})
 	}
 }
 

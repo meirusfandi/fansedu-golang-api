@@ -71,6 +71,7 @@ type CourseItem struct {
 	ID          string  `json:"id"`
 	Title       string  `json:"title"`
 	Description string  `json:"description,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
 	CreatedBy   *string `json:"created_by,omitempty"`
 	CreatedAt   string  `json:"created_at"`
 }

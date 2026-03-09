@@ -18,7 +18,38 @@ curl -s "$BASE/health"
 curl -s "$BASE/dashboard"
 curl -s "$BASE/tryouts/open"
 curl -s "$BASE/levels"
+curl -s "$BASE/courses/"
+curl -s "$BASE/courses/slug/<SLUG>"
+
+# LMS: Katalog program (paginate, filter)
+curl -s "$BASE/programs?page=1&limit=12&search=&category="
+curl -s "$BASE/programs/<SLUG>"
 ```
+
+---
+
+## Checkout (tanpa login — frictionless)
+
+Format LMS (frontend Vite): `programId` atau `programSlug`, `name`, `email`. Response: `checkoutId`, `orderId`, `total`, `program: { title, priceDisplay }`.
+
+```bash
+# 1. Initiate (LMS: programId atau programSlug + name + email)
+curl -s -X POST "$BASE/checkout/initiate" \
+  -H "Content-Type: application/json" \
+  -d '{"programSlug":"my-course-slug","name":"User Name","email":"user@example.com"}'
+# atau: "programId":"<UUID>"
+
+# 2. Payment session (LMS: checkoutId + paymentMethod; optional promoCode)
+curl -s -X POST "$BASE/checkout/payment-session" \
+  -H "Content-Type: application/json" \
+  -d '{"checkoutId":"<ORDER_ID>","paymentMethod":"bank_transfer"}'
+# Response: paymentUrl, orderId, expiry?, virtualAccountNumber?, amount
+
+# Legacy: course_slug + order_id masih didukung.
+# Webhook (dipanggil gateway): POST $BASE/webhook/payment body: {"order_id":"<ORDER_ID>"}
+```
+
+Setelah webhook sukses, enrollment course dibuat otomatis; user bisa akses course.
 
 ---
 
@@ -43,6 +74,14 @@ curl -s -X POST "$BASE/auth/login" \
 # Logout
 curl -s -X POST "$BASE/auth/logout" \
   -H "Authorization: Bearer $TOKEN"
+
+# Data user saat ini (LMS: untuk header & guard)
+curl -s "$BASE/auth/me" -H "Authorization: Bearer $TOKEN"
+
+# Register — instructor (alias guru untuk LMS)
+curl -s -X POST "$BASE/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Pak Instruktur","email":"instruktur@example.com","password":"rahasia123","role":"instructor"}'
 
 # Ganti kata sandi
 curl -s -X POST "$BASE/auth/change-password" \
@@ -136,11 +175,25 @@ curl -s -X POST "$BASE/trainer/courses" \
 
 ---
 
+## Instructor (LMS — role guru atau instructor)
+
+```bash
+curl -s "$BASE/instructor/courses" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/instructor/students" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/instructor/earnings" -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
 ## Siswa (auth)
 
 ```bash
 curl -s "$BASE/student/dashboard" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/courses" -H "Authorization: Bearer $TOKEN"
+# Riwayat transaksi (order) — LMS
+curl -s "$BASE/student/transactions" -H "Authorization: Bearer $TOKEN"
+# Kelas berdasarkan subject siswa
+curl -s "$BASE/student/courses/by-subject" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/payments" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/tryouts" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/attempts" -H "Authorization: Bearer $TOKEN"

@@ -78,7 +78,11 @@ type QuestionUpdateRequest struct {
 
 type CourseCreateRequest struct {
 	Title       string  `json:"title"`
+	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
+	PriceCents  *int    `json:"price_cents,omitempty"`
+	Thumbnail   *string `json:"thumbnail,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
 }
 
 type CertificateIssueRequest struct {

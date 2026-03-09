@@ -493,7 +493,11 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 			out[i] = dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
+				Slug:        list[i].Slug,
 				Description: list[i].Description,
+				PriceCents:  list[i].PriceCents,
+				Thumbnail:   list[i].Thumbnail,
+				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
 			}
 		}
@@ -514,7 +518,11 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
 			ID:          c.ID,
 			Title:       c.Title,
+			Slug:        c.Slug,
 			Description: c.Description,
+			PriceCents:  c.PriceCents,
+			Thumbnail:   c.Thumbnail,
+			SubjectID:   c.SubjectID,
 			CreatedBy:   c.CreatedBy,
 		})
 	}
@@ -534,8 +542,14 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 		}
 		c := domain.Course{
 			Title:       req.Title,
+			Slug:        req.Slug,
 			Description: req.Description,
+			Thumbnail:   req.Thumbnail,
+			SubjectID:   req.SubjectID,
 			CreatedBy:   createdByPtr,
+		}
+		if req.PriceCents != nil {
+			c.PriceCents = *req.PriceCents
 		}
 		created, err := deps.AdminService.CreateCourse(r.Context(), c)
 		if err != nil {
@@ -547,7 +561,11 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
 			ID:          created.ID,
 			Title:       created.Title,
+			Slug:        created.Slug,
 			Description: created.Description,
+			PriceCents:  created.PriceCents,
+			Thumbnail:   created.Thumbnail,
+			SubjectID:   created.SubjectID,
 			CreatedBy:   created.CreatedBy,
 		})
 	}
@@ -568,6 +586,18 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 		}
 		c.Title = req.Title
 		c.Description = req.Description
+		if req.SubjectID != nil {
+			c.SubjectID = req.SubjectID
+		}
+		if req.Slug != nil {
+			c.Slug = req.Slug
+		}
+		if req.PriceCents != nil {
+			c.PriceCents = *req.PriceCents
+		}
+		if req.Thumbnail != nil {
+			c.Thumbnail = req.Thumbnail
+		}
 		if err := deps.AdminService.UpdateCourse(r.Context(), c); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

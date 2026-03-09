@@ -20,18 +20,25 @@ func NewUserRepo(pool *pgxpool.Pool) UserRepo {
 
 func (r *userRepo) Create(ctx context.Context, u domain.User) (domain.User, error) {
 	id := uuid.New().String()
+	var passHash interface{} = u.PasswordHash
+	if u.PasswordHash == "" {
+		passHash = nil
+	}
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO users (id, email, password_hash, name, role, avatar_url, school_id, subject_id)
 		VALUES ($1::uuid, $2, $3, $4, $5::user_role, $6, $7::uuid, $8::uuid)
 		RETURNING id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified_at, created_at, updated_at
-	`, id, u.Email, u.PasswordHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID)
+	`, id, u.Email, passHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID)
 	var out domain.User
-	var avatarURL, schoolID, subjectID *string
+	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	err := row.Scan(&out.ID, &out.Email, &out.PasswordHash, &out.Name, &out.Role,
+	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
 		&avatarURL, &schoolID, &subjectID, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
+	}
+	if pass != nil {
+		out.PasswordHash = *pass
 	}
 	out.AvatarURL = avatarURL
 	out.SchoolID = schoolID
@@ -46,12 +53,15 @@ func (r *userRepo) FindByEmail(ctx context.Context, email string) (domain.User, 
 		FROM users WHERE email = $1
 	`, email)
 	var out domain.User
-	var avatarURL, schoolID, subjectID *string
+	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	err := row.Scan(&out.ID, &out.Email, &out.PasswordHash, &out.Name, &out.Role,
+	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
 		&avatarURL, &schoolID, &subjectID, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
+	}
+	if pass != nil {
+		out.PasswordHash = *pass
 	}
 	out.AvatarURL = avatarURL
 	out.SchoolID = schoolID
@@ -66,12 +76,15 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (domain.User, error)
 		FROM users WHERE id = $1::uuid
 	`, id)
 	var out domain.User
-	var avatarURL, schoolID, subjectID *string
+	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	err := row.Scan(&out.ID, &out.Email, &out.PasswordHash, &out.Name, &out.Role,
+	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
 		&avatarURL, &schoolID, &subjectID, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
+	}
+	if pass != nil {
+		out.PasswordHash = *pass
 	}
 	out.AvatarURL = avatarURL
 	out.SchoolID = schoolID
@@ -108,10 +121,13 @@ func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error)
 	var list []domain.User
 	for rows.Next() {
 		var u domain.User
-		var avatarURL, schoolID, subjectID *string
+		var avatarURL, schoolID, subjectID, pass *string
 		var emailVerifiedAt *time.Time
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerifiedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &pass, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerifiedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
+		}
+		if pass != nil {
+			u.PasswordHash = *pass
 		}
 		u.AvatarURL = avatarURL
 		u.SchoolID = schoolID

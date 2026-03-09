@@ -17,10 +17,13 @@ const (
 type Payment struct {
 	ID             string
 	UserID         string
+	OrderID        *string
 	AmountCents    int
 	Currency       string
 	Status         string
 	Type           string
+	Gateway        *string
+	TransactionID  *string
 	ReferenceID    *string
 	Description    *string
 	ProofURL       *string

@@ -132,6 +132,10 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 	)
 	courseService := service.NewCourseService(courseRepo, enrollmentRepo)
 	trainerService := service.NewTrainerService(userRepo, trainerRepo)
+	orderRepo := repo.NewOrderRepo(pool)
+	orderItemRepo := repo.NewOrderItemRepo(pool)
+	checkoutService := service.NewCheckoutService(courseRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo)
+	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 
 	return &handlers.Deps{
 		DB:                 pool,
@@ -143,6 +147,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		AdminService:       adminService,
 		CourseService:      courseService,
 		TrainerService:     trainerService,
+		CheckoutService:    checkoutService,
 		UserRepo:           userRepo,
 		QuestionRepo:       questionRepo,
 		AttemptAnswerRepo:  attemptAnswerRepo,
@@ -153,10 +158,14 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		EventRepo:                eventRepo,
 		SubjectRepo:              subjectRepo,
 		LevelRepo:                levelRepo,
+		LandingPackageRepo:       landingPackageRepo,
 		TryoutRegistrationRepo:   tryoutRegistrationRepo,
 		EnrollmentRepo:           enrollmentRepo,
 		CourseRepo:               courseRepo,
+		CourseContentRepo:        courseContentRepo,
 		PaymentRepo:              paymentRepo,
+		OrderRepo:                orderRepo,
+		OrderItemRepo:            orderItemRepo,
 		NotificationRepo:        notificationRepo,
 		CourseMessageRepo:        courseMessageRepo,
 		CourseDiscussionRepo:      courseDiscussionRepo,

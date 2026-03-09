@@ -49,7 +49,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		return domain.User{}, "", ErrEmailExists
 	}
 	role = normalizeRegisterRole(role)
-	if role != domain.UserRoleStudent && role != domain.UserRoleGuru {
+	if role != domain.UserRoleStudent && role != domain.UserRoleGuru && role != "instructor" {
 		role = domain.UserRoleStudent
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
@@ -78,7 +78,10 @@ func normalizeRegisterRole(r string) string {
 	if r == "" || r == "siswa" {
 		return domain.UserRoleStudent
 	}
-	if r == domain.UserRoleGuru {
+	if r == domain.UserRoleGuru || r == "instructor" {
+		if r == "instructor" {
+			return "instructor"
+		}
 		return domain.UserRoleGuru
 	}
 	return r

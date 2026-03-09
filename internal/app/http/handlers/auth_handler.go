@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -23,7 +24,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		}
 		role := strings.TrimSpace(strings.ToLower(req.Role))
 		if role != "" && !isValidRegisterRole(role) {
-			http.Error(w, "role must be student (siswa) or guru", http.StatusBadRequest)
+			http.Error(w, "role must be student, instructor, or guru", http.StatusBadRequest)
 			return
 		}
 		u, token, err := deps.AuthService.Register(r.Context(), req.Name, req.Email, req.Password, role)
@@ -82,6 +83,33 @@ func AuthLogout(_ *Deps) http.HandlerFunc {
 	}
 }
 
+// AuthMe returns current user from JWT. GET /api/v1/auth/me
+func AuthMe(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not logged in")
+			return
+		}
+		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "user not found")
+			return
+		}
+		role := u.Role
+		if role == "guru" {
+			role = "instructor"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
+			ID:    u.ID,
+			Name:  u.Name,
+			Email: u.Email,
+			Role:  role,
+		})
+	}
+}
+
 func AuthForgotPassword(_ *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Stub: always return ok (jangan bocorkan apakah email ada)
@@ -111,7 +139,7 @@ func userToMap(u domain.User) map[string]interface{} {
 	return m
 }
 
-// isValidRegisterRole: pendaftaran hanya 2 jenis — siswa (atau alias "siswa") dan guru.
+// isValidRegisterRole: student, instructor, atau guru.
 func isValidRegisterRole(role string) bool {
-	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru
+	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru || role == "instructor"
 }

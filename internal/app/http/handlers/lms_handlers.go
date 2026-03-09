@@ -586,25 +586,67 @@ func TrainerCourseCreate(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// StudentCoursesList returns courses the student is enrolled in. GET /api/v1/student/courses
+// StudentCoursesList returns courses the student is enrolled in (LMS shape). GET /api/v1/student/courses
 func StudentCoursesList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		enrollments, err := deps.EnrollmentRepo.ListByUserID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		data := make([]dto.StudentCourseItem, 0, len(enrollments))
+		for _, e := range enrollments {
+			c, err := deps.CourseRepo.GetByID(r.Context(), e.CourseID)
+			if err != nil {
+				continue
+			}
+			slug := ""
+			if c.Slug != nil {
+				slug = *c.Slug
+			}
+			thumb := ""
+			if c.Thumbnail != nil {
+				thumb = *c.Thumbnail
+			}
+			enrolledAt := e.EnrolledAt.Format("2006-01-02T15:04:05Z07:00")
+			data = append(data, dto.StudentCourseItem{
+				ID:              e.ID,
+				Program:         dto.StudentCourseProgram{ID: c.ID, Slug: slug, Title: c.Title, Thumbnail: thumb},
+				ProgressPercent: 0,
+				EnrolledAt:      enrolledAt,
+				LastAccessedAt:  enrolledAt,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.StudentCoursesResponse{Data: data})
+	}
+}
+
+// StudentCoursesBySubject returns courses filtered by the logged-in student's subject. GET /api/v1/student/courses/by-subject
+func StudentCoursesBySubject(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
-		enrollments, err := deps.EnrollmentRepo.ListByUserID(r.Context(), userID)
+		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		list, err := deps.CourseRepo.ListBySubjectID(r.Context(), u.SubjectID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		out := make([]dto.CourseItem, 0, len(enrollments))
-		for _, e := range enrollments {
-			c, err := deps.CourseRepo.GetByID(r.Context(), e.CourseID)
-			if err != nil {
-				continue
-			}
+		out := make([]dto.CourseItem, 0, len(list))
+		for _, c := range list {
 			var desc string
 			if c.Description != nil {
 				desc = *c.Description
@@ -613,6 +655,7 @@ func StudentCoursesList(deps *Deps) http.HandlerFunc {
 				ID:          c.ID,
 				Title:       c.Title,
 				Description: desc,
+				SubjectID:   c.SubjectID,
 				CreatedBy:   c.CreatedBy,
 				CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			})
@@ -625,4 +668,186 @@ func StudentCoursesList(deps *Deps) http.HandlerFunc {
 // StudentPaymentsList is an alias for PaymentListMine (student sees own payments). GET /api/v1/student/payments
 func StudentPaymentsList(deps *Deps) http.HandlerFunc {
 	return PaymentListMine(deps)
+}
+
+// StudentProfileGet returns current student profile (same shape as GET /auth/me). GET /api/v1/student/profile
+func StudentProfileGet(deps *Deps) http.HandlerFunc {
+	return AuthMe(deps)
+}
+
+// StudentProfileUpdate updates current user name/email. PUT /api/v1/student/profile
+func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		var req struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
+			return
+		}
+		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "user not found")
+			return
+		}
+		if req.Name != "" {
+			u.Name = req.Name
+		}
+		if req.Email != "" {
+			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
+			if err == nil && existing.ID != userID {
+				writeError(w, http.StatusConflict, "conflict", "email already in use")
+				return
+			}
+			u.Email = req.Email
+		}
+		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		role := u.Role
+		if role == "guru" {
+			role = "instructor"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
+			ID:    u.ID,
+			Name:  u.Name,
+			Email: u.Email,
+			Role:  role,
+		})
+	}
+}
+
+// StudentTransactionsList returns the current user's transactions (orders). GET /api/v1/student/transactions
+func StudentTransactionsList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		orders, err := deps.OrderRepo.ListByUserID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		data := make([]dto.StudentTransactionItem, 0, len(orders))
+		for _, o := range orders {
+			items, _ := deps.OrderItemRepo.ListByOrderID(r.Context(), o.ID)
+			programs := make([]dto.StudentTransactionProgram, 0, len(items))
+			for _, item := range items {
+				c, _ := deps.CourseRepo.GetByID(r.Context(), item.CourseID)
+				programs = append(programs, dto.StudentTransactionProgram{Title: c.Title})
+			}
+			paidAt := o.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
+			if o.Status == domain.OrderStatusPaid {
+				paidAt = o.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
+			}
+			data = append(data, dto.StudentTransactionItem{
+				ID:       o.ID,
+				OrderID:  o.ID,
+				Status:   o.Status,
+				Total:    o.TotalPriceCents / 100,
+				Programs: programs,
+				PaidAt:   paidAt,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.StudentTransactionsResponse{Data: data})
+	}
+}
+
+// InstructorCoursesList returns courses taught by the current instructor. GET /api/v1/instructor/courses
+func InstructorCoursesList(deps *Deps) http.HandlerFunc {
+	return TrainerCoursesList(deps)
+}
+
+// InstructorStudentsList returns students enrolled in the instructor's courses. GET /api/v1/instructor/students
+func InstructorStudentsList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		courses, err := deps.CourseRepo.ListByCreatedBy(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		var data []dto.InstructorStudentItem
+		for _, c := range courses {
+			enrollments, _ := deps.EnrollmentRepo.ListByCourseID(r.Context(), c.ID)
+			for _, e := range enrollments {
+				u, err := deps.UserRepo.FindByID(r.Context(), e.UserID)
+				if err != nil {
+					continue
+				}
+				data = append(data, dto.InstructorStudentItem{
+					UserID:          u.ID,
+					Name:            u.Name,
+					Email:           u.Email,
+					ProgramTitle:    c.Title,
+					ProgressPercent: 0,
+				})
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: data})
+	}
+}
+
+// InstructorEarningsList returns earnings summary per period. GET /api/v1/instructor/earnings (stub)
+func InstructorEarningsList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := middleware.GetUserID(r.Context()); !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.InstructorEarningsResponse{Data: []dto.InstructorEarningItem{}})
+	}
+}
+
+// PackagesListLanding returns packages for landing page "Program yang Sedang Dibuka". GET /api/v1/packages
+// Response: array of objects with snake_case (id, name, slug, short_description, price_display, ...).
+func PackagesListLanding(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var list []domain.LandingPackage
+		if deps.LandingPackageRepo != nil {
+			var err error
+			list, err = deps.LandingPackageRepo.List(r.Context())
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+				return
+			}
+		}
+		if list == nil {
+			list = []domain.LandingPackage{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(list)
+	}
+}
+
+func formatRupiah(cents int) string {
+	if cents < 0 {
+		return "Rp0"
+	}
+	s := strconv.Itoa(cents / 100)
+	var b []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b = append(b, '.')
+		}
+		b = append(b, byte(c))
+	}
+	return "Rp" + string(b)
 }

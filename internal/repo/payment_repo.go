@@ -13,6 +13,7 @@ import (
 
 type PaymentRepo interface {
 	Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
+	GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
 	List(ctx context.Context, limit int) ([]domain.Payment, error)
 	ListByUserID(ctx context.Context, userID string, limit int) ([]domain.Payment, error)
 	GetByID(ctx context.Context, id string) (domain.Payment, error)
@@ -29,7 +30,7 @@ func NewPaymentRepo(pool *pgxpool.Pool) PaymentRepo {
 
 func (r *paymentRepo) Create(ctx context.Context, p domain.Payment) (domain.Payment, error) {
 	id := uuid.New().String()
-	var refArg, proofURL, confirmedBy interface{}
+	var refArg, proofURL, confirmedBy, orderID interface{}
 	if p.ReferenceID != nil {
 		if u, err := uuid.Parse(*p.ReferenceID); err == nil {
 			refArg = u
@@ -43,15 +44,60 @@ func (r *paymentRepo) Create(ctx context.Context, p domain.Payment) (domain.Paym
 			confirmedBy = u
 		}
 	}
+	if p.OrderID != nil {
+		if u, err := uuid.Parse(*p.OrderID); err == nil {
+			orderID = u
+		}
+	}
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO payments (id, user_id, amount_cents, currency, status, type, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note)
-		VALUES ($1::uuid, $2::uuid, $3, $4, $5::payment_status, $6::payment_type, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO payments (id, user_id, order_id, amount_cents, currency, status, type, gateway, transaction_id, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6::payment_status, $7::payment_type, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING created_at, updated_at
-	`, id, p.UserID, p.AmountCents, p.Currency, p.Status, p.Type, refArg, p.Description, proofURL, p.PaidAt, confirmedBy, p.ConfirmedAt, p.RejectionNote).Scan(&p.CreatedAt, &p.UpdatedAt)
+	`, id, p.UserID, orderID, p.AmountCents, p.Currency, p.Status, p.Type, p.Gateway, p.TransactionID, refArg, p.Description, proofURL, p.PaidAt, confirmedBy, p.ConfirmedAt, p.RejectionNote).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return domain.Payment{}, err
 	}
 	p.ID = id
+	return p, nil
+}
+
+func (r *paymentRepo) GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, user_id, order_id, amount_cents, currency, status, type, gateway, transaction_id, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
+		FROM payments WHERE order_id = $1::uuid ORDER BY created_at DESC LIMIT 1
+	`, orderID)
+	var p domain.Payment
+	var refID, confirmedBy, ordID pgtype.UUID
+	var proofURL, rejectionNote pgtype.Text
+	var gateway, transactionID pgtype.Text
+	err := row.Scan(&p.ID, &p.UserID, &ordID, &p.AmountCents, &p.Currency, &p.Status, &p.Type, &gateway, &transactionID, &refID, &p.Description, &proofURL, &p.PaidAt, &confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return domain.Payment{}, err
+	}
+	if refID.Valid {
+		s := uuid.UUID(refID.Bytes).String()
+		p.ReferenceID = &s
+	}
+	if ordID.Valid {
+		s := uuid.UUID(ordID.Bytes).String()
+		p.OrderID = &s
+	}
+	if proofURL.Valid {
+		p.ProofURL = &proofURL.String
+	}
+	if confirmedBy.Valid {
+		s := uuid.UUID(confirmedBy.Bytes).String()
+		p.ConfirmedBy = &s
+	}
+	if rejectionNote.Valid {
+		p.RejectionNote = &rejectionNote.String
+	}
+	if gateway.Valid {
+		p.Gateway = &gateway.String
+	}
+	if transactionID.Valid {
+		p.TransactionID = &transactionID.String
+	}
 	return p, nil
 }
 

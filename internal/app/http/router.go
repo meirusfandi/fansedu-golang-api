@@ -48,11 +48,25 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
 			r.Post("/login", handlers.AuthLogin(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Get("/me", handlers.AuthMe(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/logout", handlers.AuthLogout(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/change-password", handlers.AuthChangePassword(deps))
 			r.Post("/forgot-password", handlers.AuthForgotPassword(deps))
 			r.Post("/reset-password", handlers.AuthResetPassword(deps))
 		})
+
+		r.Route("/checkout", func(r chi.Router) {
+			r.Post("/initiate", handlers.CheckoutInitiate(deps))
+			r.Post("/payment-session", handlers.CheckoutPaymentSession(deps))
+		})
+		r.Post("/webhook/payment", handlers.PaymentWebhook(deps))
+
+		r.Route("/programs", func(r chi.Router) {
+			r.Get("/", handlers.ProgramsList(deps))
+			r.Get("/{slug}", handlers.ProgramBySlug(deps))
+		})
+
+		r.Get("/packages", handlers.PackagesListLanding(deps))
 
 		r.Route("/tryouts", func(r chi.Router) {
 			r.Get("/open", handlers.TryoutListOpen(deps))
@@ -71,7 +85,11 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/student", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
 			r.Get("/dashboard", handlers.DashboardStudent(deps))
+			r.Get("/profile", handlers.StudentProfileGet(deps))
+			r.Put("/profile", handlers.StudentProfileUpdate(deps))
 			r.Get("/courses", handlers.StudentCoursesList(deps))
+			r.Get("/courses/by-subject", handlers.StudentCoursesBySubject(deps))
+			r.Get("/transactions", handlers.StudentTransactionsList(deps))
 			r.Get("/payments", handlers.StudentPaymentsList(deps))
 			r.Get("/tryouts", handlers.StudentTryoutList(deps))
 			r.Get("/tryouts/open", handlers.StudentTryoutListOpen(deps))
@@ -83,6 +101,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		r.Route("/courses", func(r chi.Router) {
 			r.Get("/", handlers.CourseList(deps))
+			r.Get("/slug/{slug}", handlers.CourseGetBySlug(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/enroll", handlers.CourseEnroll(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Get("/{courseId}/messages", handlers.CourseMessagesList(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/messages", handlers.CourseMessageCreate(deps))
@@ -119,6 +138,14 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/status", handlers.TrainerStatus(deps))
 			r.Post("/pay", handlers.TrainerPay(deps))
 			r.Post("/students", handlers.TrainerCreateStudent(deps))
+		})
+
+		r.Route("/instructor", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Use(middleware.TrainerOnly())
+			r.Get("/courses", handlers.InstructorCoursesList(deps))
+			r.Get("/students", handlers.InstructorStudentsList(deps))
+			r.Get("/earnings", handlers.InstructorEarningsList(deps))
 		})
 
 		r.Route("/levels", func(r chi.Router) {
