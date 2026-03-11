@@ -41,6 +41,15 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), u.ID)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		// Jika token kosong, berarti butuh verifikasi email dulu.
+		if token == "" && (u.Role == domain.UserRoleStudent || u.Role == domain.UserRoleGuru || u.Role == "instructor") {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"user":               userToMap(u),
+				"need_verification":  true,
+				"message":            "Registrasi berhasil, silakan cek email untuk verifikasi akun.",
+			})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
 			User:  userToMap(u),
 			Token: token,
@@ -63,6 +72,10 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			if err == service.ErrInvalidCreds {
 				http.Error(w, "invalid email or password", http.StatusUnauthorized)
+				return
+			}
+			if err == service.ErrEmailNotVerified {
+				http.Error(w, "email not verified", http.StatusForbidden)
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -123,6 +136,62 @@ func AuthResetPassword(_ *Deps) http.HandlerFunc {
 		// Stub: terima token + new_password, return ok
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	}
+}
+
+// AuthVerifyEmail verifies email using token from JSON body: POST /api/v1/auth/verify-email
+func AuthVerifyEmail(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.Token) == "" {
+			http.Error(w, "token required", http.StatusBadRequest)
+			return
+		}
+		if err := deps.AuthService.VerifyEmail(r.Context(), req.Token); err != nil {
+			http.Error(w, "verification_link_expired_or_invalid", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "email verified, you can now login",
+		})
+	}
+}
+
+// AuthResendVerification handles resend verification link: POST /api/v1/auth/resend-verification
+func AuthResendVerification(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		email := strings.TrimSpace(req.Email)
+		if email == "" {
+			http.Error(w, "email required", http.StatusBadRequest)
+			return
+		}
+		err := deps.AuthService.ResendVerification(r.Context(), email)
+		if err == service.ErrAlreadyVerified {
+			http.Error(w, "already_verified", http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "verification_link_sent",
+		})
 	}
 }
 

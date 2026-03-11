@@ -18,6 +18,7 @@ type User struct {
 	AvatarURL       *string
 	SchoolID        *string
 	SubjectID       *string
+	EmailVerified   bool
 	EmailVerifiedAt *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

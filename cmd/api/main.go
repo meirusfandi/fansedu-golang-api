@@ -107,6 +107,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 	courseMessageRepo := repo.NewCourseMessageRepo(pool)
 	courseDiscussionRepo := repo.NewCourseDiscussionRepo(pool)
 	courseDiscussionReplyRepo := repo.NewCourseDiscussionReplyRepo(pool)
+	emailVerificationTokenRepo := repo.NewEmailVerificationTokenRepo(pool)
 
 	var feedbackGen ai.FeedbackGenerator
 	if openAIAPIKey != "" {
@@ -115,7 +116,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		feedbackGen = ai.NewFallbackFeedbackGenerator()
 	}
 
-	authService := service.NewAuthService(userRepo, jwtSecret)
+	authService := service.NewAuthService(userRepo, emailVerificationTokenRepo, jwtSecret)
 	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo, feedbackGen)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo, questionRepo, attemptAnswerRepo)

@@ -49,6 +49,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
 			r.Post("/login", handlers.AuthLogin(deps))
+			r.Post("/verify-email", handlers.AuthVerifyEmail(deps))
+			r.Post("/resend-verification", handlers.AuthResendVerification(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Get("/me", handlers.AuthMe(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/logout", handlers.AuthLogout(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/change-password", handlers.AuthChangePassword(deps))
