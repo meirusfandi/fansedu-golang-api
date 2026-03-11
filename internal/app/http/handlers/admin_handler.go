@@ -481,6 +481,58 @@ func AdminGetTryoutQuestionStatsBulk(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func AdminGetTryoutAnalysis(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		analysis, err := deps.AdminService.GetTryoutAnalysis(r.Context(), tryoutID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(analysis)
+	}
+}
+
+func AdminListTryoutStudents(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		list, err := deps.AdminService.ListTryoutStudents(r.Context(), tryoutID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(list)
+	}
+}
+
+func AdminGetAttemptAIAnalysis(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		attemptID := chi.URLParam(r, "attemptId")
+		analysis, err := deps.AdminService.GetAttemptAIAnalysis(r.Context(), tryoutID, attemptID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(analysis)
+	}
+}
+
 func AdminListCourses(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		list, err := deps.AdminService.ListCourses(r.Context())

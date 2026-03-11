@@ -50,6 +50,9 @@ type AdminService interface {
 	GetCourseReport(ctx context.Context, courseID string) (*CourseReport, error)
 	GetQuestionStats(ctx context.Context, tryoutID, questionID string) (*QuestionStats, error)
 	GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID string) (*QuestionStatsBulk, error)
+	GetTryoutAnalysis(ctx context.Context, tryoutID string) (*TryoutAnalysis, error)
+	ListTryoutStudents(ctx context.Context, tryoutID string) ([]TryoutStudentItem, error)
+	GetAttemptAIAnalysis(ctx context.Context, tryoutID, attemptID string) (*AttemptAIAnalysisResponse, error)
 }
 
 type MonthlyReport struct {
@@ -84,6 +87,50 @@ type QuestionStatsItem struct {
 type QuestionStatsBulk struct {
 	ParticipantsCount int                `json:"participants_count"`
 	Questions         []QuestionStatsItem `json:"questions"`
+}
+
+// TryoutAnalysis response for GET /admin/tryouts/:tryoutId/analysis (grafik & analisis per soal)
+type TryoutAnalysis struct {
+	TryoutID           string                    `json:"tryout_id"`
+	TryoutTitle        string                    `json:"tryout_title"`
+	ParticipantsCount  int                       `json:"participants_count"`
+	Questions          []TryoutAnalysisQuestion  `json:"questions"`
+}
+
+// TryoutAnalysisQuestion satu soal dalam analisis tryout (siap untuk grafik)
+type TryoutAnalysisQuestion struct {
+	QuestionNumber     int                `json:"question_number"`
+	QuestionID         string             `json:"question_id"`
+	QuestionType       string             `json:"question_type"`
+	AnsweredCount     int                `json:"answered_count"`
+	UnansweredCount   int                `json:"unanswered_count"`
+	CorrectCount      int                `json:"correct_count"`
+	WrongCount        int                `json:"wrong_count"`
+	CorrectPercent    float64            `json:"correct_percent"`
+	WrongPercent      float64            `json:"wrong_percent"`
+	OptionDistribution map[string]int    `json:"option_distribution"` // A, B, C, D, ...
+}
+
+// TryoutStudentItem satu siswa yang submit tryout (untuk daftar + link ke analisis AI)
+type TryoutStudentItem struct {
+	UserID       string   `json:"user_id"`
+	UserName     string   `json:"user_name"`
+	UserEmail    string   `json:"user_email"`
+	AttemptID    string   `json:"attempt_id"`
+	Score        *float64 `json:"score"`
+	MaxScore     *float64 `json:"max_score"`
+	Percentile   *float64 `json:"percentile"`
+	SubmittedAt  *string  `json:"submitted_at"`
+}
+
+// AttemptAIAnalysisResponse analisis AI per attempt (per siswa)
+type AttemptAIAnalysisResponse struct {
+	AttemptID        string   `json:"attempt_id"`
+	Summary          string   `json:"summary"`
+	Recap            string   `json:"recap"`
+	StrengthAreas    []string `json:"strength_areas"`
+	ImprovementAreas []string `json:"improvement_areas"`
+	Recommendation   string   `json:"recommendation"`
 }
 
 // CourseReport laporan rekap skor tryout, kehadiran, progress siswa per kelas (course)

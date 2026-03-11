@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -65,12 +67,21 @@ type adminService struct {
 	}
 	attemptRepo interface {
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
+		GetByID(ctx context.Context, id string) (domain.Attempt, error)
+		ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
 	}
 	attemptAnswerRepo interface {
 		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
 		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
+		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
 	}
+	feedbackRepo interface {
+		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
+		Create(ctx context.Context, f domain.AttemptFeedback) (domain.AttemptFeedback, error)
+		Update(ctx context.Context, f domain.AttemptFeedback) error
+	}
+	feedbackGenerator ai.FeedbackGenerator
 	userCount  func(ctx context.Context) (int, error)
 	attemptAvg func(ctx context.Context) (float64, error)
 	certCount  func(ctx context.Context) (int, error)
@@ -131,12 +142,21 @@ func NewAdminService(
 	},
 	attemptRepo interface {
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
+		GetByID(ctx context.Context, id string) (domain.Attempt, error)
+		ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
 	},
 	attemptAnswerRepo interface {
 		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
 		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
+		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
 	},
+	feedbackRepo interface {
+		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
+		Create(ctx context.Context, f domain.AttemptFeedback) (domain.AttemptFeedback, error)
+		Update(ctx context.Context, f domain.AttemptFeedback) error
+	},
+	feedbackGenerator ai.FeedbackGenerator,
 	userCount func(ctx context.Context) (int, error),
 	attemptAvg func(ctx context.Context) (float64, error),
 	certCount func(ctx context.Context) (int, error),
@@ -152,6 +172,8 @@ func NewAdminService(
 		certificateRepo:  certificateRepo,
 		attemptRepo:      attemptRepo,
 		attemptAnswerRepo: attemptAnswerRepo,
+		feedbackRepo:     feedbackRepo,
+		feedbackGenerator: feedbackGenerator,
 		userCount:        userCount,
 		attemptAvg:       attemptAvg,
 		certCount:        certCount,
@@ -418,6 +440,185 @@ func (s *adminService) GetTryoutQuestionStatsBulk(ctx context.Context, tryoutID 
 		ParticipantsCount: participantsCount,
 		Questions:         out,
 	}, nil
+}
+
+func (s *adminService) GetTryoutAnalysis(ctx context.Context, tryoutID string) (*TryoutAnalysis, error) {
+	t, err := s.tryoutRepo.GetByID(ctx, tryoutID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	participantsCount, _ := s.attemptRepo.ParticipantsCountByTryout(ctx, tryoutID)
+	allAnswers, err := s.attemptAnswerRepo.ListByTryoutFromSubmittedAttempts(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	byQuestion := make(map[string][]domain.AttemptAnswer)
+	for _, a := range allAnswers {
+		byQuestion[a.QuestionID] = append(byQuestion[a.QuestionID], a)
+	}
+	out := make([]TryoutAnalysisQuestion, 0, len(questions))
+	for _, q := range questions {
+		answers := byQuestion[q.ID]
+		answeredCount := len(answers)
+		unansweredCount := participantsCount - answeredCount
+		if unansweredCount < 0 {
+			unansweredCount = 0
+		}
+		var correctCount, wrongCount int
+		optionDist := make(map[string]int)
+		for i := range answers {
+			score := ComputeQuestionScore(q, &answers[i])
+			if score > 0 {
+				correctCount++
+			} else {
+				wrongCount++
+			}
+			if answers[i].SelectedOption != nil && *answers[i].SelectedOption != "" {
+				optionDist[*answers[i].SelectedOption]++
+			}
+		}
+		total := correctCount + wrongCount
+		var correctPercent, wrongPercent float64
+		if total > 0 {
+			correctPercent = float64(correctCount) / float64(total) * 100
+			wrongPercent = float64(wrongCount) / float64(total) * 100
+		}
+		out = append(out, TryoutAnalysisQuestion{
+			QuestionNumber:      q.SortOrder,
+			QuestionID:          q.ID,
+			QuestionType:        q.Type,
+			AnsweredCount:      answeredCount,
+			UnansweredCount:    unansweredCount,
+			CorrectCount:       correctCount,
+			WrongCount:         wrongCount,
+			CorrectPercent:     roundTwo(correctPercent),
+			WrongPercent:       roundTwo(wrongPercent),
+			OptionDistribution: optionDist,
+		})
+	}
+	return &TryoutAnalysis{
+		TryoutID:          tryoutID,
+		TryoutTitle:       t.Title,
+		ParticipantsCount: participantsCount,
+		Questions:         out,
+	}, nil
+}
+
+func (s *adminService) ListTryoutStudents(ctx context.Context, tryoutID string) ([]TryoutStudentItem, error) {
+	if _, err := s.tryoutRepo.GetByID(ctx, tryoutID); err != nil {
+		return nil, ErrNotFound
+	}
+	attempts, err := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TryoutStudentItem, 0, len(attempts))
+	for _, a := range attempts {
+		u, err := s.userRepo.FindByID(ctx, a.UserID)
+		if err != nil {
+			continue
+		}
+		var submittedAt *string
+		if a.SubmittedAt != nil {
+			s := a.SubmittedAt.Format(time.RFC3339)
+			submittedAt = &s
+		}
+		out = append(out, TryoutStudentItem{
+			UserID:      u.ID,
+			UserName:    u.Name,
+			UserEmail:   u.Email,
+			AttemptID:   a.ID,
+			Score:       a.Score,
+			MaxScore:    a.MaxScore,
+			Percentile:  a.Percentile,
+			SubmittedAt: submittedAt,
+		})
+	}
+	return out, nil
+}
+
+func (s *adminService) GetAttemptAIAnalysis(ctx context.Context, tryoutID, attemptID string) (*AttemptAIAnalysisResponse, error) {
+	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if attempt.TryoutSessionID != tryoutID || attempt.Status != domain.AttemptStatusSubmitted {
+		return nil, ErrNotFound
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	answers, err := s.attemptAnswerRepo.ListByAttemptID(ctx, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	score, maxScore := 0.0, 0.0
+	if attempt.Score != nil {
+		score = *attempt.Score
+	}
+	if attempt.MaxScore != nil {
+		maxScore = *attempt.MaxScore
+	}
+
+	fb, err := s.feedbackRepo.GetByAttemptID(ctx, attemptID)
+	if err == nil && (fb.Summary != nil && *fb.Summary != "" || fb.Recap != nil && *fb.Recap != "") {
+		return feedbackToAIAnalysisResponse(attemptID, fb)
+	}
+	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
+		Questions: questions,
+		Answers:   answers,
+		Score:     score,
+		MaxScore:  maxScore,
+	})
+	if err != nil {
+		return &AttemptAIAnalysisResponse{
+			AttemptID:        attemptID,
+			Summary:          "Analisis AI tidak tersedia.",
+			Recap:            "",
+			StrengthAreas:    nil,
+			ImprovementAreas: nil,
+			Recommendation:   "Coba lagi nanti atau periksa konfigurasi AI.",
+		}, nil
+	}
+	strengthJSON, _ := json.Marshal(gen.StrengthAreas)
+	improvementJSON, _ := json.Marshal(gen.ImprovementAreas)
+	_, _ = s.feedbackRepo.Create(ctx, domain.AttemptFeedback{
+		AttemptID:         attemptID,
+		Summary:           &gen.Summary,
+		Recap:             &gen.Recap,
+		StrengthAreas:     strengthJSON,
+		ImprovementAreas:  improvementJSON,
+		RecommendationText: &gen.Recommendation,
+	})
+	return &AttemptAIAnalysisResponse{
+		AttemptID:        attemptID,
+		Summary:          gen.Summary,
+		Recap:            gen.Recap,
+		StrengthAreas:    gen.StrengthAreas,
+		ImprovementAreas: gen.ImprovementAreas,
+		Recommendation:   gen.Recommendation,
+	}, nil
+}
+
+func feedbackToAIAnalysisResponse(attemptID string, fb domain.AttemptFeedback) (*AttemptAIAnalysisResponse, error) {
+	resp := AttemptAIAnalysisResponse{AttemptID: attemptID}
+	if fb.Summary != nil {
+		resp.Summary = *fb.Summary
+	}
+	if fb.Recap != nil {
+		resp.Recap = *fb.Recap
+	}
+	if fb.RecommendationText != nil {
+		resp.Recommendation = *fb.RecommendationText
+	}
+	_ = json.Unmarshal(fb.StrengthAreas, &resp.StrengthAreas)
+	_ = json.Unmarshal(fb.ImprovementAreas, &resp.ImprovementAreas)
+	return &resp, nil
 }
 
 func (s *adminService) GetCourseReport(ctx context.Context, courseID string) (*CourseReport, error) {

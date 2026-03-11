@@ -137,6 +137,61 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 		}
 		c, err := deps.CourseRepo.GetBySlug(r.Context(), slug)
 		if err != nil {
+			// Fallback: slug mungkin dari tabel packages (landing)
+			if deps.LandingPackageRepo != nil {
+				pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), slug)
+				if pkgErr == nil {
+					shortDesc := ""
+					if pkg.ShortDescription != nil {
+						shortDesc = *pkg.ShortDescription
+					}
+					priceDisplay := ""
+					if pkg.PriceDisplay != nil {
+						priceDisplay = *pkg.PriceDisplay
+					} else if pkg.PriceEarlyBird != nil {
+						priceDisplay = *pkg.PriceEarlyBird
+					}
+					dur := "-"
+					if pkg.Durasi != nil {
+						dur = *pkg.Durasi
+					}
+					modules := make([]dto.ProgramModule, 0)
+					if len(pkg.Materi) > 0 {
+						lessons := make([]dto.ProgramLesson, 0, len(pkg.Materi))
+						for _, m := range pkg.Materi {
+							lessons = append(lessons, dto.ProgramLesson{ID: "", Title: m, Duration: ""})
+						}
+						modules = append(modules, dto.ProgramModule{ID: "materi", Title: "Yang akan kamu kuasai", Lessons: lessons})
+					}
+					if len(pkg.Fasilitas) > 0 {
+						lessons := make([]dto.ProgramLesson, 0, len(pkg.Fasilitas))
+						for _, f := range pkg.Fasilitas {
+							lessons = append(lessons, dto.ProgramLesson{ID: "", Title: f, Duration: ""})
+						}
+						modules = append(modules, dto.ProgramModule{ID: "fasilitas", Title: "Fasilitas", Lessons: lessons})
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_ = json.NewEncoder(w).Encode(dto.ProgramDetailResponse{
+						ID:               pkg.ID,
+						Slug:             pkg.Slug,
+						Title:            pkg.Name,
+						ShortDescription: shortDesc,
+						Description:      shortDesc,
+						Thumbnail:        "",
+						Price:            0,
+						PriceDisplay:     priceDisplay,
+						Instructor:       dto.ProgramInstructor{},
+						Category:         "",
+						Level:            "beginner",
+						Duration:         dur,
+						Rating:           4.9,
+						ReviewCount:      0,
+						Modules:          modules,
+						Reviews:          []dto.ProgramReview{},
+					})
+					return
+				}
+			}
 			writeError(w, http.StatusNotFound, "not_found", "program not found")
 			return
 		}

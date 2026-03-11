@@ -21,7 +21,8 @@ func getEnv(key, def string) string {
 func NewRouter(deps *handlers.Deps) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.CORS(getEnv("CORS_ORIGINS", "*")))
+	// CORS: default allow frontend (Vite http://localhost:5173) and all; set CORS_ORIGINS to restrict.
+	r.Use(middleware.CORS(getEnv("CORS_ORIGINS", "http://localhost:5173,*")))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recover())
 	r.Use(chimw.RealIP)
@@ -224,6 +225,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 				r.Route("/{tryoutId}", func(r chi.Router) {
 					r.Put("/", handlers.AdminUpdateTryout(deps))
 					r.Delete("/", handlers.AdminDeleteTryout(deps))
+					r.Get("/analysis", handlers.AdminGetTryoutAnalysis(deps))
+					r.Get("/students", handlers.AdminListTryoutStudents(deps))
 					r.Get("/questions", handlers.AdminListQuestions(deps))
 					r.Get("/questions/stats", handlers.AdminGetTryoutQuestionStatsBulk(deps))
 					r.Post("/questions", handlers.AdminCreateQuestion(deps))
@@ -231,6 +234,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 					r.Put("/questions/{questionId}", handlers.AdminUpdateQuestion(deps))
 					r.Delete("/questions/{questionId}", handlers.AdminDeleteQuestion(deps))
 					r.Get("/questions/{questionId}/stats", handlers.AdminGetQuestionStats(deps))
+					r.Get("/attempts/{attemptId}/ai-analysis", handlers.AdminGetAttemptAIAnalysis(deps))
 				})
 			})
 			r.Post("/certificates", handlers.AdminIssueCertificate(deps))

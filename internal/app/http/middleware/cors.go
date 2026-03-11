@@ -6,11 +6,12 @@ import (
 )
 
 // CORS returns a middleware that sets CORS headers and handles OPTIONS preflight.
-// Allowed origins: set CORS_ORIGINS env (e.g. "*" or "https://app.example.com,http://localhost:3000"). Default "*".
+// Allowed origins: set CORS_ORIGINS env (comma-separated, e.g. "http://localhost:5173,https://app.example.com").
+// Default allows http://localhost:5173 (Vite frontend) and "*".
 func CORS(allowedOrigins string) func(http.Handler) http.Handler {
 	origins := strings.TrimSpace(allowedOrigins)
 	if origins == "" {
-		origins = "*"
+		origins = "http://localhost:5173,*"
 	}
 	allowAll := origins == "*"
 	originList := strings.Split(origins, ",")

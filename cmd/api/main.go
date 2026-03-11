@@ -126,6 +126,8 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		certificateRepo,
 		attemptRepo,
 		attemptAnswerRepo,
+		feedbackRepo,
+		feedbackGen,
 		func(ctx context.Context) (int, error) { return userRepo.CountByRole(ctx, "student") },
 		attemptRepo.AvgScoreSubmitted,
 		certificateRepo.Count,

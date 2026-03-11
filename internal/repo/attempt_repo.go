@@ -14,6 +14,7 @@ type AttemptRepo interface {
 	GetByID(ctx context.Context, id string) (domain.Attempt, error)
 	GetByUserAndTryout(ctx context.Context, userID, tryoutSessionID string) (domain.Attempt, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
+	ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 	Update(ctx context.Context, a domain.Attempt) error
 	AvgScoreSubmitted(ctx context.Context) (float64, error)
 	ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
@@ -62,6 +63,26 @@ func (r *attemptRepo) ListByUserID(ctx context.Context, userID string) ([]domain
 		SELECT id, user_id, tryout_session_id, started_at, submitted_at, status, score, max_score, percentile, time_seconds_spent, created_at, updated_at
 		FROM attempts WHERE user_id = $1::uuid ORDER BY started_at DESC
 	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []domain.Attempt
+	for rows.Next() {
+		var a domain.Attempt
+		if err := rows.Scan(&a.ID, &a.UserID, &a.TryoutSessionID, &a.StartedAt, &a.SubmittedAt, &a.Status, &a.Score, &a.MaxScore, &a.Percentile, &a.TimeSecondsSpent, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+func (r *attemptRepo) ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, user_id, tryout_session_id, started_at, submitted_at, status, score, max_score, percentile, time_seconds_spent, created_at, updated_at
+		FROM attempts WHERE tryout_session_id = $1::uuid AND status = 'submitted' ORDER BY submitted_at DESC
+	`, tryoutSessionID)
 	if err != nil {
 		return nil, err
 	}

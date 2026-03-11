@@ -89,6 +89,11 @@ go run ./cmd/migrate
 - `GET /api/v1/courses` — Daftar kursus
 - `POST /api/v1/courses/{courseId}/enroll` — Bearer required — Daftar kelas
 
+**Landing (untuk frontend Vite, prefix sama dengan VITE_API_URL)**
+- `GET /api/v1/packages` — Daftar paket (Program yang Sedang Dibuka). Response: JSON array, field **snake_case** (`id`, `name`, `slug`, `short_description`, `price_display`, `price_early_bird`, `price_normal`, `cta_label`, `wa_message_template`, `cta_url`, `is_open`, `is_bundle`, `bundle_subtitle`, `durasi`, `materi`, `fasilitas`, `bonus`).
+
+**CORS:** Default mengizinkan origin `http://localhost:5173` (Vite dev) dan `*`. Set env `CORS_ORIGINS` (comma-separated) untuk membatasi, mis. `CORS_ORIGINS=https://app.example.com`.
+
 **Levels (jenjang pendidikan: SD, SMP, SMA)**
 - `GET /api/v1/levels` — Daftar jenjang
 - `GET /api/v1/levels/{id}` — Detail jenjang beserta daftar bidang/mata pelajaran
