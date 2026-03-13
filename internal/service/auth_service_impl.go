@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -125,9 +126,11 @@ func (s *authService) Login(ctx context.Context, email, password string) (domain
 		return domain.User{}, "", ErrInvalidCreds
 	}
 
-	// Require email verification for student/guru/instructor
+	// Require email verification for student/guru/instructor (skip in dev if SKIP_EMAIL_VERIFICATION=1)
 	if (u.Role == domain.UserRoleStudent || u.Role == domain.UserRoleGuru || u.Role == "instructor") && !u.EmailVerified {
-		return domain.User{}, "", ErrEmailNotVerified
+		if os.Getenv("SKIP_EMAIL_VERIFICATION") != "1" && os.Getenv("SKIP_EMAIL_VERIFICATION") != "true" {
+			return domain.User{}, "", ErrEmailNotVerified
+		}
 	}
 
 	token, err := s.signJWT(u.ID, u.Role)

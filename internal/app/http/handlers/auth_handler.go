@@ -75,7 +75,12 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 				return
 			}
 			if err == service.ErrEmailNotVerified {
-				http.Error(w, "email not verified", http.StatusForbidden)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"error": "email not verified",
+					"code":  "email_not_verified",
+				})
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)

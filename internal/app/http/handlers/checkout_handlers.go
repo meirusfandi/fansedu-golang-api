@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
+	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -44,14 +47,67 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "bad_request", "programId, programSlug, or course_slug required")
 			return
 		}
+
+		// Ensure a backing course exists for this slug. Many landing programs only
+		// exist in the packages table; in that case, lazily create a course so
+		// checkout can proceed instead of returning 404.
+		if _, err := deps.CourseRepo.GetBySlug(r.Context(), courseSlug); err != nil && deps.LandingPackageRepo != nil {
+			if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
+				priceCents := parseRupiahToCents(firstNonEmpty(
+					stringPtrValue(pkg.PriceEarlyBird),
+					stringPtrValue(pkg.PriceDisplay),
+					stringPtrValue(pkg.PriceNormal),
+				))
+				desc := pkg.ShortDescription
+				slug := pkg.Slug
+				_, _ = deps.CourseRepo.Create(r.Context(), domain.Course{
+					Title:       pkg.Name,
+					Slug:        &slug,
+					Description: desc,
+					PriceCents:  priceCents,
+				})
+				// We ignore create error here; if it fails, Initiate will still
+				// return ErrCourseNotFound and handler will respond 404 as before.
+			}
+		}
+
 		result, err := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name)
 		if err != nil {
-			if err == service.ErrCourseNotFound {
-				writeError(w, http.StatusNotFound, "not_found", "program not found")
+			// If course still not found, try one more time to create it lazily
+			// from landing packages, then retry Initiate once.
+			if err == service.ErrCourseNotFound && deps.LandingPackageRepo != nil {
+				if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
+					priceCents := parseRupiahToCents(firstNonEmpty(
+						stringPtrValue(pkg.PriceEarlyBird),
+						stringPtrValue(pkg.PriceDisplay),
+						stringPtrValue(pkg.PriceNormal),
+					))
+					desc := pkg.ShortDescription
+					slug := pkg.Slug
+					if _, createErr := deps.CourseRepo.Create(r.Context(), domain.Course{
+						Title:       pkg.Name,
+						Slug:        &slug,
+						Description: desc,
+						PriceCents:  priceCents,
+					}); createErr == nil {
+						// Retry once after successful create
+						if retryResult, retryErr := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name); retryErr == nil {
+							result = retryResult
+							err = nil
+						} else {
+							err = retryErr
+						}
+					}
+				}
+			}
+			if err != nil {
+				if err == service.ErrCourseNotFound {
+					writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
+					return
+				}
+				writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
-			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -65,6 +121,46 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 			},
 		})
 	}
+}
+
+// parseRupiahToCents converts strings like "Rp249.000" into integer cents (Rp * 100).
+func parseRupiahToCents(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	var digits []rune
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		}
+	}
+	if len(digits) == 0 {
+		return 0
+	}
+	n, err := strconv.Atoi(string(digits))
+	if err != nil {
+		return 0
+	}
+	return n * 100
+}
+
+// firstNonEmpty returns the first non-empty string from the arguments.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// stringPtrValue safely dereferences a *string, returning "" if nil.
+func stringPtrValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // CheckoutPaymentSession creates gateway session and returns payment URL. POST /api/v1/checkout/payment-session
