@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -192,6 +194,82 @@ func TrainerCreateStudent(deps *Deps) http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"user": userToMap(u),
 		})
+	}
+}
+
+// TrainerTryoutList returns list of tryouts for trainer/guru (untuk pilih tryout sebelum lihat analisis).
+// GET /api/v1/trainer/tryouts
+func TrainerTryoutList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := deps.AdminService.ListTryouts(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.TryoutResponse, len(list))
+		for i := range list {
+			out[i] = tryoutToDTO(list[i])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// TrainerTryoutAnalysis exposes per-question analysis for trainers/guru using admin service.
+// GET /api/v1/trainer/tryouts/{tryoutId}/analysis
+func TrainerTryoutAnalysis(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		analysis, err := deps.AdminService.GetTryoutAnalysis(r.Context(), tryoutID)
+		if err != nil {
+			if err == service.ErrNotFound {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(analysis)
+	}
+}
+
+// TrainerTryoutStudents exposes per-student list for trainers/guru.
+// GET /api/v1/trainer/tryouts/{tryoutId}/students
+func TrainerTryoutStudents(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		list, err := deps.AdminService.ListTryoutStudents(r.Context(), tryoutID)
+		if err != nil {
+			if err == service.ErrNotFound {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(list)
+	}
+}
+
+// TrainerAttemptAIAnalysis exposes AI-based analysis per attempt for trainers/guru.
+// GET /api/v1/trainer/tryouts/{tryoutId}/attempts/{attemptId}/ai-analysis
+func TrainerAttemptAIAnalysis(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		attemptID := chi.URLParam(r, "attemptId")
+		analysis, err := deps.AdminService.GetAttemptAIAnalysis(r.Context(), tryoutID, attemptID)
+		if err != nil {
+			if err == service.ErrNotFound {
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(analysis)
 	}
 }
 

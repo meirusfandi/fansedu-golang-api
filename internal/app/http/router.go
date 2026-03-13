@@ -141,6 +141,12 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/status", handlers.TrainerStatus(deps))
 			r.Post("/pay", handlers.TrainerPay(deps))
 			r.Post("/students", handlers.TrainerCreateStudent(deps))
+			r.Route("/tryouts", func(r chi.Router) {
+				r.Get("/", handlers.TrainerTryoutList(deps))
+				r.Get("/{tryoutId}/analysis", handlers.TrainerTryoutAnalysis(deps))
+				r.Get("/{tryoutId}/students", handlers.TrainerTryoutStudents(deps))
+				r.Get("/{tryoutId}/attempts/{attemptId}/ai-analysis", handlers.TrainerAttemptAIAnalysis(deps))
+			})
 		})
 
 		r.Route("/instructor", func(r chi.Router) {
@@ -149,6 +155,12 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/courses", handlers.InstructorCoursesList(deps))
 			r.Get("/students", handlers.InstructorStudentsList(deps))
 			r.Get("/earnings", handlers.InstructorEarningsList(deps))
+			r.Route("/tryouts", func(r chi.Router) {
+				r.Get("/", handlers.TrainerTryoutList(deps))
+				r.Get("/{tryoutId}/analysis", handlers.TrainerTryoutAnalysis(deps))
+				r.Get("/{tryoutId}/students", handlers.TrainerTryoutStudents(deps))
+				r.Get("/{tryoutId}/attempts/{attemptId}/ai-analysis", handlers.TrainerAttemptAIAnalysis(deps))
+			})
 		})
 
 		r.Route("/levels", func(r chi.Router) {
