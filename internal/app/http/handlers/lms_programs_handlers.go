@@ -107,8 +107,8 @@ func ProgramsList(deps *Deps) http.HandlerFunc {
 				Title:            c.Title,
 				ShortDescription: shortDesc,
 				Thumbnail:        thumb,
-				Price:            c.PriceCents / 100,
-				PriceDisplay:     formatRupiah(c.PriceCents),
+				Price:            c.Price,
+				PriceDisplay:     formatRupiah(c.Price),
 				Instructor:       instructor,
 				Category:         cat,
 				Level:            "beginner",
@@ -145,12 +145,8 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 					if pkg.ShortDescription != nil {
 						shortDesc = *pkg.ShortDescription
 					}
-					priceDisplay := ""
-					if pkg.PriceDisplay != nil {
-						priceDisplay = *pkg.PriceDisplay
-					} else if pkg.PriceEarlyBird != nil {
-						priceDisplay = *pkg.PriceEarlyBird
-					}
+					priceRupiah := packagePriceRupiah(pkg)
+					priceDisplay := formatRupiah(priceRupiah)
 					dur := "-"
 					if pkg.Durasi != nil {
 						dur = *pkg.Durasi
@@ -178,7 +174,7 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 						ShortDescription: shortDesc,
 						Description:      shortDesc,
 						Thumbnail:        "",
-						Price:            0,
+						Price:            priceRupiah,
 						PriceDisplay:     priceDisplay,
 						Instructor:       dto.ProgramInstructor{},
 						Category:         "",
@@ -246,8 +242,8 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 			ShortDescription: shortDesc,
 			Description:      desc,
 			Thumbnail:        thumb,
-			Price:            c.PriceCents / 100,
-			PriceDisplay:     formatRupiah(c.PriceCents),
+			Price:            c.Price,
+			PriceDisplay:     formatRupiah(c.Price),
 			Instructor:       instructor,
 			Category:         cat,
 			Level:            "beginner",

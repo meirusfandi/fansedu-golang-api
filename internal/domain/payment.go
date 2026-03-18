@@ -18,7 +18,7 @@ type Payment struct {
 	ID             string
 	UserID         string
 	OrderID        *string
-	AmountCents    int
+	Amount int // rupiah
 	Currency       string
 	Status         string
 	Type           string

@@ -22,6 +22,7 @@ type Config struct {
 	DatabaseURL   string
 	JWTSecret     string
 	OpenAIAPIKey  string // opsional: untuk generate feedback dengan AI saat submit tryout
+	AppURL        string // URL frontend/app untuk link di email (contoh: https://app.fansedu.com)
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -50,6 +51,7 @@ func Load() Config {
 		DatabaseURL:  getenv("DATABASE_URL", ""),
 		JWTSecret:    getenv("JWT_SECRET", defaultDevJWTSecret),
 		OpenAIAPIKey: getenv("OPENAI_API_KEY", ""),
+		AppURL:       getenv("APP_URL", "http://localhost:5173"),
 	}
 
 	if cfg.Env == EnvProduction {

@@ -48,6 +48,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
+			r.Post("/register-with-invite", handlers.AuthRegisterWithInvite(deps))
 			r.Post("/login", handlers.AuthLogin(deps))
 			r.Post("/verify-email", handlers.AuthVerifyEmail(deps))
 			r.Post("/resend-verification", handlers.AuthResendVerification(deps))
@@ -59,8 +60,10 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		})
 
 		r.Route("/checkout", func(r chi.Router) {
-			r.Post("/initiate", handlers.CheckoutInitiate(deps))
+			r.With(middleware.OptionalAuth(deps.JWTSecret)).Post("/initiate", handlers.CheckoutInitiate(deps))
 			r.Post("/payment-session", handlers.CheckoutPaymentSession(deps))
+			r.Post("/payment-session/", handlers.CheckoutPaymentSession(deps))
+			r.Post("/orders/{orderId}/payment-proof", handlers.CheckoutPaymentProof(deps))
 		})
 		r.Post("/webhook/payment", handlers.PaymentWebhook(deps))
 
@@ -188,6 +191,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/payments", handlers.AdminListPayments(deps))
 			r.Post("/payments", handlers.AdminCreatePayment(deps))
 			r.Put("/payments/{paymentId}", handlers.AdminConfirmPayment(deps))
+			r.Put("/orders/{orderId}/verify", handlers.AdminVerifyOrder(deps))
 			r.Get("/reports/monthly", handlers.AdminReportMonthly(deps))
 			r.Get("/reports/courses/{courseId}", handlers.AdminCourseReport(deps))
 			r.Get("/roles", handlers.AdminListRoles(deps))

@@ -6,7 +6,7 @@ ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 
 -- 2. Courses: slug, price, thumbnail (instructor = created_by)
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS price_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS price INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS thumbnail VARCHAR(512);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_slug ON courses (slug) WHERE slug IS NOT NULL;
 
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   status             order_status NOT NULL DEFAULT 'pending',
-  total_price_cents  INTEGER NOT NULL DEFAULT 0,
+  total_price        INTEGER NOT NULL DEFAULT 0,
   payment_method     VARCHAR(50),
   payment_reference  VARCHAR(255),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id   UUID NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
   course_id  UUID NOT NULL REFERENCES courses (id) ON DELETE CASCADE,
-  price_cents INTEGER NOT NULL DEFAULT 0,
+  price      INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id);

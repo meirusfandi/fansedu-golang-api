@@ -34,7 +34,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS payments (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  amount_cents  INTEGER NOT NULL,
+  amount        INTEGER NOT NULL,
   currency      VARCHAR(3) NOT NULL DEFAULT 'IDR',
   status        payment_status NOT NULL DEFAULT 'pending',
   type          payment_type NOT NULL DEFAULT 'course_purchase',

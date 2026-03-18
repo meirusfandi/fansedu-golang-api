@@ -344,11 +344,11 @@ func (s *adminService) ReportMonthly(ctx context.Context, year, month int) (*Mon
 	paymentsCount, _ := s.paymentRepo.CountPaidInMonth(ctx, year, month)
 	revenue, _ := s.paymentRepo.TotalAmountPaidInMonth(ctx, year, month)
 	return &MonthlyReport{
-		Year:              year,
-		Month:             month,
-		NewEnrollments:    enrollments,
-		PaymentsCount:     paymentsCount,
-		TotalRevenueCents: revenue,
+		Year:           year,
+		Month:          month,
+		NewEnrollments: enrollments,
+		PaymentsCount:  paymentsCount,
+		TotalRevenue:   revenue,
 	}, nil
 }
 

@@ -28,7 +28,7 @@ type NotificationItem struct {
 type UserPaymentResponse struct {
 	ID           string `json:"id"`
 	UserID       string `json:"user_id"`
-	AmountCents  int    `json:"amount_cents"`
+	Amount       int    `json:"amount"`
 	Currency     string `json:"currency"`
 	Status       string `json:"status"`
 	Type         string `json:"type"`

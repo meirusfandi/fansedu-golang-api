@@ -57,6 +57,45 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// AuthRegisterWithInvite: POST /api/v1/auth/register-with-invite
+// Body: { "token", "email", "name", "password" } — token dari link email checkout.
+func AuthRegisterWithInvite(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Token    string `json:"token"`
+			Email    string `json:"email"`
+			Name     string `json:"name"`
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		if req.Token == "" || req.Email == "" || req.Password == "" {
+			http.Error(w, "token, email, and password required", http.StatusBadRequest)
+			return
+		}
+		u, token, err := deps.AuthService.RegisterWithInvite(r.Context(), req.Token, req.Email, req.Name, req.Password)
+		if err != nil {
+			if err == service.ErrInviteInvalid {
+				writeError(w, http.StatusBadRequest, "invalid_invite", "Token tidak valid atau sudah kadaluarsa")
+				return
+			}
+			if err == service.ErrInviteAlreadyUsed {
+				writeError(w, http.StatusBadRequest, "invite_used", "Link registrasi sudah digunakan")
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
+			User:  userToMap(u),
+			Token: token,
+		})
+	}
+}
+
 func AuthLogin(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.LoginRequest

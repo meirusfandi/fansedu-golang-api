@@ -60,7 +60,7 @@ type MonthlyReport struct {
 	Month              int   `json:"month"`
 	NewEnrollments     int   `json:"new_enrollments"`
 	PaymentsCount      int   `json:"payments_count"`
-	TotalRevenueCents  int64 `json:"total_revenue_cents"`
+	TotalRevenue int64 `json:"total_revenue"`
 }
 
 // QuestionStats response for GET /admin/tryouts/:tryoutId/questions/:questionId/stats

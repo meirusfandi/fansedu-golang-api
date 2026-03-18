@@ -547,7 +547,7 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 				Title:       list[i].Title,
 				Slug:        list[i].Slug,
 				Description: list[i].Description,
-				PriceCents:  list[i].PriceCents,
+				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
@@ -572,7 +572,7 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 			Title:       c.Title,
 			Slug:        c.Slug,
 			Description: c.Description,
-			PriceCents:  c.PriceCents,
+			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
 			CreatedBy:   c.CreatedBy,
@@ -600,8 +600,8 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			SubjectID:   req.SubjectID,
 			CreatedBy:   createdByPtr,
 		}
-		if req.PriceCents != nil {
-			c.PriceCents = *req.PriceCents
+		if req.Price != nil {
+			c.Price = *req.Price
 		}
 		created, err := deps.AdminService.CreateCourse(r.Context(), c)
 		if err != nil {
@@ -615,7 +615,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Title:       created.Title,
 			Slug:        created.Slug,
 			Description: created.Description,
-			PriceCents:  created.PriceCents,
+			Price:       created.Price,
 			Thumbnail:   created.Thumbnail,
 			SubjectID:   created.SubjectID,
 			CreatedBy:   created.CreatedBy,
@@ -644,8 +644,8 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 		if req.Slug != nil {
 			c.Slug = req.Slug
 		}
-		if req.PriceCents != nil {
-			c.PriceCents = *req.PriceCents
+		if req.Price != nil {
+			c.Price = *req.Price
 		}
 		if req.Thumbnail != nil {
 			c.Thumbnail = req.Thumbnail
@@ -842,9 +842,9 @@ func AdminListPayments(deps *Deps) http.HandlerFunc {
 				paidAt = &s
 			}
 			out[i] = dto.PaymentResponse{
-				ID:          list[i].ID,
-				UserID:      list[i].UserID,
-				AmountCents: list[i].AmountCents,
+				ID:     list[i].ID,
+				UserID: list[i].UserID,
+				Amount: list[i].Amount,
 				Currency:    list[i].Currency,
 				Status:      list[i].Status,
 				Type:        list[i].Type,
@@ -870,8 +870,8 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		if req.UserID == "" || req.AmountCents <= 0 {
-			http.Error(w, "user_id and amount_cents required", http.StatusBadRequest)
+		if req.UserID == "" || req.Amount <= 0 {
+			http.Error(w, "user_id and amount required", http.StatusBadRequest)
 			return
 		}
 		status := req.Status
@@ -892,8 +892,8 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			currency = "IDR"
 		}
 		p := domain.Payment{
-			UserID:      req.UserID,
-			AmountCents: req.AmountCents,
+			UserID: req.UserID,
+			Amount: req.Amount,
 			Currency:    currency,
 			Status:      status,
 			Type:        ptype,
@@ -914,14 +914,14 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			paidAtStr = &s
 		}
 		_ = json.NewEncoder(w).Encode(dto.PaymentResponse{
-			ID:          created.ID,
-			UserID:      created.UserID,
-			AmountCents: created.AmountCents,
-			Currency:    created.Currency,
-			Status:      created.Status,
-			Type:        created.Type,
-			PaidAt:      paidAtStr,
-			CreatedAt:   created.CreatedAt.Format(time.RFC3339),
+			ID:        created.ID,
+			UserID:    created.UserID,
+			Amount:    created.Amount,
+			Currency:  created.Currency,
+			Status:    created.Status,
+			Type:      created.Type,
+			PaidAt:    paidAtStr,
+			CreatedAt: created.CreatedAt.Format(time.RFC3339),
 		})
 	}
 }
@@ -951,6 +951,27 @@ func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// AdminVerifyOrder: PUT /api/v1/admin/orders/:orderId/verify — verifikasi pembayaran, enroll user, kirim email.
+func AdminVerifyOrder(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		orderID := chi.URLParam(r, "orderId")
+		if orderID == "" {
+			writeError(w, http.StatusBadRequest, "bad_request", "orderId required")
+			return
+		}
+		if err := deps.CheckoutService.VerifyOrder(r.Context(), orderID); err != nil {
+			if err == service.ErrOrderNotFound {
+				writeError(w, http.StatusNotFound, "order_not_found", "order tidak ditemukan")
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "Pembayaran terverifikasi, user ter-enroll"})
+	}
+}
+
 func AdminReportMonthly(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		year, month := time.Now().Year(), int(time.Now().Month())
@@ -975,7 +996,7 @@ func AdminReportMonthly(deps *Deps) http.HandlerFunc {
 			Month:             report.Month,
 			NewEnrollments:    report.NewEnrollments,
 			PaymentsCount:     report.PaymentsCount,
-			TotalRevenueCents: report.TotalRevenueCents,
+			TotalRevenue: report.TotalRevenue,
 		})
 	}
 }

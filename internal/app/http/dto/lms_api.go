@@ -103,12 +103,17 @@ type StudentTransactionsResponse struct {
 }
 
 type StudentTransactionItem struct {
-	ID       string                    `json:"id"`
-	OrderID  string                    `json:"orderId"`
-	Status   string                    `json:"status"`
-	Total    int                       `json:"total"`
-	Programs []StudentTransactionProgram `json:"programs"`
-	PaidAt   string                    `json:"paidAt"`
+	ID                string                     `json:"id"`
+	OrderID           string                     `json:"orderId"`
+	Status            string                     `json:"status"`
+	Total             int                        `json:"total"`
+	NormalPrice       int                        `json:"normalPrice"`
+	PromoCode         string                     `json:"promoCode"`
+	Discount          int                        `json:"discount"`
+	DiscountPercent   float64                    `json:"discountPercent"`
+	ConfirmationCode  string                     `json:"confirmationCode"`
+	Programs          []StudentTransactionProgram `json:"programs"`
+	PaidAt            string                     `json:"paidAt"`
 }
 
 type StudentTransactionProgram struct {
@@ -144,17 +149,24 @@ type CheckoutInitiateRequestLMS struct {
 	ProgramSlug string `json:"programSlug"`
 	Name        string `json:"name"`
 	Email       string `json:"email"`
+	PromoCode   string `json:"promoCode"`
 }
 
 type CheckoutInitiateResponseLMS struct {
-	CheckoutID string             `json:"checkoutId"`
-	OrderID    string             `json:"orderId"`
-	Total      int                `json:"total"`
-	Program    CheckoutProgramInfo `json:"program"`
+	CheckoutID       string               `json:"checkoutId"`
+	OrderID          string               `json:"orderId"`
+	Total            int                  `json:"total"`
+	Program          CheckoutProgramInfo  `json:"program"`
+	NormalPrice      int                  `json:"normalPrice"`
+	PromoCode        string               `json:"promoCode,omitempty"`
+	Discount          int                  `json:"discount"`
+	DiscountPercent  float64              `json:"discountPercent"`
+	FinalPrice       int                  `json:"finalPrice"`
+	ConfirmationCode string               `json:"confirmationCode"`
 }
 
 type CheckoutProgramInfo struct {
-	Title       string `json:"title"`
+	Title        string `json:"title"`
 	PriceDisplay string `json:"priceDisplay"`
 }
 

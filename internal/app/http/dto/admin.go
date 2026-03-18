@@ -80,7 +80,7 @@ type CourseCreateRequest struct {
 	Title       string  `json:"title"`
 	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
-	PriceCents  *int    `json:"price_cents,omitempty"`
+	Price       *int    `json:"price,omitempty"` // nominal dalam rupiah
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subject_id,omitempty"`
 }
@@ -111,8 +111,8 @@ type CourseContentResponse struct {
 }
 
 type PaymentCreateRequest struct {
-	UserID      string  `json:"user_id"`
-	AmountCents int     `json:"amount_cents"`
+	UserID string `json:"user_id"`
+	Amount int    `json:"amount"`
 	Currency    string  `json:"currency"`
 	Type        string  `json:"type"`
 	ReferenceID *string `json:"reference_id,omitempty"`
@@ -121,14 +121,14 @@ type PaymentCreateRequest struct {
 }
 
 type PaymentResponse struct {
-	ID          string  `json:"id"`
-	UserID      string  `json:"user_id"`
-	AmountCents int     `json:"amount_cents"`
-	Currency    string  `json:"currency"`
-	Status      string  `json:"status"`
-	Type        string  `json:"type"`
-	PaidAt      *string `json:"paid_at,omitempty"`
-	CreatedAt   string  `json:"created_at"`
+	ID       string  `json:"id"`
+	UserID   string  `json:"user_id"`
+	Amount   int     `json:"amount"`
+	Currency string  `json:"currency"`
+	Status   string  `json:"status"`
+	Type     string  `json:"type"`
+	PaidAt   *string `json:"paid_at,omitempty"`
+	CreatedAt string `json:"created_at"`
 }
 
 type MonthlyReportResponse struct {
@@ -136,7 +136,7 @@ type MonthlyReportResponse struct {
 	Month              int   `json:"month"`
 	NewEnrollments     int   `json:"new_enrollments"`
 	PaymentsCount      int   `json:"payments_count"`
-	TotalRevenueCents  int64 `json:"total_revenue_cents"`
+	TotalRevenue int64 `json:"total_revenue"`
 }
 
 // --- Role ---

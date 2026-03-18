@@ -15,10 +15,12 @@ import (
 )
 
 var (
-	ErrEmailExists      = errors.New("email already registered")
-	ErrInvalidCreds     = errors.New("invalid email or password")
-	ErrEmailNotVerified = errors.New("email not verified")
-	ErrAlreadyVerified  = errors.New("already verified")
+	ErrEmailExists       = errors.New("email already registered")
+	ErrInvalidCreds      = errors.New("invalid email or password")
+	ErrEmailNotVerified  = errors.New("email not verified")
+	ErrAlreadyVerified   = errors.New("already verified")
+	ErrInviteInvalid     = errors.New("invite token tidak valid atau sudah kadaluarsa")
+	ErrInviteAlreadyUsed = errors.New("invite token sudah digunakan")
 )
 
 type authService struct {
@@ -32,6 +34,10 @@ type authService struct {
 		Create(ctx context.Context, t domain.EmailVerificationToken) (domain.EmailVerificationToken, error)
 		GetByToken(ctx context.Context, token string) (domain.EmailVerificationToken, error)
 		MarkUsed(ctx context.Context, id string, usedAt time.Time) error
+	}
+	inviteRepo interface {
+		GetByToken(ctx context.Context, token string) (domain.UserInvite, error)
+		MarkUsed(ctx context.Context, id string, usedAt interface{}) error
 	}
 	jwtSecret  []byte
 	jwtExpiry  time.Duration
@@ -47,10 +53,14 @@ func NewAuthService(userRepo interface {
 	Create(ctx context.Context, t domain.EmailVerificationToken) (domain.EmailVerificationToken, error)
 	GetByToken(ctx context.Context, token string) (domain.EmailVerificationToken, error)
 	MarkUsed(ctx context.Context, id string, usedAt time.Time) error
+}, inviteRepo interface {
+	GetByToken(ctx context.Context, token string) (domain.UserInvite, error)
+	MarkUsed(ctx context.Context, id string, usedAt interface{}) error
 }, jwtSecret []byte) AuthService {
 	return &authService{
 		userRepo:       userRepo,
 		emailTokenRepo: emailTokenRepo,
+		inviteRepo:     inviteRepo,
 		jwtSecret:      jwtSecret,
 		jwtExpiry:      24 * time.Hour,
 		bcryptCost:     bcrypt.DefaultCost,
@@ -101,6 +111,49 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		return domain.User{}, "", err
 	}
 	return u, token, nil
+}
+
+func (s *authService) RegisterWithInvite(ctx context.Context, token, email, name, password string) (domain.User, string, error) {
+	if s.inviteRepo == nil {
+		return domain.User{}, "", ErrInviteInvalid
+	}
+	inv, err := s.inviteRepo.GetByToken(ctx, token)
+	if err != nil {
+		return domain.User{}, "", ErrInviteInvalid
+	}
+	if inv.UsedAt != nil {
+		return domain.User{}, "", ErrInviteAlreadyUsed
+	}
+	if time.Now().After(inv.ExpiresAt) {
+		return domain.User{}, "", ErrInviteInvalid
+	}
+	if strings.TrimSpace(strings.ToLower(email)) != strings.TrimSpace(strings.ToLower(inv.Email)) {
+		return domain.User{}, "", ErrInviteInvalid
+	}
+	u, err := s.userRepo.FindByID(ctx, inv.UserID)
+	if err != nil {
+		return domain.User{}, "", ErrInviteInvalid
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	if err != nil {
+		return domain.User{}, "", err
+	}
+	u.PasswordHash = string(hash)
+	if name != "" {
+		u.Name = name
+	}
+	u.EmailVerified = true
+	now := time.Now()
+	u.EmailVerifiedAt = &now
+	if err := s.userRepo.Update(ctx, u); err != nil {
+		return domain.User{}, "", err
+	}
+	_ = s.inviteRepo.MarkUsed(ctx, inv.ID, nil)
+	jwtToken, err := s.signJWT(u.ID, u.Role)
+	if err != nil {
+		return domain.User{}, "", err
+	}
+	return u, jwtToken, nil
 }
 
 func normalizeRegisterRole(r string) string {

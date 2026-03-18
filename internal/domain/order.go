@@ -9,20 +9,29 @@ const (
 )
 
 type Order struct {
-	ID                string
-	UserID            string
-	Status            string
-	TotalPriceCents   int
-	PaymentMethod     *string
-	PaymentReference  *string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID               string
+	UserID           string
+	Status           string
+	TotalPrice       int    // final amount (rupiah)
+	NormalPrice      int    // harga normal sebelum promo (rupiah)
+	PromoCode        *string
+	Discount         int    // potongan (rupiah)
+	DiscountPercent  *float64
+	ConfirmationCode   *string // 3 digit unik untuk konfirmasi pembayaran
+	PaymentMethod      *string
+	PaymentReference   *string
+	PaymentProofURL    *string
+	PaymentProofAt     *time.Time
+	SenderAccountNo    *string
+	SenderName         *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type OrderItem struct {
-	ID         string
-	OrderID    string
-	CourseID   string
-	PriceCents int
-	CreatedAt  time.Time
+	ID        string
+	OrderID   string
+	CourseID  string
+	Price     int // rupiah
+	CreatedAt time.Time
 }

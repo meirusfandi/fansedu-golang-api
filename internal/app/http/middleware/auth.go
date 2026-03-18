@@ -86,6 +86,40 @@ func GetRole(ctx context.Context) (string, bool) {
 	return s, ok
 }
 
+// OptionalAuth parses JWT when Authorization header is present and sets user/role in context.
+// Does not return 401 when header is missing — so checkout can work for both guest and logged-in users.
+func OptionalAuth(jwtSecret []byte) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tokenStr, ok := bearerToken(r.Header.Get("Authorization"))
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, errors.New("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || token == nil || !token.Valid {
+				next.ServeHTTP(w, r)
+				return
+			}
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			userID, _ := claims["sub"].(string)
+			role, _ := claims["role"].(string)
+			ctx := context.WithValue(r.Context(), ctxKeyUserID{}, userID)
+			ctx = context.WithValue(ctx, ctxKeyRole{}, role)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func bearerToken(v string) (string, bool) {
 	if v == "" {
 		return "", false

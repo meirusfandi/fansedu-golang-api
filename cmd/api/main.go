@@ -18,6 +18,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/config"
 	"github.com/meirusfandi/fansedu-golang-api/internal/db"
+	"github.com/meirusfandi/fansedu-golang-api/internal/mail"
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -59,7 +60,7 @@ func main() {
 	if pool == nil {
 		router = httpapi.NewRouter(nil)
 	} else {
-		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey)
+		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL)
 		router = httpapi.NewRouter(deps)
 	}
 
@@ -83,7 +84,7 @@ func main() {
 	log.Printf("shutdown complete")
 }
 
-func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handlers.Deps {
+func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string) *handlers.Deps {
 	userRepo := repo.NewUserRepo(pool)
 	tryoutRepo := repo.NewTryoutRepo(pool)
 	questionRepo := repo.NewQuestionRepo(pool)
@@ -116,7 +117,8 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		feedbackGen = ai.NewFallbackFeedbackGenerator()
 	}
 
-	authService := service.NewAuthService(userRepo, emailVerificationTokenRepo, jwtSecret)
+	userInviteRepo := repo.NewUserInviteRepo(pool)
+	authService := service.NewAuthService(userRepo, emailVerificationTokenRepo, userInviteRepo, jwtSecret)
 	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo, feedbackGen)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo, questionRepo, attemptAnswerRepo)
@@ -137,7 +139,12 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 	trainerService := service.NewTrainerService(userRepo, trainerRepo)
 	orderRepo := repo.NewOrderRepo(pool)
 	orderItemRepo := repo.NewOrderItemRepo(pool)
-	checkoutService := service.NewCheckoutService(courseRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo)
+	promoRepo := repo.NewPromoRepo(pool)
+	mailer := mail.NewLogMailer()
+	if appURL == "" {
+		appURL = "http://localhost:5173"
+	}
+	checkoutService := service.NewCheckoutService(courseRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo, promoRepo, mailer, userInviteRepo, appURL)
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 
 	return &handlers.Deps{
@@ -169,6 +176,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey string) *handl
 		PaymentRepo:              paymentRepo,
 		OrderRepo:                orderRepo,
 		OrderItemRepo:            orderItemRepo,
+		PromoRepo:                promoRepo,
 		NotificationRepo:        notificationRepo,
 		CourseMessageRepo:        courseMessageRepo,
 		CourseDiscussionRepo:      courseDiscussionRepo,

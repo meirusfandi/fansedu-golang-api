@@ -5,7 +5,7 @@ type CourseResponse struct {
 	Title       string  `json:"title"`
 	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
-	PriceCents  int     `json:"price_cents"`
+	Price       int     `json:"price"` // nominal dalam rupiah
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subject_id,omitempty"`
 	CreatedBy   *string `json:"created_by,omitempty"`

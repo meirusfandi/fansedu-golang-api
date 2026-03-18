@@ -7,7 +7,7 @@ type Course struct {
 	Title       string
 	Slug        *string
 	Description *string
-	PriceCents  int
+	Price int // nominal dalam rupiah
 	Thumbnail   *string
 	SubjectID   *string
 	CreatedBy   *string

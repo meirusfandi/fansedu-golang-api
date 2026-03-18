@@ -4,13 +4,13 @@
 --
 -- Idempotent: hanya membuat course untuk slug yang belum ada di courses.
 
-INSERT INTO courses (id, title, slug, description, price_cents, thumbnail, subject_id, created_by, created_at, updated_at)
+INSERT INTO courses (id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at)
 SELECT
   gen_random_uuid()                                    AS id,
   p.name                                               AS title,
   p.slug                                               AS slug,
   p.short_description                                  AS description,
-  0                                                    AS price_cents,
+  COALESCE(p.price_early_bird, p.price_normal, 0)      AS price,
   NULL                                                 AS thumbnail,
   NULL                                                 AS subject_id,
   NULL                                                 AS created_by,

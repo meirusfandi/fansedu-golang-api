@@ -170,18 +170,18 @@ func PaymentCreate(deps *Deps) http.HandlerFunc {
 			return
 		}
 		var req struct {
-			AmountCents  int     `json:"amount_cents"`
-			Type         string  `json:"type"`
-			ReferenceID  *string `json:"reference_id"`
-			Description  *string `json:"description"`
-			ProofURL     *string `json:"proof_url"`
+			Amount      int     `json:"amount"`
+			Type        string  `json:"type"`
+			ReferenceID *string `json:"reference_id"`
+			Description *string `json:"description"`
+			ProofURL    *string `json:"proof_url"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		if req.AmountCents <= 0 {
-			http.Error(w, "amount_cents must be positive", http.StatusBadRequest)
+		if req.Amount <= 0 {
+			http.Error(w, "amount must be positive", http.StatusBadRequest)
 			return
 		}
 		ptype := req.Type
@@ -189,8 +189,8 @@ func PaymentCreate(deps *Deps) http.HandlerFunc {
 			ptype = domain.PaymentTypeCoursePurchase
 		}
 		p := domain.Payment{
-			UserID:      userID,
-			AmountCents: req.AmountCents,
+			UserID: userID,
+			Amount: req.Amount,
 			Currency:    "IDR",
 			Status:      domain.PaymentStatusPending,
 			Type:        ptype,
@@ -221,9 +221,9 @@ func paymentToResponse(p domain.Payment) dto.UserPaymentResponse {
 		paidAt = p.PaidAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 	return dto.UserPaymentResponse{
-		ID:           p.ID,
-		UserID:       p.UserID,
-		AmountCents:  p.AmountCents,
+		ID:       p.ID,
+		UserID:   p.UserID,
+		Amount:   p.Amount,
 		Currency:     p.Currency,
 		Status:       p.Status,
 		Type:         p.Type,
@@ -750,13 +750,30 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 			if o.Status == domain.OrderStatusPaid {
 				paidAt = o.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 			}
+			discountPct := 0.0
+			if o.DiscountPercent != nil {
+				discountPct = *o.DiscountPercent
+			}
+			promoCode := ""
+			if o.PromoCode != nil {
+				promoCode = *o.PromoCode
+			}
+			confCode := ""
+			if o.ConfirmationCode != nil {
+				confCode = *o.ConfirmationCode
+			}
 			data = append(data, dto.StudentTransactionItem{
-				ID:       o.ID,
-				OrderID:  o.ID,
-				Status:   o.Status,
-				Total:    o.TotalPriceCents / 100,
-				Programs: programs,
-				PaidAt:   paidAt,
+				ID:               o.ID,
+				OrderID:          o.ID,
+				Status:           o.Status,
+				Total:            o.TotalPrice,
+				NormalPrice:      o.NormalPrice,
+				PromoCode:        promoCode,
+				Discount:         o.Discount,
+				DiscountPercent:  discountPct,
+				ConfirmationCode: confCode,
+				Programs:         programs,
+				PaidAt:           paidAt,
 			})
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -817,7 +834,7 @@ func InstructorEarningsList(deps *Deps) http.HandlerFunc {
 }
 
 // PackagesListLanding returns packages for landing page "Program yang Sedang Dibuka". GET /api/v1/packages
-// Response: array of objects with snake_case (id, name, slug, short_description, price_display, ...).
+// Response: array of objects with snake_case (id, name, slug, price_early_bird, price_normal, ...).
 func PackagesListLanding(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var list []domain.LandingPackage
@@ -837,11 +854,12 @@ func PackagesListLanding(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func formatRupiah(cents int) string {
-	if cents < 0 {
+// formatRupiah formats amount (dalam rupiah) ke string "RpXXX.XXX".
+func formatRupiah(rupiah int) string {
+	if rupiah < 0 {
 		return "Rp0"
 	}
-	s := strconv.Itoa(cents / 100)
+	s := strconv.Itoa(rupiah)
 	var b []byte
 	for i, c := range s {
 		if i > 0 && (len(s)-i)%3 == 0 {

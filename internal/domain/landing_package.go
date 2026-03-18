@@ -2,14 +2,13 @@ package domain
 
 // LandingPackage is a package/program for the landing page (snake_case in API response).
 type LandingPackage struct {
-	ID                 string   `json:"id"`
-	Name               string   `json:"name"`
-	Slug               string   `json:"slug"`
-	ShortDescription   *string  `json:"short_description,omitempty"`
-	PriceDisplay       *string  `json:"price_display,omitempty"`
-	PriceEarlyBird     *string  `json:"price_early_bird,omitempty"`
-	PriceNormal        *string  `json:"price_normal,omitempty"`
-	CTALabel           string   `json:"cta_label"`
+	ID                   string   `json:"id"`
+	Name                 string   `json:"name"`
+	Slug                 string   `json:"slug"`
+	ShortDescription     *string  `json:"short_description,omitempty"`
+	PriceEarlyBird  *int64   `json:"price_early_bird,omitempty"`  // nominal dalam rupiah
+	PriceNormal     *int64   `json:"price_normal,omitempty"`     // nominal dalam rupiah
+	CTALabel             string   `json:"cta_label"`
 	WAMessageTemplate  *string  `json:"wa_message_template,omitempty"`
 	CTAURL             *string  `json:"cta_url,omitempty"`
 	IsOpen             bool     `json:"is_open"`

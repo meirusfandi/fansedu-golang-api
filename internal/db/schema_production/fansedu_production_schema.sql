@@ -151,7 +151,7 @@ CREATE TABLE classes (
   title       VARCHAR(500) NOT NULL,
   description TEXT,
   capacity    INTEGER NOT NULL DEFAULT 50 CHECK (capacity > 0),
-  price_cents INTEGER NOT NULL DEFAULT 0,
+  price INTEGER NOT NULL DEFAULT 0,
   status      class_status NOT NULL DEFAULT 'draft',
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -383,7 +383,7 @@ CREATE TYPE payment_confirmation_status AS ENUM ('pending', 'confirmed', 'reject
 CREATE TABLE orders (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  total_cents   INTEGER NOT NULL DEFAULT 0,
+  total_price   INTEGER NOT NULL DEFAULT 0,
   currency      VARCHAR(3) NOT NULL DEFAULT 'IDR',
   status        order_status NOT NULL DEFAULT 'pending',
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -400,8 +400,8 @@ CREATE TABLE order_items (
   item_type    order_item_type NOT NULL,
   item_id      UUID,
   quantity     INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-  unit_cents   INTEGER NOT NULL,
-  total_cents  INTEGER NOT NULL,
+  unit_price   INTEGER NOT NULL,
+  total_price  INTEGER NOT NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 COMMENT ON TABLE order_items IS 'Line items: class purchase, tryout, teacher slots, etc.';
@@ -411,7 +411,7 @@ CREATE INDEX idx_order_items_item ON order_items (item_type, item_id);
 CREATE TABLE payments (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id        UUID NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
-  amount_cents    INTEGER NOT NULL,
+  amount          INTEGER NOT NULL,
   method          payment_method NOT NULL DEFAULT 'bank_transfer',
   status          payment_confirmation_status NOT NULL DEFAULT 'pending',
   proof_url       VARCHAR(1024),
