@@ -1,13 +1,5 @@
 package dto
 
-// --- Auth (spec: user + token, auth/me) ---
-type AuthUserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"` // "student" | "instructor"
-}
-
 // --- Programs (katalog) ---
 type ProgramsListResponse struct {
 	Data       []ProgramListItem `json:"data"`

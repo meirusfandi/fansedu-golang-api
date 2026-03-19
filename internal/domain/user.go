@@ -20,6 +20,7 @@ type User struct {
 	SubjectID       *string
 	EmailVerified   bool
 	EmailVerifiedAt *time.Time
+	MustSetPassword bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

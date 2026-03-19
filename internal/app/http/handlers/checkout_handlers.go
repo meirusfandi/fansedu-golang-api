@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -19,19 +21,21 @@ import (
 func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ProgramID     string `json:"programId"`
-			ProgramSlug   string `json:"programSlug"`
-			CourseSlug    string `json:"course_slug"`
-			Name          string `json:"name"`
-			Email         string `json:"email"`
-			PromoCode     string `json:"promoCode"`
-			NormalPrice   int    `json:"normalPrice"`
-			NormalPriceL  int    `json:"normal_price"`
-			Price         int    `json:"price"`
-			FinalPrice    int    `json:"finalPrice"`
-			FinalPriceL   int    `json:"final_price"`
-			ExpectedTotal int    `json:"expectedTotal"`
-			ExpectedTotalL int   `json:"expected_total"`
+			ProgramID      string `json:"programId"`
+			ProgramSlug    string `json:"programSlug"`
+			CourseSlug     string `json:"course_slug"`
+			Name           string `json:"name"`
+			Email          string `json:"email"`
+			PromoCode      string `json:"promoCode"`
+			NormalPrice    int    `json:"normalPrice"`
+			NormalPriceL   int    `json:"normal_price"`
+			Price          int    `json:"price"`
+			FinalPrice     int    `json:"finalPrice"`
+			FinalPriceL    int    `json:"final_price"`
+			ExpectedTotal  int    `json:"expectedTotal"`
+			ExpectedTotalL int    `json:"expected_total"`
+			RoleHint       string `json:"roleHint"`
+			RoleHintL      string `json:"role_hint"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
@@ -128,7 +132,11 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 		}
 
 		loggedInUserID, _ := middleware.GetUserID(r.Context())
-		result, err := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID)
+		roleHint := req.RoleHint
+		if roleHint == "" {
+			roleHint = req.RoleHintL
+		}
+		result, err := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID, roleHint)
 		if err != nil {
 			// If course still not found, try one more time to create it lazily
 			// from landing packages (or using request price), then retry Initiate once.
@@ -154,7 +162,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 						Price:       priceForCreate,
 					}); createErr == nil {
 						// Retry once after successful create
-						if retryResult, retryErr := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID); retryErr == nil {
+						if retryResult, retryErr := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID, roleHint); retryErr == nil {
 							result = retryResult
 							err = nil
 						} else {
@@ -356,4 +364,138 @@ func CheckoutPaymentProof(deps *Deps) http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "Bukti pembayaran berhasil diupload"})
 	}
+}
+
+// CompletePurchaseAuth bootstrap auth setelah purchase valid.
+// POST /api/v1/checkout/orders/:orderId/complete-purchase-auth
+// Jika user belum ada, akan auto-create dengan mustSetPassword=true.
+// Hanya bisa dipanggil jika order status sudah valid (paid atau proof submitted).
+func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		orderID := chi.URLParam(r, "orderId")
+		if orderID == "" {
+			writeError(w, http.StatusBadRequest, "bad_request", "orderId required")
+			return
+		}
+
+		var req dto.CompletePurchaseAuthRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		order, err := deps.OrderRepo.GetByID(r.Context(), orderID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "order_not_found", "order tidak ditemukan")
+			return
+		}
+
+		// Validasi status purchase - harus paid atau ada payment proof
+		validStatus := order.Status == domain.OrderStatusPaid || order.PaymentProofURL != nil
+		if !validStatus {
+			writeError(w, http.StatusConflict, "purchase_not_completed", "order belum dibayar atau bukti pembayaran belum diupload")
+			return
+		}
+
+		// Cari atau buat user
+		var user domain.User
+		var isNewUser bool
+
+		// Coba cari user by order.UserID
+		user, err = deps.UserRepo.FindByID(r.Context(), order.UserID)
+		if err != nil {
+			// User tidak ditemukan, coba cari by email dari order.BuyerEmail
+			email := ""
+			if order.BuyerEmail != nil {
+				email = *order.BuyerEmail
+			}
+			if email == "" {
+				writeError(w, http.StatusBadRequest, "bad_request", "order tidak memiliki email pembeli")
+				return
+			}
+			user, err = deps.UserRepo.FindByEmail(r.Context(), email)
+			if err != nil {
+				// Auto-create user baru
+				role := resolveRole(order.RoleHint, &req.RoleHint)
+				now := time.Now()
+				user, err = deps.UserRepo.Create(r.Context(), domain.User{
+					Email:           email,
+					Name:            email, // Sementara pakai email sebagai nama
+					PasswordHash:    "",
+					Role:            role,
+					EmailVerified:   true,
+					EmailVerifiedAt: &now,
+					MustSetPassword: true,
+				})
+				if err != nil {
+					writeError(w, http.StatusInternalServerError, "internal_error", "gagal membuat user: "+err.Error())
+					return
+				}
+				isNewUser = true
+			}
+		}
+
+		// Jika user existing dan belum punya password, set mustSetPassword
+		if !isNewUser && user.PasswordHash == "" {
+			user.MustSetPassword = true
+			if err := deps.UserRepo.Update(r.Context(), user); err != nil {
+				writeError(w, http.StatusInternalServerError, "internal_error", "gagal update user")
+				return
+			}
+		}
+
+		// Generate JWT token (bootstrap token untuk complete-purchase-auth)
+		token := generateBootstrapToken(deps.JWTSecret, user.ID, user.Role)
+
+		// Auto-enroll user ke course dari order items jika belum
+		if user.Role == domain.UserRoleStudent {
+			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), user.ID)
+		}
+
+		nextAction := ""
+		if user.MustSetPassword {
+			nextAction = "SET_PASSWORD"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.CompletePurchaseAuthResponse{
+			Token:           token,
+			User:            userToMap(user),
+			MustSetPassword: user.MustSetPassword,
+			NextAction:      nextAction,
+		})
+	}
+}
+
+// resolveRole menentukan role berdasarkan roleHint dari order dan request
+func resolveRole(orderHint, reqHint *string) string {
+	if reqHint != nil && isValidRoleHint(*reqHint) {
+		return normalizeRoleHint(*reqHint)
+	}
+	if orderHint != nil && isValidRoleHint(*orderHint) {
+		return normalizeRoleHint(*orderHint)
+	}
+	return domain.UserRoleStudent
+}
+
+func isValidRoleHint(hint string) bool {
+	h := strings.ToLower(strings.TrimSpace(hint))
+	return h == "student" || h == "instructor" || h == "guru" || h == "siswa"
+}
+
+func normalizeRoleHint(hint string) string {
+	h := strings.ToLower(strings.TrimSpace(hint))
+	if h == "instructor" || h == "guru" {
+		return domain.UserRoleGuru
+	}
+	return domain.UserRoleStudent
+}
+
+func generateBootstrapToken(jwtSecret []byte, userID, role string) string {
+	claims := jwt.MapClaims{
+		"sub":  userID,
+		"role": role,
+		"iat":  time.Now().Unix(),
+		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+	}
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, _ := t.SignedString(jwtSecret)
+	return tokenStr
 }

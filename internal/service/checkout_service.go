@@ -39,7 +39,7 @@ type CheckoutInitiateResult struct {
 }
 
 type CheckoutService interface {
-	Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID string) (*CheckoutInitiateResult, error)
+	Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint string) (*CheckoutInitiateResult, error)
 	CreatePaymentSession(ctx context.Context, orderID, paymentMethod string) (paymentURL string, err error)
 	HandlePaymentWebhook(ctx context.Context, orderID string) error
 	SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
@@ -130,7 +130,7 @@ func NewCheckoutService(
 	}
 }
 
-func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID string) (*CheckoutInitiateResult, error) {
+func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint string) (*CheckoutInitiateResult, error) {
 	course, err := s.courseRepo.GetBySlug(ctx, courseSlug)
 	if err != nil {
 		return nil, ErrCourseNotFound
@@ -149,11 +149,19 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	} else {
 		user, err = s.userRepo.FindByEmail(ctx, email)
 		if err != nil {
+			now := time.Now()
+			role := domain.UserRoleStudent
+			if roleHint == "instructor" || roleHint == "guru" {
+				role = domain.UserRoleGuru
+			}
 			user, err = s.userRepo.Create(ctx, domain.User{
-				Email:        email,
-				Name:         name,
-				PasswordHash: "",
-				Role:         domain.UserRoleStudent,
+				Email:           email,
+				Name:            name,
+				PasswordHash:    "",
+				Role:            role,
+				EmailVerified:   true,
+				EmailVerifiedAt: &now,
+				MustSetPassword: true,
 			})
 			if err != nil {
 				return nil, err
@@ -254,6 +262,10 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	if appliedPromoCode != "" {
 		promoCodePtr = &appliedPromoCode
 	}
+	var roleHintPtr *string
+	if roleHint != "" {
+		roleHintPtr = &roleHint
+	}
 	order, err := s.orderRepo.Create(ctx, domain.Order{
 		UserID:           user.ID,
 		Status:           domain.OrderStatusPending,
@@ -263,6 +275,8 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 		Discount:         discountRupiah,
 		DiscountPercent:  discountPercent,
 		ConfirmationCode: &confirmationCode,
+		RoleHint:         roleHintPtr,
+		BuyerEmail:       &email,
 	})
 	if err != nil {
 		return nil, err

@@ -25,16 +25,16 @@ func (r *userRepo) Create(ctx context.Context, u domain.User) (domain.User, erro
 		passHash = nil
 	}
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO users (id, email, password_hash, name, role, avatar_url, school_id, subject_id)
-		VALUES ($1::uuid, $2, $3, $4, $5::user_role, $6, $7::uuid, $8::uuid)
-		RETURNING id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, created_at, updated_at
-	`, id, u.Email, passHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID)
+		INSERT INTO users (id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password)
+		VALUES ($1::uuid, $2, $3, $4, $5::user_role, $6, $7::uuid, $8::uuid, $9, $10, $11)
+		RETURNING id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password, created_at, updated_at
+	`, id, u.Email, passHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.EmailVerified, u.EmailVerifiedAt, u.MustSetPassword)
 	var out domain.User
 	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	var emailVerified bool
+	var emailVerified, mustSetPassword bool
 	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
-		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
+		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &mustSetPassword, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -46,20 +46,21 @@ func (r *userRepo) Create(ctx context.Context, u domain.User) (domain.User, erro
 	out.SubjectID = subjectID
 	out.EmailVerified = emailVerified
 	out.EmailVerifiedAt = emailVerifiedAt
+	out.MustSetPassword = mustSetPassword
 	return out, nil
 }
 
 func (r *userRepo) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email)
 	var out domain.User
 	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	var emailVerified bool
+	var emailVerified, mustSetPassword bool
 	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
-		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
+		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &mustSetPassword, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -71,20 +72,21 @@ func (r *userRepo) FindByEmail(ctx context.Context, email string) (domain.User, 
 	out.SubjectID = subjectID
 	out.EmailVerified = emailVerified
 	out.EmailVerifiedAt = emailVerifiedAt
+	out.MustSetPassword = mustSetPassword
 	return out, nil
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id string) (domain.User, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password, created_at, updated_at
 		FROM users WHERE id = $1::uuid
 	`, id)
 	var out domain.User
 	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time
-	var emailVerified bool
+	var emailVerified, mustSetPassword bool
 	err := row.Scan(&out.ID, &out.Email, &pass, &out.Name, &out.Role,
-		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &out.CreatedAt, &out.UpdatedAt)
+		&avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &mustSetPassword, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -96,6 +98,7 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (domain.User, error)
 	out.SubjectID = subjectID
 	out.EmailVerified = emailVerified
 	out.EmailVerifiedAt = emailVerifiedAt
+	out.MustSetPassword = mustSetPassword
 	return out, nil
 }
 
@@ -112,7 +115,7 @@ func (r *userRepo) Count(ctx context.Context) (int, error) {
 }
 
 func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error) {
-	query := `SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, created_at, updated_at FROM users`
+	query := `SELECT id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password, created_at, updated_at FROM users`
 	args := []interface{}{}
 	if role != "" {
 		query += ` WHERE role = $1::user_role`
@@ -129,8 +132,8 @@ func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error)
 		var u domain.User
 		var avatarURL, schoolID, subjectID, pass *string
 		var emailVerifiedAt *time.Time
-		var emailVerified bool
-		if err := rows.Scan(&u.ID, &u.Email, &pass, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		var emailVerified, mustSetPassword bool
+		if err := rows.Scan(&u.ID, &u.Email, &pass, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &mustSetPassword, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if pass != nil {
@@ -141,6 +144,7 @@ func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error)
 		u.SubjectID = subjectID
 		u.EmailVerified = emailVerified
 		u.EmailVerifiedAt = emailVerifiedAt
+		u.MustSetPassword = mustSetPassword
 		list = append(list, u)
 	}
 	return list, rows.Err()
@@ -148,8 +152,8 @@ func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error)
 
 func (r *userRepo) Update(ctx context.Context, u domain.User) error {
 	_, err := r.pool.Exec(ctx, `
-		UPDATE users SET name = $2, email = $3, role = $4::user_role, avatar_url = $5, school_id = $6::uuid, subject_id = $7::uuid, password_hash = $8, email_verified = $9, email_verified_at = $10, updated_at = NOW()
+		UPDATE users SET name = $2, email = $3, role = $4::user_role, avatar_url = $5, school_id = $6::uuid, subject_id = $7::uuid, password_hash = $8, email_verified = $9, email_verified_at = $10, must_set_password = $11, updated_at = NOW()
 		WHERE id = $1::uuid
-	`, u.ID, u.Name, u.Email, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.PasswordHash, u.EmailVerified, u.EmailVerifiedAt)
+	`, u.ID, u.Name, u.Email, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.PasswordHash, u.EmailVerified, u.EmailVerifiedAt, u.MustSetPassword)
 	return err
 }

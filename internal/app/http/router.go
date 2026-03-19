@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"os"
 
@@ -54,6 +55,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Post("/resend-verification", handlers.AuthResendVerification(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Get("/me", handlers.AuthMe(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/logout", handlers.AuthLogout(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/set-password", handlers.AuthSetPassword(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/change-password", handlers.AuthChangePassword(deps))
 			r.Post("/forgot-password", handlers.AuthForgotPassword(deps))
 			r.Post("/reset-password", handlers.AuthResetPassword(deps))
@@ -64,6 +66,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Post("/payment-session", handlers.CheckoutPaymentSession(deps))
 			r.Post("/payment-session/", handlers.CheckoutPaymentSession(deps))
 			r.Post("/orders/{orderId}/payment-proof", handlers.CheckoutPaymentProof(deps))
+			r.Post("/orders/{orderId}/complete-purchase-auth", handlers.CompletePurchaseAuth(deps))
 		})
 		r.Post("/webhook/payment", handlers.PaymentWebhook(deps))
 
@@ -88,8 +91,18 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{attemptId}/submit", handlers.AttemptSubmit(deps))
 		})
 
+		// Helper untuk PasswordSetupGuard
+		passwordGuard := middleware.PasswordSetupGuard(func(ctx context.Context, id string) (bool, error) {
+			u, err := deps.UserRepo.FindByID(ctx, id)
+			if err != nil {
+				return false, err
+			}
+			return u.MustSetPassword, nil
+		})
+
 		r.Route("/student", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Use(passwordGuard)
 			r.Get("/dashboard", handlers.DashboardStudent(deps))
 			r.Get("/profile", handlers.StudentProfileGet(deps))
 			r.Put("/profile", handlers.StudentProfileUpdate(deps))
@@ -136,6 +149,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		r.Route("/trainer", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Use(passwordGuard)
 			r.Use(middleware.TrainerOnly())
 			r.Get("/profile", handlers.TrainerProfileGet(deps))
 			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
@@ -154,6 +168,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		r.Route("/instructor", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Use(passwordGuard)
 			r.Use(middleware.TrainerOnly())
 			r.Get("/courses", handlers.InstructorCoursesList(deps))
 			r.Get("/students", handlers.InstructorStudentsList(deps))

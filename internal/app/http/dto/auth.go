@@ -13,7 +13,37 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	User  any    `json:"user"`
-	Token string `json:"token"`
+	User            any    `json:"user"`
+	Token           string `json:"token"`
+	MustSetPassword bool   `json:"mustSetPassword"`
+	NextAction      string `json:"nextAction,omitempty"`
+}
+
+type AuthUserResponse struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Email           string `json:"email"`
+	Role            string `json:"role"`
+	MustSetPassword bool   `json:"mustSetPassword"`
+}
+
+type SetPasswordRequest struct {
+	NewPassword string `json:"newPassword"`
+}
+
+type SetPasswordResponse struct {
+	Message         string `json:"message"`
+	MustSetPassword bool   `json:"mustSetPassword"`
+}
+
+type CompletePurchaseAuthRequest struct {
+	RoleHint string `json:"roleHint,omitempty"`
+}
+
+type CompletePurchaseAuthResponse struct {
+	Token           string `json:"token"`
+	User            any    `json:"user"`
+	MustSetPassword bool   `json:"mustSetPassword"`
+	NextAction      string `json:"nextAction,omitempty"`
 }
 

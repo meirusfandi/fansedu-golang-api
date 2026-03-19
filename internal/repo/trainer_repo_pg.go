@@ -60,7 +60,7 @@ func (r *trainerRepo) CountStudents(ctx context.Context, trainerID string) (int,
 
 func (r *trainerRepo) ListStudents(ctx context.Context, trainerID string) ([]domain.User, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT u.id, u.email, u.password_hash, u.name, u.role, u.avatar_url, u.school_id, u.subject_id, u.email_verified, u.email_verified_at, u.created_at, u.updated_at
+		SELECT u.id, u.email, u.password_hash, u.name, u.role, u.avatar_url, u.school_id, u.subject_id, u.email_verified, u.email_verified_at, u.must_set_password, u.created_at, u.updated_at
 		FROM trainer_students ts
 		JOIN users u ON u.id = ts.student_id
 		WHERE ts.trainer_id = $1::uuid
@@ -75,8 +75,8 @@ func (r *trainerRepo) ListStudents(ctx context.Context, trainerID string) ([]dom
 		var u domain.User
 		var avatarURL, schoolID, subjectID *string
 		var emailVerifiedAt *time.Time
-		var emailVerified bool
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		var emailVerified, mustSetPassword bool
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID, &emailVerified, &emailVerifiedAt, &mustSetPassword, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		u.AvatarURL = avatarURL
@@ -84,6 +84,7 @@ func (r *trainerRepo) ListStudents(ctx context.Context, trainerID string) ([]dom
 		u.SubjectID = subjectID
 		u.EmailVerified = emailVerified
 		u.EmailVerifiedAt = emailVerifiedAt
+		u.MustSetPassword = mustSetPassword
 		list = append(list, u)
 	}
 	return list, rows.Err()

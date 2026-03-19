@@ -31,10 +31,10 @@ func (r *orderRepo) Create(ctx context.Context, o domain.Order) (domain.Order, e
 		normalPrice = o.TotalPrice + o.Discount
 	}
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO orders (id, user_id, status, total_price, normal_price, promo_code, discount, discount_percent, confirmation_code, payment_method, payment_reference)
-		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO orders (id, user_id, status, total_price, normal_price, promo_code, discount, discount_percent, confirmation_code, payment_method, payment_reference, role_hint, buyer_email)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING created_at, updated_at
-	`, id, o.UserID, o.Status, o.TotalPrice, normalPrice, o.PromoCode, o.Discount, o.DiscountPercent, o.ConfirmationCode, o.PaymentMethod, o.PaymentReference).Scan(&o.CreatedAt, &o.UpdatedAt)
+	`, id, o.UserID, o.Status, o.TotalPrice, normalPrice, o.PromoCode, o.Discount, o.DiscountPercent, o.ConfirmationCode, o.PaymentMethod, o.PaymentReference, o.RoleHint, o.BuyerEmail).Scan(&o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		return domain.Order{}, err
 	}
@@ -46,14 +46,14 @@ func (r *orderRepo) Create(ctx context.Context, o domain.Order) (domain.Order, e
 func (r *orderRepo) GetByID(ctx context.Context, id string) (domain.Order, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, user_id, status, total_price, COALESCE(normal_price, total_price), promo_code, COALESCE(discount, 0), discount_percent, confirmation_code, payment_method, payment_reference,
-		       payment_proof_url, payment_proof_at, sender_account_no, sender_name, created_at, updated_at
+		       payment_proof_url, payment_proof_at, sender_account_no, sender_name, role_hint, buyer_email, created_at, updated_at
 		FROM orders WHERE id = $1::uuid
 	`, id)
 	var o domain.Order
 	var promoCode, confCode *string
 	var discountPercent *float64
 	err := row.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference,
-		&o.PaymentProofURL, &o.PaymentProofAt, &o.SenderAccountNo, &o.SenderName, &o.CreatedAt, &o.UpdatedAt)
+		&o.PaymentProofURL, &o.PaymentProofAt, &o.SenderAccountNo, &o.SenderName, &o.RoleHint, &o.BuyerEmail, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		return domain.Order{}, err
 	}

@@ -24,6 +24,8 @@ type Order struct {
 	PaymentProofAt     *time.Time
 	SenderAccountNo    *string
 	SenderName         *string
+	RoleHint           *string // student|instructor for auto-create user
+	BuyerEmail         *string // email pembeli untuk guest checkout
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }

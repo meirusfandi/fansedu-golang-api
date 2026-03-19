@@ -131,3 +131,38 @@ func bearerToken(v string) (string, bool) {
 	return parts[1], true
 }
 
+// UserRepoForMiddleware adalah interface minimal untuk middleware lookup user
+type UserRepoForMiddleware interface {
+	FindByID(ctx context.Context, id string) (interface{ GetMustSetPassword() bool }, error)
+}
+
+// PasswordSetupGuard blocks protected endpoints when must_set_password=true.
+// Allowlisted paths (like /auth/me, /auth/set-password, /auth/logout) should NOT use this middleware.
+// Use this middleware AFTER Auth middleware.
+func PasswordSetupGuard(userFinder func(ctx context.Context, id string) (bool, error)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := GetUserID(r.Context())
+			if !ok || userID == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			mustSetPassword, err := userFinder(r.Context(), userID)
+			if err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if mustSetPassword {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":"password_setup_required","code":"password_setup_required","message":"Anda harus mengatur password terlebih dahulu"}`))
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+

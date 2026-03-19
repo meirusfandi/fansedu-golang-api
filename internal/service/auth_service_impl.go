@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 var (
 	ErrEmailExists       = errors.New("email already registered")
 	ErrInvalidCreds      = errors.New("invalid email or password")
-	ErrEmailNotVerified  = errors.New("email not verified")
 	ErrAlreadyVerified   = errors.New("already verified")
 	ErrInviteInvalid     = errors.New("invite token tidak valid atau sudah kadaluarsa")
 	ErrInviteAlreadyUsed = errors.New("invite token sudah digunakan")
@@ -68,9 +66,32 @@ func NewAuthService(userRepo interface {
 }
 
 func (s *authService) Register(ctx context.Context, name, email, password, role string) (domain.User, string, error) {
-	_, err := s.userRepo.FindByEmail(ctx, email)
+	existing, err := s.userRepo.FindByEmail(ctx, email)
 	if err == nil {
-		return domain.User{}, "", ErrEmailExists
+		// Email sudah terdaftar: perlakukan sebagai update password (reset/first setup),
+		// bukan error. Dipakai untuk flow guest checkout yang kemudian isi password.
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+		if err != nil {
+			return domain.User{}, "", err
+		}
+		existing.PasswordHash = string(hash)
+		if strings.TrimSpace(name) != "" {
+			existing.Name = name
+		}
+		now := time.Now()
+		existing.EmailVerified = true
+		if existing.EmailVerifiedAt == nil {
+			existing.EmailVerifiedAt = &now
+		}
+		existing.MustSetPassword = false
+		if err := s.userRepo.Update(ctx, existing); err != nil {
+			return domain.User{}, "", err
+		}
+		token, err := s.signJWT(existing.ID, existing.Role)
+		if err != nil {
+			return domain.User{}, "", err
+		}
+		return existing, token, nil
 	}
 	role = normalizeRegisterRole(role)
 	if role != domain.UserRoleStudent && role != domain.UserRoleGuru && role != "instructor" {
@@ -80,30 +101,18 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 	if err != nil {
 		return domain.User{}, "", err
 	}
+	now := time.Now()
 	u := domain.User{
-		Email:        email,
-		PasswordHash: string(hash),
-		Name:         name,
-		Role:         role,
-		EmailVerified: false,
+		Email:           email,
+		PasswordHash:    string(hash),
+		Name:            name,
+		Role:            role,
+		EmailVerified:   true,
+		EmailVerifiedAt: &now,
 	}
 	u, err = s.userRepo.Create(ctx, u)
 	if err != nil {
 		return domain.User{}, "", err
-	}
-
-	// For student/guru/instructor, require email verification before login.
-	if role == domain.UserRoleStudent || role == domain.UserRoleGuru || role == "instructor" {
-		if s.emailTokenRepo != nil {
-			_, _ = s.emailTokenRepo.Create(ctx, domain.EmailVerificationToken{
-				ID:        uuid.New().String(),
-				UserID:    u.ID,
-				Token:     uuid.New().String(),
-				ExpiresAt: time.Now().Add(24 * time.Hour),
-			})
-		}
-		// Do not issue JWT yet; user must verify email first.
-		return u, "", nil
 	}
 
 	token, err := s.signJWT(u.ID, u.Role)
@@ -179,13 +188,6 @@ func (s *authService) Login(ctx context.Context, email, password string) (domain
 		return domain.User{}, "", ErrInvalidCreds
 	}
 
-	// Require email verification for student/guru/instructor (skip in dev if SKIP_EMAIL_VERIFICATION=1)
-	if (u.Role == domain.UserRoleStudent || u.Role == domain.UserRoleGuru || u.Role == "instructor") && !u.EmailVerified {
-		if os.Getenv("SKIP_EMAIL_VERIFICATION") != "1" && os.Getenv("SKIP_EMAIL_VERIFICATION") != "true" {
-			return domain.User{}, "", ErrEmailNotVerified
-		}
-	}
-
 	token, err := s.signJWT(u.ID, u.Role)
 	if err != nil {
 		return domain.User{}, "", err
@@ -217,6 +219,20 @@ func (s *authService) ChangePassword(ctx context.Context, userID, currentPasswor
 		return err
 	}
 	u.PasswordHash = string(hash)
+	return s.userRepo.Update(ctx, u)
+}
+
+func (s *authService) SetPassword(ctx context.Context, userID, newPassword string) error {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return ErrInvalidCreds
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.bcryptCost)
+	if err != nil {
+		return err
+	}
+	u.PasswordHash = string(hash)
+	u.MustSetPassword = false
 	return s.userRepo.Update(ctx, u)
 }
 

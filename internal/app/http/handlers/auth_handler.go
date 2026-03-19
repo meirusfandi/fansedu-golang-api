@@ -15,25 +15,21 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.RegisterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
 			return
 		}
 		if req.Email == "" || req.Password == "" || req.Name == "" {
-			http.Error(w, "name, email, password required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "validation_error", "name, email, password required")
 			return
 		}
 		role := strings.TrimSpace(strings.ToLower(req.Role))
 		if role != "" && !isValidRegisterRole(role) {
-			http.Error(w, "role must be student, instructor, or guru", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "validation_error", "role must be student, instructor, or guru")
 			return
 		}
 		u, token, err := deps.AuthService.Register(r.Context(), req.Name, req.Email, req.Password, role)
 		if err != nil {
-			if err == service.ErrEmailExists {
-				http.Error(w, "email already registered", http.StatusConflict)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return
 		}
 		// Auto-daftarkan siswa ke semua tryout yang akan datang (bukan draft)
@@ -41,19 +37,16 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), u.ID)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		// Jika token kosong, berarti butuh verifikasi email dulu.
-		if token == "" && (u.Role == domain.UserRoleStudent || u.Role == domain.UserRoleGuru || u.Role == "instructor") {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"user":               userToMap(u),
-				"need_verification":  true,
-				"message":            "Registrasi berhasil, silakan cek email untuk verifikasi akun.",
-			})
-			return
+		w.WriteHeader(http.StatusCreated)
+		resp := dto.AuthResponse{
+			User:            userToMap(u),
+			Token:           token,
+			MustSetPassword: u.MustSetPassword,
 		}
-		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
-			User:  userToMap(u),
-			Token: token,
-		})
+		if u.MustSetPassword {
+			resp.NextAction = "SET_PASSWORD"
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -89,10 +82,15 @@ func AuthRegisterWithInvite(deps *Deps) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
-			User:  userToMap(u),
-			Token: token,
-		})
+		resp := dto.AuthResponse{
+			User:            userToMap(u),
+			Token:           token,
+			MustSetPassword: u.MustSetPassword,
+		}
+		if u.MustSetPassword {
+			resp.NextAction = "SET_PASSWORD"
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -113,23 +111,19 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 				http.Error(w, "invalid email or password", http.StatusUnauthorized)
 				return
 			}
-			if err == service.ErrEmailNotVerified {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_ = json.NewEncoder(w).Encode(map[string]string{
-					"error": "email not verified",
-					"code":  "email_not_verified",
-				})
-				return
-			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.AuthResponse{
-			User:  userToMap(u),
-			Token: token,
-		})
+		resp := dto.AuthResponse{
+			User:            userToMap(u),
+			Token:           token,
+			MustSetPassword: u.MustSetPassword,
+		}
+		if u.MustSetPassword {
+			resp.NextAction = "SET_PASSWORD"
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -159,10 +153,11 @@ func AuthMe(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
-			ID:    u.ID,
-			Name:  u.Name,
-			Email: u.Email,
-			Role:  role,
+			ID:              u.ID,
+			Name:            u.Name,
+			Email:           u.Email,
+			Role:            role,
+			MustSetPassword: u.MustSetPassword,
 		})
 	}
 }
@@ -240,11 +235,16 @@ func AuthResendVerification(deps *Deps) http.HandlerFunc {
 }
 
 func userToMap(u domain.User) map[string]interface{} {
+	role := u.Role
+	if role == "guru" {
+		role = "instructor"
+	}
 	m := map[string]interface{}{
-		"id":    u.ID,
-		"name":  u.Name,
-		"email": u.Email,
-		"role":  u.Role,
+		"id":              u.ID,
+		"name":            u.Name,
+		"email":           u.Email,
+		"role":            role,
+		"mustSetPassword": u.MustSetPassword,
 	}
 	if u.AvatarURL != nil {
 		m["avatar_url"] = *u.AvatarURL
@@ -255,4 +255,37 @@ func userToMap(u domain.User) map[string]interface{} {
 // isValidRegisterRole: student, instructor, atau guru.
 func isValidRegisterRole(role string) bool {
 	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru || role == "instructor"
+}
+
+// AuthSetPassword handles setting password for users with mustSetPassword=true
+// POST /api/v1/auth/set-password (Bearer required)
+func AuthSetPassword(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not logged in")
+			return
+		}
+
+		var req dto.SetPasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
+			return
+		}
+		if len(req.NewPassword) < 6 {
+			writeError(w, http.StatusBadRequest, "bad_request", "password must be at least 6 characters")
+			return
+		}
+
+		if err := deps.AuthService.SetPassword(r.Context(), userID, req.NewPassword); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.SetPasswordResponse{
+			Message:         "Password berhasil diatur",
+			MustSetPassword: false,
+		})
+	}
 }
