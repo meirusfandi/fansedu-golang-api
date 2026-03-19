@@ -71,7 +71,10 @@ type ProgramReview struct {
 
 // --- Student courses (enrolled with progress) ---
 type StudentCoursesResponse struct {
-	Data []StudentCourseItem `json:"data"`
+	Data       []StudentCourseItem `json:"data"`
+	Total      int                  `json:"total"`
+	Page       int                  `json:"page"`
+	TotalPages int                  `json:"totalPages"`
 }
 
 type StudentCourseItem struct {
@@ -91,7 +94,10 @@ type StudentCourseProgram struct {
 
 // --- Student transactions ---
 type StudentTransactionsResponse struct {
-	Data []StudentTransactionItem `json:"data"`
+	Data       []StudentTransactionItem `json:"data"`
+	Total      int                    `json:"total"`
+	Page       int                    `json:"page"`
+	TotalPages int                    `json:"totalPages"`
 }
 
 type StudentTransactionItem struct {

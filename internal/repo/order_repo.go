@@ -15,6 +15,7 @@ type OrderRepo interface {
 	Create(ctx context.Context, o domain.Order) (domain.Order, error)
 	GetByID(ctx context.Context, id string) (domain.Order, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.Order, error)
+	ListByUserIDWithFilters(ctx context.Context, userID, status, search string, page, limit int) ([]domain.Order, int, error)
 	GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error)
 	UpdateStatus(ctx context.Context, id, status string) error
 	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
@@ -86,6 +87,81 @@ func (r *orderRepo) ListByUserID(ctx context.Context, userID string) ([]domain.O
 		list = append(list, o)
 	}
 	return list, rows.Err()
+}
+
+func (r *orderRepo) ListByUserIDWithFilters(ctx context.Context, userID, status, search string, page, limit int) ([]domain.Order, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	query := `
+		SELECT
+			o.id,
+			o.user_id,
+			o.status,
+			o.total_price,
+			COALESCE(o.normal_price, o.total_price),
+			o.promo_code,
+			COALESCE(o.discount, 0),
+			o.discount_percent,
+			o.confirmation_code,
+			o.created_at,
+			o.updated_at,
+			COUNT(*) OVER()::int AS total
+		FROM orders o
+		WHERE o.user_id = $1::uuid
+		  AND (
+			CASE
+				WHEN $2 = '' THEN true
+				ELSE o.status = $2::order_status
+			END
+		  )
+		  AND (
+			$3 = '' OR
+			o.id::text ILIKE '%' || $3 || '%' OR
+			EXISTS (
+				SELECT 1
+				FROM order_items oi
+				JOIN courses c ON c.id = oi.course_id
+				WHERE oi.order_id = o.id
+				  AND (c.title ILIKE '%' || $3 || '%' OR COALESCE(c.slug, '') ILIKE '%' || $3 || '%')
+			)
+		  )
+		ORDER BY o.created_at DESC
+		LIMIT $4 OFFSET $5
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID, status, search, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.Order, 0, limit)
+	total := 0
+	for rows.Next() {
+		var o domain.Order
+		var promoCode, confCode *string
+		var discountPercent *float64
+		var rowTotal int
+		if err := rows.Scan(
+			&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice,
+			&promoCode, &o.Discount, &discountPercent, &confCode,
+			&o.CreatedAt, &o.UpdatedAt, &rowTotal,
+		); err != nil {
+			return nil, 0, err
+		}
+		o.PromoCode = promoCode
+		o.DiscountPercent = discountPercent
+		o.ConfirmationCode = confCode
+		out = append(out, o)
+		total = rowTotal
+	}
+	return out, total, rows.Err()
 }
 
 func (r *orderRepo) GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error) {

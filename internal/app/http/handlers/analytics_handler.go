@@ -7,6 +7,81 @@ import (
 	"strings"
 )
 
+// POST /api/v1/analytics/events
+// Body contract:
+// {
+//   "event": "cta_register_click",
+//   "page": "/",
+//   "label": "hero",
+//   "programId": "uuid-optional",
+//   "programSlug": "slug-optional",
+//   "metadata": {"placement":"hero"}
+// }
+func AnalyticsTrackEvent(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.AnalyticsRepo == nil {
+			// Keep endpoint resilient; FE shouldn't break flow.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+			return
+		}
+
+		var req struct {
+			Event      string                 `json:"event"`
+			Page       string                 `json:"page"`
+			Label      string                 `json:"label"`
+			ProgramID  *string                `json:"programId"`
+			ProgramSlug *string               `json:"programSlug"`
+			Metadata   map[string]any        `json:"metadata"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
+			return
+		}
+
+		sessionID := strings.TrimSpace(r.Header.Get("X-Session-Id"))
+		if sessionID == "" {
+			sessionID = strings.TrimSpace(r.Header.Get("X-Request-Id"))
+		}
+		if sessionID == "" {
+			sessionID = strings.ReplaceAll(strings.TrimSpace(r.RemoteAddr), ":", "_")
+		}
+
+		ip := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
+		if ip == "" {
+			ip = strings.TrimSpace(r.RemoteAddr)
+		}
+		ua := strings.TrimSpace(r.UserAgent())
+
+		inserted, err := deps.AnalyticsRepo.TrackEvent(
+			r.Context(),
+			sessionID,
+			strings.TrimSpace(req.Event),
+			strings.TrimSpace(req.Page),
+			strings.TrimSpace(req.Label),
+			req.ProgramID,
+			req.ProgramSlug,
+			req.Metadata,
+			ip,
+			ua,
+		)
+		if err != nil {
+			// Don't block FE on analytics errors
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+			return
+		}
+
+		if inserted {
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+	}
+}
+
 // POST /api/v1/analytics/pageview
 func AnalyticsTrackPageview(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

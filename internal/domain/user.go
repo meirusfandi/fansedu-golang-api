@@ -18,6 +18,17 @@ type User struct {
 	AvatarURL       *string
 	SchoolID        *string
 	SubjectID       *string
+	Phone           *string
+	Whatsapp        *string
+	ClassLevel      *string
+	City            *string
+	Province        *string
+	Gender          *string
+	BirthDate       *time.Time
+	Bio             *string
+	ParentName      *string
+	ParentPhone     *string
+	Instagram       *string
 	EmailVerified   bool
 	EmailVerifiedAt *time.Time
 	MustSetPassword bool

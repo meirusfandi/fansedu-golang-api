@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -594,37 +596,47 @@ func StudentCoursesList(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		enrollments, err := deps.EnrollmentRepo.ListByUserID(r.Context(), userID)
+
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit < 1 || limit > 50 {
+			limit = 10
+		}
+		search := r.URL.Query().Get("search")
+		progressStatus := r.URL.Query().Get("progressStatus")
+		if progressStatus != "" && progressStatus != "in-progress" && progressStatus != "completed" {
+			writeError(w, http.StatusUnprocessableEntity, "validation_error", "invalid progressStatus")
+			return
+		}
+
+		items, total, err := deps.EnrollmentRepo.ListCoursesByUserWithFilters(r.Context(), userID, search, progressStatus, page, limit)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
-		data := make([]dto.StudentCourseItem, 0, len(enrollments))
-		for _, e := range enrollments {
-			c, err := deps.CourseRepo.GetByID(r.Context(), e.CourseID)
-			if err != nil {
-				continue
-			}
-			slug := ""
-			if c.Slug != nil {
-				slug = *c.Slug
-			}
-			thumb := ""
-			if c.Thumbnail != nil {
-				thumb = *c.Thumbnail
-			}
-			enrolledAt := e.EnrolledAt.Format("2006-01-02T15:04:05Z07:00")
-			progress := enrollmentProgressPercent(e.Status)
+
+		data := make([]dto.StudentCourseItem, 0, len(items))
+		for _, row := range items {
+			enrolledAt := row.EnrolledAt.Format("2006-01-02T15:04:05Z07:00")
 			data = append(data, dto.StudentCourseItem{
-				ID:              e.ID,
-				Program:         dto.StudentCourseProgram{ID: c.ID, Slug: slug, Title: c.Title, Thumbnail: thumb},
-				ProgressPercent: progress,
+				ID:              row.EnrollmentID,
+				Program:         dto.StudentCourseProgram{ID: row.CourseID, Slug: row.CourseSlug, Title: row.CourseTitle, Thumbnail: row.CourseThumbnail},
+				ProgressPercent: enrollmentProgressPercent(row.EnrollmentStatus),
 				EnrolledAt:      enrolledAt,
 				LastAccessedAt:  enrolledAt,
 			})
 		}
+		totalPages := int((total + limit - 1) / limit)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.StudentCoursesResponse{Data: data})
+		_ = json.NewEncoder(w).Encode(dto.StudentCoursesResponse{
+			Data:       data,
+			Total:      total,
+			Page:       page,
+			TotalPages: totalPages,
+		})
 	}
 }
 
@@ -718,10 +730,11 @@ func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
-			ID:    u.ID,
-			Name:  u.Name,
-			Email: u.Email,
-			Role:  role,
+			ID:              u.ID,
+			Name:            u.Name,
+			Email:           u.Email,
+			Role:            role,
+			MustSetPassword: u.MustSetPassword,
 		})
 	}
 }
@@ -734,11 +747,83 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		orders, err := deps.OrderRepo.ListByUserID(r.Context(), userID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit < 1 || limit > 50 {
+			limit = 10
+		}
+		search := r.URL.Query().Get("search")
+		status := r.URL.Query().Get("status") // pending|paid
+		if status != "" && status != domain.OrderStatusPaid && status != domain.OrderStatusPending {
+			writeError(w, http.StatusUnprocessableEntity, "validation_error", "invalid status")
 			return
 		}
+
+		var (
+			orders []domain.Order
+			total  int
+		)
+
+		orders, total, err := deps.OrderRepo.ListByUserIDWithFilters(r.Context(), userID, status, search, page, limit)
+		if err != nil {
+			// Fallback: keep endpoint working even if server-side query fails.
+			// We still filter/paginate in memory, then return the same contract.
+			log.Printf("ListByUserIDWithFilters failed: %v", err)
+
+			allOrders, err2 := deps.OrderRepo.ListByUserID(r.Context(), userID)
+			if err2 != nil {
+				writeError(w, http.StatusInternalServerError, "server_error", err2.Error())
+				return
+			}
+
+			q := strings.TrimSpace(strings.ToLower(search))
+			filtered := make([]domain.Order, 0, len(allOrders))
+			for _, o := range allOrders {
+				if status != "" && o.Status != status {
+					continue
+				}
+				if q == "" {
+					filtered = append(filtered, o)
+					continue
+				}
+
+				// Match by orderId first.
+				if strings.Contains(strings.ToLower(o.ID), q) {
+					filtered = append(filtered, o)
+					continue
+				}
+
+				// Match by program title(s) in order items.
+				items, _ := deps.OrderItemRepo.ListByOrderID(r.Context(), o.ID)
+				matched := false
+				for _, item := range items {
+					c, _ := deps.CourseRepo.GetByID(r.Context(), item.CourseID)
+					if c.Title != "" && strings.Contains(strings.ToLower(c.Title), q) {
+						matched = true
+						break
+					}
+				}
+				if matched {
+					filtered = append(filtered, o)
+				}
+			}
+
+			total = len(filtered)
+			start := (page - 1) * limit
+			if start >= total {
+				orders = []domain.Order{}
+			} else {
+				end := start + limit
+				if end > total {
+					end = total
+				}
+				orders = filtered[start:end]
+			}
+		}
+
 		data := make([]dto.StudentTransactionItem, 0, len(orders))
 		for _, o := range orders {
 			items, _ := deps.OrderItemRepo.ListByOrderID(r.Context(), o.ID)
@@ -777,8 +862,14 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 				PaidAt:           paidAt,
 			})
 		}
+		totalPages := int((total + limit - 1) / limit)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.StudentTransactionsResponse{Data: data})
+		_ = json.NewEncoder(w).Encode(dto.StudentTransactionsResponse{
+			Data:       data,
+			Total:      total,
+			Page:       page,
+			TotalPages: totalPages,
+		})
 	}
 }
 

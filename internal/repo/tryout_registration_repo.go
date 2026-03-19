@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,6 +14,8 @@ import (
 type TryoutRegistrationRepo interface {
 	Register(ctx context.Context, userID, tryoutID string) error
 	IsRegistered(ctx context.Context, userID, tryoutID string) (bool, error)
+	GetRegisteredAt(ctx context.Context, userID, tryoutID string) (time.Time, bool, error)
+	CountRegisteredForStudent(ctx context.Context, userID string, subjectID *string) (int, error)
 	ListLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error)
 	EnsureAllStudentsForTryout(ctx context.Context, tryoutID string) error
 	EnsureStudentForAllOpenTryouts(ctx context.Context, userID string) error
@@ -45,6 +48,43 @@ func (r *tryoutRegistrationRepo) IsRegistered(ctx context.Context, userID, tryou
 		return false, err
 	}
 	return true, nil
+}
+
+func (r *tryoutRegistrationRepo) GetRegisteredAt(ctx context.Context, userID, tryoutID string) (time.Time, bool, error) {
+	var t time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT registered_at
+		FROM tryout_registrations
+		WHERE user_id = $1::uuid AND tryout_session_id = $2::uuid
+	`, userID, tryoutID).Scan(&t)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, false, nil
+		}
+		return time.Time{}, false, err
+	}
+	return t, true, nil
+}
+
+func (r *tryoutRegistrationRepo) CountRegisteredForStudent(ctx context.Context, userID string, subjectID *string) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM tryout_registrations tr
+		JOIN tryout_sessions t ON t.id = tr.tryout_session_id
+		WHERE tr.user_id = $1::uuid
+		  AND (
+			$2::uuid IS NULL
+			OR t.subject_id IS NULL
+			OR t.subject_id = $2::uuid
+		  )
+	`
+	var subj interface{} = nil
+	if subjectID != nil && *subjectID != "" {
+		subj = *subjectID
+	}
+	var n int
+	err := r.pool.QueryRow(ctx, query, userID, subj).Scan(&n)
+	return n, err
 }
 
 // ListLeaderboard: nama siswa, sekolah, nilai. Urutan: nilai tertinggi DESC, waktu tercepat ASC, nama ASC; belum mengerjakan = nama ASC di akhir.

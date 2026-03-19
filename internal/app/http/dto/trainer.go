@@ -29,9 +29,20 @@ type TrainerCreateStudentRequest struct {
 
 // TrainerProfileResponse for GET /api/v1/trainer/profile
 type TrainerProfileResponse struct {
-	Name   string          `json:"name,omitempty"`
-	Email  string          `json:"email,omitempty"`
-	School *SchoolProfile  `json:"school,omitempty"`
+	Name   string         `json:"name,omitempty"`
+	Email  string         `json:"email,omitempty"`
+	Phone  *string        `json:"phone,omitempty"`
+	Whatsapp *string      `json:"whatsapp,omitempty"`
+	ClassLevel *string   `json:"classLevel,omitempty"`
+	City   *string        `json:"city,omitempty"`
+	Province *string      `json:"province,omitempty"`
+	Gender *string        `json:"gender,omitempty"`
+	BirthDate *string    `json:"birthDate,omitempty"` // YYYY-MM-DD
+	Bio    *string        `json:"bio,omitempty"`
+	ParentName *string    `json:"parentName,omitempty"`
+	ParentPhone *string  `json:"parentPhone,omitempty"`
+	Instagram *string    `json:"instagram,omitempty"`
+	School *SchoolProfile `json:"school,omitempty"`
 }
 
 // SchoolProfile objek sekolah untuk response (nama field dinormalisasi untuk frontend)
@@ -46,6 +57,31 @@ type SchoolProfile struct {
 
 // TrainerProfileUpdateRequest for PUT /api/v1/trainer/profile
 type TrainerProfileUpdateRequest struct {
-	Name     string  `json:"name"`
-	SchoolID *string `json:"school_id,omitempty"` // opsional: kaitkan guru ke sekolah; kosong/null = lepas
+	Name  string  `json:"name"`
+	Email string  `json:"email"`
+	Phone *string `json:"phone,omitempty"`
+	Whatsapp *string `json:"whatsapp,omitempty"`
+	ClassLevel *string `json:"classLevel,omitempty"`
+	City *string `json:"city,omitempty"`
+	Province *string `json:"province,omitempty"`
+	Gender *string `json:"gender,omitempty"`
+	BirthDate *string `json:"birthDate,omitempty"` // YYYY-MM-DD
+	Bio *string `json:"bio,omitempty"`
+	ParentName *string `json:"parentName,omitempty"`
+	ParentPhone *string `json:"parentPhone,omitempty"`
+	Instagram *string `json:"instagram,omitempty"`
+	SchoolID *string `json:"school_id,omitempty"` // optional
+}
+
+// TrainerStudentItem minimal student data for trainer screens.
+type TrainerStudentItem struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+type TrainerStudentUpdateRequest struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }

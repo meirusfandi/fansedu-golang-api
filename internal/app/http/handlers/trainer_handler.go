@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -32,6 +33,20 @@ func TrainerProfileGet(deps *Deps) http.HandlerFunc {
 			Name:  u.Name,
 			Email: u.Email,
 		}
+		resp.Phone = u.Phone
+		resp.Whatsapp = u.Whatsapp
+		resp.ClassLevel = u.ClassLevel
+		resp.City = u.City
+		resp.Province = u.Province
+		resp.Gender = u.Gender
+		if u.BirthDate != nil {
+			s := u.BirthDate.UTC().Format("2006-01-02")
+			resp.BirthDate = &s
+		}
+		resp.Bio = u.Bio
+		resp.ParentName = u.ParentName
+		resp.ParentPhone = u.ParentPhone
+		resp.Instagram = u.Instagram
 		// Objek school diisi jika guru terhubung ke sekolah (school_id); frontend pakai untuk "Detail info sekolah".
 		if u.SchoolID != nil && *u.SchoolID != "" {
 			school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID)
@@ -65,6 +80,15 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 		if req.Name != "" {
 			u.Name = req.Name
 		}
+		if req.Email != "" {
+			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
+			if err == nil && existing.ID != u.ID {
+				http.Error(w, "email already in use", http.StatusConflict)
+				return
+			}
+			u.Email = req.Email
+		}
+
 		if req.SchoolID != nil {
 			sid := strings.TrimSpace(*req.SchoolID)
 			if sid == "" {
@@ -77,12 +101,129 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 				u.SchoolID = &sid
 			}
 		}
+
+		if req.Phone != nil {
+			u.Phone = req.Phone
+		}
+		if req.Whatsapp != nil {
+			u.Whatsapp = req.Whatsapp
+		}
+		if req.ClassLevel != nil {
+			u.ClassLevel = req.ClassLevel
+		}
+		if req.City != nil {
+			u.City = req.City
+		}
+		if req.Province != nil {
+			u.Province = req.Province
+		}
+		if req.Gender != nil {
+			u.Gender = req.Gender
+		}
+		if req.BirthDate != nil {
+			b := strings.TrimSpace(*req.BirthDate)
+			if b == "" {
+				u.BirthDate = nil
+			} else {
+				parsed, err := time.Parse("2006-01-02", b)
+				if err != nil {
+					http.Error(w, "invalid birthDate format; expected YYYY-MM-DD", http.StatusBadRequest)
+					return
+				}
+				u.BirthDate = &parsed
+			}
+		}
+		if req.Bio != nil {
+			u.Bio = req.Bio
+		}
+		if req.ParentName != nil {
+			u.ParentName = req.ParentName
+		}
+		if req.ParentPhone != nil {
+			u.ParentPhone = req.ParentPhone
+		}
+		if req.Instagram != nil {
+			u.Instagram = req.Instagram
+		}
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		var schoolProfile *dto.SchoolProfile
+		if u.SchoolID != nil && *u.SchoolID != "" {
+			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
+				schoolProfile = schoolToProfile(school)
+			}
+		}
+		var birthDateStr *string
+		if u.BirthDate != nil {
+			s := u.BirthDate.UTC().Format("2006-01-02")
+			birthDateStr = &s
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "profile updated"})
+		_ = json.NewEncoder(w).Encode(dto.TrainerProfileResponse{
+			Name:        u.Name,
+			Email:       u.Email,
+			Phone:       u.Phone,
+			Whatsapp:    u.Whatsapp,
+			ClassLevel:  u.ClassLevel,
+			City:        u.City,
+			Province:    u.Province,
+			Gender:      u.Gender,
+			BirthDate:  birthDateStr,
+			Bio:         u.Bio,
+			ParentName: u.ParentName,
+			ParentPhone: u.ParentPhone,
+			Instagram:  u.Instagram,
+			School:      schoolProfile,
+		})
+	}
+}
+
+// InstructorProfilePassword changes password for instructor.
+// PUT /api/v1/instructor/profile/password
+func InstructorProfilePassword(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+
+		var req struct {
+			CurrentPassword string `json:"currentPassword"`
+			NewPassword     string `json:"newPassword"`
+			ConfirmPassword string `json:"confirmPassword"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
+			return
+		}
+		if req.CurrentPassword == "" || req.NewPassword == "" || req.ConfirmPassword == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "currentPassword/newPassword/confirmPassword required")
+			return
+		}
+		if len(req.NewPassword) < 6 {
+			writeError(w, http.StatusBadRequest, "validation_error", "newPassword must be at least 6 characters")
+			return
+		}
+		if req.NewPassword != req.ConfirmPassword {
+			writeError(w, http.StatusBadRequest, "validation_error", "confirmPassword does not match")
+			return
+		}
+
+		if err := deps.AuthService.ChangePassword(r.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+			if err == service.ErrInvalidCreds {
+				writeError(w, http.StatusUnauthorized, "invalid_current_password", "current password is incorrect")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "password updated"})
 	}
 }
 
@@ -193,6 +334,140 @@ func TrainerCreateStudent(deps *Deps) http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"user": userToMap(u),
+		})
+	}
+}
+
+// TrainerStudentsList lists students linked to current trainer/guru.
+// GET /api/v1/trainer/students
+func TrainerStudentsList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.TrainerStudentItem, 0, len(students))
+		for _, u := range students {
+			out = append(out, dto.TrainerStudentItem{
+				ID:    u.ID,
+				Name:  u.Name,
+				Email: u.Email,
+				Role:  u.Role,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": out})
+	}
+}
+
+// TrainerStudentGet returns detail a single student for current trainer.
+// GET /api/v1/trainer/students/:studentId
+func TrainerStudentGet(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		studentID := chi.URLParam(r, "studentId")
+		if studentID == "" {
+			http.Error(w, "studentId required", http.StatusBadRequest)
+			return
+		}
+		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, u := range students {
+			if u.ID == studentID {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(dto.TrainerStudentItem{
+					ID:    u.ID,
+					Name:  u.Name,
+					Email: u.Email,
+					Role:  u.Role,
+				})
+				return
+			}
+		}
+		http.Error(w, "student not found", http.StatusNotFound)
+	}
+}
+
+// TrainerStudentUpdate updates a student's name/email.
+// PUT /api/v1/trainer/students/:studentId
+func TrainerStudentUpdate(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		studentID := chi.URLParam(r, "studentId")
+		if studentID == "" {
+			http.Error(w, "studentId required", http.StatusBadRequest)
+			return
+		}
+		var req dto.TrainerStudentUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		// Ensure student belongs to this trainer by checking in the list.
+		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		found := false
+		for _, u := range students {
+			if u.ID == studentID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			http.Error(w, "student not found", http.StatusNotFound)
+			return
+		}
+
+		u, err := deps.UserRepo.FindByID(r.Context(), studentID)
+		if err != nil {
+			http.Error(w, "student not found", http.StatusNotFound)
+			return
+		}
+
+		if req.Name != "" {
+			u.Name = req.Name
+		}
+		if req.Email != "" {
+			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
+			if err == nil && existing.ID != u.ID {
+				http.Error(w, "email already in use", http.StatusConflict)
+				return
+			}
+			u.Email = req.Email
+		}
+
+		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.TrainerStudentItem{
+			ID:    u.ID,
+			Name:  u.Name,
+			Email: u.Email,
+			Role:  u.Role,
 		})
 	}
 }

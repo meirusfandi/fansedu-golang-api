@@ -15,6 +15,7 @@ type EnrollmentRepo interface {
 	GetByUserAndCourse(ctx context.Context, userID, courseID string) (domain.CourseEnrollment, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.CourseEnrollment, error)
 	ListByCourseID(ctx context.Context, courseID string) ([]domain.CourseEnrollment, error)
+	ListCoursesByUserWithFilters(ctx context.Context, userID, search, progressStatus string, page, limit int) ([]domain.StudentCourseRow, int, error)
 	Update(ctx context.Context, e domain.CourseEnrollment) error
 	Count(ctx context.Context) (int, error)
 	CountEnrolledInMonth(ctx context.Context, year, month int) (int, error)
@@ -86,6 +87,60 @@ func (r *enrollmentRepo) ListByCourseID(ctx context.Context, courseID string) ([
 		list = append(list, e)
 	}
 	return list, rows.Err()
+}
+
+func (r *enrollmentRepo) ListCoursesByUserWithFilters(ctx context.Context, userID, search, progressStatus string, page, limit int) ([]domain.StudentCourseRow, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	query := `
+		SELECT
+			e.id::text AS enrollment_id,
+			c.id::text AS course_id,
+			c.title,
+			COALESCE(c.slug, '') AS course_slug,
+			COALESCE(c.thumbnail, '') AS course_thumbnail,
+			e.status AS enrollment_status,
+			e.enrolled_at,
+			COUNT(*) OVER()::int AS total
+		FROM course_enrollments e
+		JOIN courses c ON c.id = e.course_id
+		WHERE e.user_id = $1::uuid
+		  AND (
+			$2 = '' OR
+			c.title ILIKE '%' || $2 || '%' OR
+			COALESCE(c.slug, '') ILIKE '%' || $2 || '%'
+		  )
+		  AND (
+			$3 = '' OR
+			($3 = 'in-progress' AND e.status = 'in_progress') OR
+			($3 = 'completed' AND e.status = 'completed')
+		  )
+		ORDER BY e.enrolled_at DESC
+		LIMIT $4 OFFSET $5
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID, search, progressStatus, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.StudentCourseRow, 0, limit)
+	total := 0
+	for rows.Next() {
+		var row domain.StudentCourseRow
+		if err := rows.Scan(&row.EnrollmentID, &row.CourseID, &row.CourseTitle, &row.CourseSlug, &row.CourseThumbnail, &row.EnrollmentStatus, &row.EnrolledAt, &total); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, row)
+	}
+	return out, total, rows.Err()
 }
 
 func (r *enrollmentRepo) Update(ctx context.Context, e domain.CourseEnrollment) error {
