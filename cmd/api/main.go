@@ -140,6 +140,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string
 	orderRepo := repo.NewOrderRepo(pool)
 	orderItemRepo := repo.NewOrderItemRepo(pool)
 	promoRepo := repo.NewPromoRepo(pool)
+	analyticsRepo := repo.NewAnalyticsRepo(pool)
 	mailer := mail.NewLogMailer()
 	if appURL == "" {
 		appURL = "http://localhost:5173"
@@ -177,6 +178,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string
 		OrderRepo:                orderRepo,
 		OrderItemRepo:            orderItemRepo,
 		PromoRepo:                promoRepo,
+		AnalyticsRepo:            analyticsRepo,
 		NotificationRepo:        notificationRepo,
 		CourseMessageRepo:        courseMessageRepo,
 		CourseDiscussionRepo:      courseDiscussionRepo,

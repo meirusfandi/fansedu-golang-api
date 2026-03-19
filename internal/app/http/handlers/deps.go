@@ -33,6 +33,7 @@ type Deps struct {
 	OrderRepo                 repo.OrderRepo
 	OrderItemRepo             repo.OrderItemRepo
 	PromoRepo                 repo.PromoRepo
+	AnalyticsRepo             repo.AnalyticsRepo
 	NotificationRepo          repo.NotificationRepo
 	CourseMessageRepo         repo.CourseMessageRepo
 	CourseDiscussionRepo      repo.CourseDiscussionRepo

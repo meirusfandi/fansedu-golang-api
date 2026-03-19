@@ -65,9 +65,10 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.OptionalAuth(deps.JWTSecret)).Post("/initiate", handlers.CheckoutInitiate(deps))
 			r.Post("/payment-session", handlers.CheckoutPaymentSession(deps))
 			r.Post("/payment-session/", handlers.CheckoutPaymentSession(deps))
-			r.Post("/orders/{orderId}/payment-proof", handlers.CheckoutPaymentProof(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Post("/orders/{orderId}/payment-proof", handlers.CheckoutPaymentProof(deps))
 			r.Post("/orders/{orderId}/complete-purchase-auth", handlers.CompletePurchaseAuth(deps))
 		})
+		r.Post("/analytics/pageview", handlers.AnalyticsTrackPageview(deps))
 		r.Post("/webhook/payment", handlers.PaymentWebhook(deps))
 
 		r.Route("/programs", func(r chi.Router) {
@@ -207,6 +208,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Post("/payments", handlers.AdminCreatePayment(deps))
 			r.Put("/payments/{paymentId}", handlers.AdminConfirmPayment(deps))
 			r.Put("/orders/{orderId}/verify", handlers.AdminVerifyOrder(deps))
+			r.Get("/analytics/summary", handlers.AdminAnalyticsSummary(deps))
+			r.Get("/analytics/visitors", handlers.AdminAnalyticsVisitors(deps))
 			r.Get("/reports/monthly", handlers.AdminReportMonthly(deps))
 			r.Get("/reports/courses/{courseId}", handlers.AdminCourseReport(deps))
 			r.Get("/roles", handlers.AdminListRoles(deps))
