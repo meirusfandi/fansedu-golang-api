@@ -614,10 +614,11 @@ func StudentCoursesList(deps *Deps) http.HandlerFunc {
 				thumb = *c.Thumbnail
 			}
 			enrolledAt := e.EnrolledAt.Format("2006-01-02T15:04:05Z07:00")
+			progress := enrollmentProgressPercent(e.Status)
 			data = append(data, dto.StudentCourseItem{
 				ID:              e.ID,
 				Program:         dto.StudentCourseProgram{ID: c.ID, Slug: slug, Title: c.Title, Thumbnail: thumb},
-				ProgressPercent: 0,
+				ProgressPercent: progress,
 				EnrolledAt:      enrolledAt,
 				LastAccessedAt:  enrolledAt,
 			})
@@ -812,12 +813,25 @@ func InstructorStudentsList(deps *Deps) http.HandlerFunc {
 					Name:            u.Name,
 					Email:           u.Email,
 					ProgramTitle:    c.Title,
-					ProgressPercent: 0,
+					ProgressPercent: enrollmentProgressPercent(e.Status),
 				})
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: data})
+	}
+}
+
+func enrollmentProgressPercent(status string) int {
+	switch status {
+	case domain.EnrollmentStatusCompleted:
+		return 100
+	case domain.EnrollmentStatusInProgress:
+		return 50
+	case domain.EnrollmentStatusEnrolled:
+		return 0
+	default:
+		return 0
 	}
 }
 

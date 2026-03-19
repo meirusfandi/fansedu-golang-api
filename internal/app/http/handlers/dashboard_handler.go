@@ -108,11 +108,46 @@ func DashboardStudent(deps *Deps) http.HandlerFunc {
 			},
 			OpenTryouts:        openTryouts,
 			RecentAttempts:     recentAttempts,
+			CourseProgress:    nil,
 			StrengthAreas:      resp.StrengthAreas,
 			ImprovementAreas:   resp.ImprovementAreas,
 			Recommendation:     resp.Recommendation,
 			LearningEvaluation: learningEval,
 		}
+
+		// Course progress for "kelas" section in student dashboard.
+		// We derive progress from enrollment status because course-level progress
+		// isn't stored as a separate numeric field yet.
+		if enrollments, err := deps.EnrollmentRepo.ListByUserID(r.Context(), userID); err == nil {
+			progress := make([]dto.StudentCourseItem, 0, len(enrollments))
+			for _, e := range enrollments {
+				c, err := deps.CourseRepo.GetByID(r.Context(), e.CourseID)
+				if err != nil {
+					continue
+				}
+				slug := ""
+				if c.Slug != nil {
+					slug = *c.Slug
+				}
+				thumb := ""
+				if c.Thumbnail != nil {
+					thumb = *c.Thumbnail
+				}
+				enrolledAt := e.EnrolledAt.Format("2006-01-02T15:04:05Z07:00")
+				progressPercent := enrollmentProgressPercent(e.Status)
+				progress = append(progress, dto.StudentCourseItem{
+					ID:              e.ID,
+					Program:         dto.StudentCourseProgram{ID: c.ID, Slug: slug, Title: c.Title, Thumbnail: thumb},
+					ProgressPercent: progressPercent,
+					EnrolledAt:      enrolledAt,
+					LastAccessedAt:  enrolledAt,
+				})
+			}
+			out.CourseProgress = progress
+		} else {
+			out.CourseProgress = []dto.StudentCourseItem{}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
 	}

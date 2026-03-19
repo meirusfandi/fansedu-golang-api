@@ -26,6 +26,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 	r.Use(middleware.CORS(getEnv("CORS_ORIGINS", "http://localhost:5173,*")))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recover())
+	// Redirect trailing slashes so both "/x" and "/x/" can match.
+	r.Use(chimw.RedirectSlashes)
 	r.Use(chimw.RealIP)
 	r.Use(middleware.Logger())
 
@@ -79,6 +81,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Get("/packages", handlers.PackagesListLanding(deps))
 
 		r.Route("/tryouts", func(r chi.Router) {
+			r.Get("/", handlers.TryoutList(deps))
 			r.Get("/open", handlers.TryoutListOpen(deps))
 			r.Get("/{tryoutId}", handlers.TryoutGetByID(deps))
 			r.Get("/{tryoutId}/leaderboard", handlers.TryoutLeaderboard(deps))

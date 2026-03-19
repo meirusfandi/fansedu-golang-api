@@ -29,6 +29,29 @@ func TryoutListOpen(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// TryoutList supports query param: GET /api/v1/tryouts?status=open
+// Currently we only support status=open (public).
+func TryoutList(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := r.URL.Query().Get("status")
+		if status == "" || status == domain.TryoutStatusOpen || status == "open" {
+			list, err := deps.TryoutService.ListOpen(r.Context())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			out := make([]dto.TryoutResponse, len(list))
+			for i := range list {
+				out[i] = tryoutToDTO(list[i])
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(out)
+			return
+		}
+		writeError(w, http.StatusUnprocessableEntity, "validation_error", "invalid status; only status=open is supported")
+	}
+}
+
 // StudentTryoutList returns all tryouts/events for the student's subject (bidang), excluding draft.
 // Status open/closed and opens_at/closes_at are included; frontend can separate "dibuka" vs "ditutup". Requires Auth.
 func StudentTryoutList(deps *Deps) http.HandlerFunc {
