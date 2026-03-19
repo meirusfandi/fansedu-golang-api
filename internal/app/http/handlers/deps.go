@@ -35,6 +35,7 @@ type Deps struct {
 	PromoRepo                 repo.PromoRepo
 	AnalyticsRepo             repo.AnalyticsRepo
 	NotificationRepo          repo.NotificationRepo
+	TrainerRepo               repo.TrainerRepo
 	CourseMessageRepo         repo.CourseMessageRepo
 	CourseDiscussionRepo      repo.CourseDiscussionRepo
 	CourseDiscussionReplyRepo repo.CourseDiscussionReplyRepo

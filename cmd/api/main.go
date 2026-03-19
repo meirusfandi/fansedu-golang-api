@@ -180,6 +180,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string
 		PromoRepo:                promoRepo,
 		AnalyticsRepo:            analyticsRepo,
 		NotificationRepo:        notificationRepo,
+		TrainerRepo:             trainerRepo,
 		CourseMessageRepo:        courseMessageRepo,
 		CourseDiscussionRepo:      courseDiscussionRepo,
 		CourseDiscussionReplyRepo: courseDiscussionReplyRepo,

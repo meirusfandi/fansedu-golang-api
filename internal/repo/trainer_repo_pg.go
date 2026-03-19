@@ -106,6 +106,43 @@ func (r *trainerRepo) LinkStudent(ctx context.Context, trainerID, studentID stri
 	return nil
 }
 
+func (r *trainerRepo) ListTrainersByStudent(ctx context.Context, studentID string) ([]domain.User, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT u.id, u.email, u.password_hash, u.name, u.role, u.avatar_url, u.school_id, u.subject_id,
+		       u.email_verified, u.email_verified_at, u.must_set_password, u.created_at, u.updated_at
+		FROM trainer_students ts
+		JOIN users u ON u.id = ts.trainer_id
+		WHERE ts.student_id = $1::uuid
+		ORDER BY ts.created_at DESC
+	`, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]domain.User, 0)
+	for rows.Next() {
+		var u domain.User
+		var avatarURL, schoolID, subjectID *string
+		var emailVerifiedAt *time.Time
+		var emailVerified, mustSetPassword bool
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &avatarURL, &schoolID, &subjectID,
+			&emailVerified, &emailVerifiedAt, &mustSetPassword, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		u.AvatarURL = avatarURL
+		u.SchoolID = schoolID
+		u.SubjectID = subjectID
+		u.EmailVerified = emailVerified
+		u.EmailVerifiedAt = emailVerifiedAt
+		u.MustSetPassword = mustSetPassword
+		list = append(list, u)
+	}
+	return list, rows.Err()
+}
+
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {

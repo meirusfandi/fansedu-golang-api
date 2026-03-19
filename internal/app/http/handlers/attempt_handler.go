@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -140,6 +141,33 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Progress notification -> notify all trainers (guru/instructor) linked to this student.
+		// We trigger it when an attempt is successfully submitted.
+		if a.Status == domain.AttemptStatusSubmitted && a.SubmittedAt != nil {
+			student, _ := deps.UserRepo.FindByID(r.Context(), userID)
+			tryout, _ := deps.TryoutService.GetByID(r.Context(), a.TryoutSessionID)
+			trainers, _ := deps.TrainerRepo.ListTrainersByStudent(r.Context(), userID)
+			for _, t := range trainers {
+				_, _ = deps.NotificationRepo.Create(r.Context(), domain.Notification{
+					UserID: t.ID,
+					Title:  "Progress Siswa",
+					Body: fmt.Sprintf(
+						"%s menyelesaikan tryout %s. Skor: %.0f",
+						student.Name,
+						tryout.Title,
+						func() float64 {
+							if a.Score != nil {
+								return *a.Score
+							}
+							return 0
+						}(),
+					),
+					Type: "progress_update",
+				})
+			}
+		}
+
 		score, percentile := 0.0, 0.0
 		if a.Score != nil {
 			score = *a.Score

@@ -17,4 +17,6 @@ type TrainerRepo interface {
 	ListStudents(ctx context.Context, trainerID string) ([]domain.User, error)
 	// LinkStudent links a student to the trainer (fails if already linked).
 	LinkStudent(ctx context.Context, trainerID, studentID string) error
+	// ListTrainersByStudent returns all trainers linked to a student.
+	ListTrainersByStudent(ctx context.Context, studentID string) ([]domain.User, error)
 }
