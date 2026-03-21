@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -181,13 +182,34 @@ func NewAdminService(
 }
 
 func (s *adminService) Overview(ctx context.Context) (*AdminOverview, error) {
-	students, _ := s.userCount(ctx)
-	totalUsers, _ := s.userRepo.Count(ctx)
-	open, _ := s.tryoutRepo.ListOpen(ctx, time.Now())
-	totalCourses, _ := s.courseRepo.Count(ctx)
-	totalEnrollments, _ := s.enrollmentRepo.Count(ctx)
-	avg, _ := s.attemptAvg(ctx)
-	certs, _ := s.certCount(ctx)
+	students, err := s.userCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count students: %w", err)
+	}
+	totalUsers, err := s.userRepo.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count users: %w", err)
+	}
+	open, err := s.tryoutRepo.ListOpen(ctx, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("list open tryouts: %w", err)
+	}
+	totalCourses, err := s.courseRepo.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count courses: %w", err)
+	}
+	totalEnrollments, err := s.enrollmentRepo.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count enrollments: %w", err)
+	}
+	avg, err := s.attemptAvg(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("avg attempt score: %w", err)
+	}
+	certs, err := s.certCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count certificates: %w", err)
+	}
 	return &AdminOverview{
 		TotalStudents:     students,
 		TotalUsers:        totalUsers,
@@ -340,9 +362,18 @@ func (s *adminService) ConfirmPayment(ctx context.Context, paymentID string, con
 }
 
 func (s *adminService) ReportMonthly(ctx context.Context, year, month int) (*MonthlyReport, error) {
-	enrollments, _ := s.enrollmentRepo.CountEnrolledInMonth(ctx, year, month)
-	paymentsCount, _ := s.paymentRepo.CountPaidInMonth(ctx, year, month)
-	revenue, _ := s.paymentRepo.TotalAmountPaidInMonth(ctx, year, month)
+	enrollments, err := s.enrollmentRepo.CountEnrolledInMonth(ctx, year, month)
+	if err != nil {
+		return nil, fmt.Errorf("count monthly enrollments: %w", err)
+	}
+	paymentsCount, err := s.paymentRepo.CountPaidInMonth(ctx, year, month)
+	if err != nil {
+		return nil, fmt.Errorf("count monthly paid payments: %w", err)
+	}
+	revenue, err := s.paymentRepo.TotalAmountPaidInMonth(ctx, year, month)
+	if err != nil {
+		return nil, fmt.Errorf("sum monthly revenue: %w", err)
+	}
 	return &MonthlyReport{
 		Year:           year,
 		Month:          month,

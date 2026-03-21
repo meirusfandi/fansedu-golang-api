@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -13,15 +15,29 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 )
 
-const (
-	adminEmail    = "me.rusfandi@gmail.com"
-	adminPassword = "mr@Condong1105"
-	adminName     = "Administrator Fansedu"
-)
+func getRequiredEnv(key string) (string, error) {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return "", errors.New(key + " is required")
+	}
+	return v, nil
+}
 
 func main() {
 	config.LoadEnvFile()
 	cfg := config.Load()
+	adminEmail, err := getRequiredEnv("BOOTSTRAP_ADMIN_EMAIL")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminPassword, err := getRequiredEnv("BOOTSTRAP_ADMIN_PASSWORD")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminName := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_NAME"))
+	if adminName == "" {
+		adminName = "Administrator"
+	}
 
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is required. Set it in .env or .env.dev")

@@ -119,6 +119,8 @@ go run ./cmd/migrate
 - **Payment (placeholder):**  
   - `GET /api/v1/admin/payments` — Daftar pembayaran (query: `?limit=50`)  
   - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount_cents, currency, type, reference_id, description, status)
+  - `PUT /api/v1/admin/payments/{paymentId}` — Konfirmasi pembayaran (approve/reject)
+  - `PUT /api/v1/admin/orders/{orderId}/verify` — Verifikasi order checkout (mark paid + enroll)
 - **Report bulanan:**  
   - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue_cents
 - **Tryout & soal (event/quiz):**  
@@ -132,5 +134,21 @@ go run ./cmd/migrate
   - `PUT /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Update soal  
   - `DELETE /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Hapus soal  
 - `POST /api/v1/admin/certificates` — Terbitkan sertifikat
+- **Audit trail admin:**  
+  - `GET /api/v1/admin/audit-logs` — Riwayat aksi admin (page, limit)
+- **Landing CMS (admin):**
+  - `GET /api/v1/admin/landing/site-settings`
+  - `PUT /api/v1/admin/landing/site-settings`
+  - `GET|POST|PUT|DELETE /api/v1/admin/landing/resources/{resource}`
+  - `GET|POST|PUT|DELETE /api/v1/admin/landing/packages`
+
+**RBAC Admin roles**
+- `admin`, `super_admin`, `finance_admin`, `academic_admin`, `content_admin`
+
+**Bootstrap admin CLI**
+- `cmd/create-admin` sekarang membaca env:
+  - `BOOTSTRAP_ADMIN_EMAIL`
+  - `BOOTSTRAP_ADMIN_PASSWORD`
+  - `BOOTSTRAP_ADMIN_NAME` (opsional, default `Administrator`)
 
 # fansedu-golang-api

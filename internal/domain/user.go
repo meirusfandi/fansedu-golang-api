@@ -3,10 +3,14 @@ package domain
 import "time"
 
 const (
-	UserRoleAdmin   = "admin"
-	UserRoleStudent = "student"
-	UserRoleGuru    = "guru"
-	UserRoleTrainer = "trainer" // nanti dibuat oleh admin
+	UserRoleAdmin        = "admin"
+	UserRoleSuperAdmin   = "super_admin"
+	UserRoleFinanceAdmin = "finance_admin"
+	UserRoleAcademicAdmin = "academic_admin"
+	UserRoleContentAdmin = "content_admin"
+	UserRoleStudent      = "student"
+	UserRoleGuru         = "guru"
+	UserRoleTrainer      = "trainer" // nanti dibuat oleh admin
 )
 
 type User struct {

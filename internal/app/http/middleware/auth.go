@@ -5,8 +5,10 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
 type ctxKeyUserID struct{}
@@ -51,11 +53,123 @@ func AdminOnly() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
-			if role != "admin" {
+			if !isAdminRole(role) {
 				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func isAdminRole(role string) bool {
+	switch role {
+	case domain.UserRoleAdmin,
+		domain.UserRoleSuperAdmin,
+		domain.UserRoleFinanceAdmin,
+		domain.UserRoleAcademicAdmin,
+		domain.UserRoleContentAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+var rolePermissions = map[string]map[string]struct{}{
+	domain.UserRoleAdmin: {
+		"*": {},
+	},
+	domain.UserRoleSuperAdmin: {
+		"*": {},
+	},
+	domain.UserRoleFinanceAdmin: {
+		"admin.overview.read": {},
+		"payments.manage":     {},
+		"orders.verify":       {},
+		"reports.read":        {},
+		"analytics.read":      {},
+		"admin.audit.read":    {},
+	},
+	domain.UserRoleAcademicAdmin: {
+		"admin.overview.read": {},
+		"users.manage":        {},
+		"courses.manage":      {},
+		"tryouts.manage":      {},
+		"certificates.issue":  {},
+		"reports.read":        {},
+		"analytics.read":      {},
+		"master-data.manage":  {},
+		"admin.audit.read":    {},
+	},
+	domain.UserRoleContentAdmin: {
+		"admin.overview.read": {},
+		"courses.manage":      {},
+		"tryouts.manage":      {},
+		"landing.manage":      {},
+		"master-data.manage":  {},
+		"admin.audit.read":    {},
+	},
+}
+
+func HasPermission(role, permission string) bool {
+	perms, ok := rolePermissions[strings.TrimSpace(role)]
+	if !ok {
+		return false
+	}
+	if _, ok := perms["*"]; ok {
+		return true
+	}
+	_, ok = perms[permission]
+	return ok
+}
+
+func RequirePermission(permission string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role, _ := GetRole(r.Context())
+			if !HasPermission(role, permission) {
+				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+type AdminAuditLogger func(ctx context.Context, userID, role, method, path string, statusCode int, duration time.Duration, requestID string) error
+
+type responseRecorder struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+func (r *responseRecorder) WriteHeader(code int) {
+	r.status = code
+	r.wroteHeader = true
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *responseRecorder) Write(b []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+func AdminAuditLog(logger AdminAuditLogger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rr := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+			start := time.Now()
+			next.ServeHTTP(rr, r)
+			if logger == nil {
+				return
+			}
+			userID, _ := GetUserID(r.Context())
+			role, _ := GetRole(r.Context())
+			requestID, _ := GetRequestID(r.Context())
+			_ = logger(r.Context(), userID, role, r.Method, r.URL.Path, rr.status, time.Since(start), requestID)
 		})
 	}
 }

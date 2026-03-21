@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -114,12 +115,13 @@ func AdminCreateUser(deps *Deps) http.HandlerFunc {
 			http.Error(w, "email, password, name required", http.StatusBadRequest)
 			return
 		}
-		role := req.Role
+		role := strings.TrimSpace(req.Role)
 		if role == "" {
 			role = domain.UserRoleStudent
 		}
-		if role != domain.UserRoleStudent && role != domain.UserRoleAdmin {
-			role = domain.UserRoleStudent
+		if !isAllowedManagedUserRole(role) {
+			http.Error(w, "invalid role", http.StatusBadRequest)
+			return
 		}
 		u := domain.User{Email: req.Email, Name: req.Name, Role: role, AvatarURL: req.AvatarURL, SchoolID: req.SchoolID, SubjectID: req.SubjectID}
 		created, err := deps.AdminService.CreateUser(r.Context(), u, req.Password)
@@ -182,7 +184,12 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 			u.Email = *req.Email
 		}
 		if req.Role != nil {
-			u.Role = *req.Role
+			role := strings.TrimSpace(*req.Role)
+			if !isAllowedManagedUserRole(role) {
+				http.Error(w, "invalid role", http.StatusBadRequest)
+				return
+			}
+			u.Role = role
 		}
 		if req.AvatarURL != nil {
 			u.AvatarURL = req.AvatarURL
@@ -206,6 +213,23 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func isAllowedManagedUserRole(role string) bool {
+	switch strings.TrimSpace(role) {
+	case domain.UserRoleStudent,
+		domain.UserRoleAdmin,
+		domain.UserRoleSuperAdmin,
+		domain.UserRoleFinanceAdmin,
+		domain.UserRoleAcademicAdmin,
+		domain.UserRoleContentAdmin,
+		domain.UserRoleGuru,
+		domain.UserRoleTrainer,
+		"instructor":
+		return true
+	default:
+		return false
 	}
 }
 
