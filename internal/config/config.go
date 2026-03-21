@@ -17,12 +17,13 @@ const (
 const defaultDevJWTSecret = "dev-secret-change-me"
 
 type Config struct {
-	Env           string // "development" | "production"
-	Port          string
-	DatabaseURL   string
-	JWTSecret     string
-	OpenAIAPIKey  string // opsional: untuk generate feedback dengan AI saat submit tryout
-	AppURL        string // URL frontend/app untuk link di email (contoh: https://app.fansedu.com)
+	Env                    string // "development" | "production"
+	Port                   string
+	DatabaseURL            string
+	JWTSecret              string
+	OpenAIAPIKey           string // opsional: untuk generate feedback dengan AI saat submit tryout
+	AppURL                 string // URL frontend/app untuk link di email (contoh: https://app.fansedu.com)
+	AdminPasswordBypassKey string // opsional: kunci khusus untuk emergency reset password admin
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -46,12 +47,13 @@ func Load() Config {
 	}
 
 	cfg := Config{
-		Env:          env,
-		Port:         getenv("PORT", "8080"),
-		DatabaseURL:  getenv("DATABASE_URL", ""),
-		JWTSecret:    getenv("JWT_SECRET", defaultDevJWTSecret),
-		OpenAIAPIKey: getenv("OPENAI_API_KEY", ""),
-		AppURL:       getenv("APP_URL", "http://localhost:5173"),
+		Env:                    env,
+		Port:                   getenv("PORT", "8080"),
+		DatabaseURL:            getenv("DATABASE_URL", ""),
+		JWTSecret:              getenv("JWT_SECRET", defaultDevJWTSecret),
+		OpenAIAPIKey:           getenv("OPENAI_API_KEY", ""),
+		AppURL:                 getenv("APP_URL", "http://localhost:5173"),
+		AdminPasswordBypassKey: getenv("ADMIN_PASSWORD_BYPASS_KEY", ""),
 	}
 
 	if cfg.Env == EnvProduction {

@@ -136,6 +136,8 @@ go run ./cmd/migrate
 - `POST /api/v1/admin/certificates` — Terbitkan sertifikat
 - **Audit trail admin:**  
   - `GET /api/v1/admin/audit-logs` — Riwayat aksi admin (page, limit)
+- **Admin tools:**  
+  - `POST /api/v1/admin/tools/hash-password` — Generate bcrypt hash dari password input
 - **Landing CMS (admin):**
   - `GET /api/v1/admin/landing/site-settings`
   - `PUT /api/v1/admin/landing/site-settings`
@@ -150,5 +152,11 @@ go run ./cmd/migrate
   - `BOOTSTRAP_ADMIN_EMAIL`
   - `BOOTSTRAP_ADMIN_PASSWORD`
   - `BOOTSTRAP_ADMIN_NAME` (opsional, default `Administrator`)
+
+**Emergency bypass reset password admin**
+- Endpoint: `POST /api/v1/auth/admin/password-bypass`
+- Header wajib: `X-Admin-Bypass-Key: <ADMIN_PASSWORD_BYPASS_KEY>`
+- Body: `{ "email": "admin@domain.com", "new_password": "password_baru" }`
+- Endpoint hanya akan aktif jika env `ADMIN_PASSWORD_BYPASS_KEY` terisi.
 
 # fansedu-golang-api

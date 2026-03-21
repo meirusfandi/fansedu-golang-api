@@ -47,3 +47,12 @@ type CompletePurchaseAuthResponse struct {
 	NextAction      string `json:"nextAction,omitempty"`
 }
 
+type PasswordHashRequest struct {
+	Password string `json:"password"`
+}
+
+type PasswordHashResponse struct {
+	Algorithm string `json:"algorithm"`
+	Hash      string `json:"hash"`
+}
+

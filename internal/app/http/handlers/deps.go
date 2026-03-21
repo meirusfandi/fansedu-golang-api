@@ -8,8 +8,9 @@ import (
 )
 
 type Deps struct {
-	DB        *pgxpool.Pool
-	JWTSecret []byte
+	DB                     *pgxpool.Pool
+	JWTSecret              []byte
+	AdminPasswordBypassKey string
 
 	AuthService      service.AuthService
 	TryoutService    service.TryoutService

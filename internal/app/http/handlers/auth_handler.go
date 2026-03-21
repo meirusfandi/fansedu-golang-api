@@ -178,6 +178,81 @@ func AuthResetPassword(_ *Deps) http.HandlerFunc {
 	}
 }
 
+// AuthAdminPasswordBypass resets admin password using emergency bypass key.
+// Endpoint: POST /api/v1/auth/admin/password-bypass
+// Header: X-Admin-Bypass-Key: <ADMIN_PASSWORD_BYPASS_KEY>
+// Body: { "email": "...", "new_password": "..." }
+func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bypassKey := strings.TrimSpace(deps.AdminPasswordBypassKey)
+		if bypassKey == "" {
+			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "admin password bypass is disabled")
+			return
+		}
+		reqKey := strings.TrimSpace(r.Header.Get("X-Admin-Bypass-Key"))
+		if reqKey == "" || reqKey != bypassKey {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid bypass key")
+			return
+		}
+		var req struct {
+			Email       string `json:"email"`
+			NewPassword string `json:"new_password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
+			return
+		}
+		email := strings.TrimSpace(strings.ToLower(req.Email))
+		if email == "" || len(req.NewPassword) < 6 {
+			writeError(w, http.StatusBadRequest, "validation_error", "email and new_password (min 6 chars) required")
+			return
+		}
+		u, err := deps.UserRepo.FindByEmail(r.Context(), email)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "admin user not found")
+			return
+		}
+		if !isAdminRoleForBypass(u.Role) {
+			writeError(w, http.StatusForbidden, "forbidden", "target user is not admin")
+			return
+		}
+		if err := deps.AuthService.SetPassword(r.Context(), u.ID, req.NewPassword); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "admin password updated",
+		})
+	}
+}
+
+// AdminGeneratePasswordHash returns bcrypt hash for a raw password.
+// Endpoint: POST /api/v1/admin/tools/hash-password (admin + permission protected)
+func AdminGeneratePasswordHash(_ *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req dto.PasswordHashRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
+			return
+		}
+		if strings.TrimSpace(req.Password) == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "password is required")
+			return
+		}
+		hash, err := service.GeneratePasswordHash(req.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.PasswordHashResponse{
+			Algorithm: "bcrypt",
+			Hash:      hash,
+		})
+	}
+}
+
 // AuthVerifyEmail verifies email using token from JSON body: POST /api/v1/auth/verify-email
 func AuthVerifyEmail(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -255,6 +330,19 @@ func userToMap(u domain.User) map[string]interface{} {
 // isValidRegisterRole: student, instructor, atau guru.
 func isValidRegisterRole(role string) bool {
 	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru || role == "instructor"
+}
+
+func isAdminRoleForBypass(role string) bool {
+	switch role {
+	case domain.UserRoleAdmin,
+		domain.UserRoleSuperAdmin,
+		domain.UserRoleFinanceAdmin,
+		domain.UserRoleAcademicAdmin,
+		domain.UserRoleContentAdmin:
+		return true
+	default:
+		return false
+	}
 }
 
 // AuthSetPassword handles setting password for users with mustSetPassword=true

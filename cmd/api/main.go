@@ -60,7 +60,7 @@ func main() {
 	if pool == nil {
 		router = httpapi.NewRouter(nil)
 	} else {
-		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL)
+		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL, cfg.AdminPasswordBypassKey)
 		router = httpapi.NewRouter(deps)
 	}
 
@@ -84,7 +84,7 @@ func main() {
 	log.Printf("shutdown complete")
 }
 
-func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string) *handlers.Deps {
+func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, adminPasswordBypassKey string) *handlers.Deps {
 	userRepo := repo.NewUserRepo(pool)
 	tryoutRepo := repo.NewTryoutRepo(pool)
 	questionRepo := repo.NewQuestionRepo(pool)
@@ -151,6 +151,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL string
 	return &handlers.Deps{
 		DB:                 pool,
 		JWTSecret:          jwtSecret,
+		AdminPasswordBypassKey: adminPasswordBypassKey,
 		AuthService:        authService,
 		TryoutService:      tryoutService,
 		AttemptService:     attemptService,

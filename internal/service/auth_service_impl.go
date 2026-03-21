@@ -70,11 +70,11 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 	if err == nil {
 		// Email sudah terdaftar: perlakukan sebagai update password (reset/first setup),
 		// bukan error. Dipakai untuk flow guest checkout yang kemudian isi password.
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+		hash, err := GeneratePasswordHashWithCost(password, s.bcryptCost)
 		if err != nil {
 			return domain.User{}, "", err
 		}
-		existing.PasswordHash = string(hash)
+		existing.PasswordHash = hash
 		if strings.TrimSpace(name) != "" {
 			existing.Name = name
 		}
@@ -97,14 +97,14 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 	if role != domain.UserRoleStudent && role != domain.UserRoleGuru && role != "instructor" {
 		role = domain.UserRoleStudent
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	hash, err := GeneratePasswordHashWithCost(password, s.bcryptCost)
 	if err != nil {
 		return domain.User{}, "", err
 	}
 	now := time.Now()
 	u := domain.User{
 		Email:           email,
-		PasswordHash:    string(hash),
+		PasswordHash:    hash,
 		Name:            name,
 		Role:            role,
 		EmailVerified:   true,
@@ -143,11 +143,11 @@ func (s *authService) RegisterWithInvite(ctx context.Context, token, email, name
 	if err != nil {
 		return domain.User{}, "", ErrInviteInvalid
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	hash, err := GeneratePasswordHashWithCost(password, s.bcryptCost)
 	if err != nil {
 		return domain.User{}, "", err
 	}
-	u.PasswordHash = string(hash)
+	u.PasswordHash = hash
 	if name != "" {
 		u.Name = name
 	}
@@ -214,11 +214,11 @@ func (s *authService) ChangePassword(ctx context.Context, userID, currentPasswor
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(currentPassword)); err != nil {
 		return ErrInvalidCreds
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.bcryptCost)
+	hash, err := GeneratePasswordHashWithCost(newPassword, s.bcryptCost)
 	if err != nil {
 		return err
 	}
-	u.PasswordHash = string(hash)
+	u.PasswordHash = hash
 	return s.userRepo.Update(ctx, u)
 }
 
@@ -227,11 +227,11 @@ func (s *authService) SetPassword(ctx context.Context, userID, newPassword strin
 	if err != nil {
 		return ErrInvalidCreds
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.bcryptCost)
+	hash, err := GeneratePasswordHashWithCost(newPassword, s.bcryptCost)
 	if err != nil {
 		return err
 	}
-	u.PasswordHash = string(hash)
+	u.PasswordHash = hash
 	u.MustSetPassword = false
 	return s.userRepo.Update(ctx, u)
 }
