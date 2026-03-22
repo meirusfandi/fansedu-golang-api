@@ -118,11 +118,11 @@ go run ./cmd/migrate
   - `DELETE /api/v1/admin/courses/{courseId}/contents/{contentId}` — Hapus konten
 - **Payment (placeholder):**  
   - `GET /api/v1/admin/payments` — Daftar pembayaran (query: `?limit=50`)  
-  - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount_cents, currency, type, reference_id, description, status)
+  - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount, currency, type, reference_id, description, status)
   - `PUT /api/v1/admin/payments/{paymentId}` — Konfirmasi pembayaran (approve/reject)
   - `PUT /api/v1/admin/orders/{orderId}/verify` — Verifikasi order checkout (mark paid + enroll)
 - **Report bulanan:**  
-  - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue_cents
+  - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue
 - **Tryout & soal (event/quiz):**  
   - `GET /api/v1/admin/tryouts` — Daftar semua tryout/quiz  
   - `POST /api/v1/admin/tryouts` — Buat tryout (body: title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status)  

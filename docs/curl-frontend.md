@@ -107,7 +107,7 @@ curl -s -X PATCH "$BASE/notifications/<NOTIFICATION_ID>/read" -H "Authorization:
 curl -s "$BASE/payments" -H "Authorization: Bearer $TOKEN"
 curl -s -X POST "$BASE/payments" -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"amount_cents":100000,"type":"course_purchase","reference_id":"<UUID>","proof_url":"https://..."}'
+  -d '{"amount":100000,"type":"course_purchase","reference_id":"<UUID>","proof_url":"https://..."}'
 ```
 
 ---

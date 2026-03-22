@@ -215,7 +215,7 @@ internal/
 ## Migration Summary
 
 - `users.password_hash` → nullable.
-- `courses`: add slug (UNIQUE), price_cents, thumbnail; instructor_id = created_by or new column.
+- `courses`: add slug (UNIQUE), price, thumbnail; instructor_id = created_by or new column.
 - New: `orders`, `order_items`.
 - `payments`: add order_id (FK), gateway, transaction_id (or new table `order_payments`).
 - Role enum: add `instructor` if not present.
