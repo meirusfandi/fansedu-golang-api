@@ -60,7 +60,7 @@ func main() {
 	if pool == nil {
 		router = httpapi.NewRouter(nil)
 	} else {
-		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL, cfg.AdminPasswordBypassKey)
+		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL, cfg.AdminPasswordBypassKey, cfg.MigrateBypassKey)
 		router = httpapi.NewRouter(deps)
 	}
 
@@ -84,7 +84,7 @@ func main() {
 	log.Printf("shutdown complete")
 }
 
-func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, adminPasswordBypassKey string) *handlers.Deps {
+func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, adminPasswordBypassKey, migrateBypassKey string) *handlers.Deps {
 	userRepo := repo.NewUserRepo(pool)
 	tryoutRepo := repo.NewTryoutRepo(pool)
 	questionRepo := repo.NewQuestionRepo(pool)
@@ -149,40 +149,41 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, admin
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 
 	return &handlers.Deps{
-		DB:                 pool,
-		JWTSecret:          jwtSecret,
+		DB:                      pool,
+		JWTSecret:               jwtSecret,
 		AdminPasswordBypassKey: adminPasswordBypassKey,
-		AuthService:        authService,
-		TryoutService:      tryoutService,
-		AttemptService:     attemptService,
-		DashboardService:   dashboardService,
-		AdminService:       adminService,
-		CourseService:      courseService,
-		TrainerService:     trainerService,
-		CheckoutService:    checkoutService,
-		UserRepo:           userRepo,
-		QuestionRepo:       questionRepo,
-		AttemptAnswerRepo:  attemptAnswerRepo,
-		CertificateRepo:          certificateRepo,
-		RoleRepo:                 roleRepo,
-		SchoolRepo:               schoolRepo,
-		SettingRepo:              settingRepo,
-		EventRepo:                eventRepo,
-		SubjectRepo:              subjectRepo,
-		LevelRepo:                levelRepo,
-		LandingPackageRepo:       landingPackageRepo,
-		TryoutRegistrationRepo:   tryoutRegistrationRepo,
-		EnrollmentRepo:           enrollmentRepo,
-		CourseRepo:               courseRepo,
-		CourseContentRepo:        courseContentRepo,
-		PaymentRepo:              paymentRepo,
-		OrderRepo:                orderRepo,
-		OrderItemRepo:            orderItemRepo,
-		PromoRepo:                promoRepo,
-		AnalyticsRepo:            analyticsRepo,
-		NotificationRepo:        notificationRepo,
-		TrainerRepo:             trainerRepo,
-		CourseMessageRepo:        courseMessageRepo,
+		MigrateBypassKey:       migrateBypassKey,
+		AuthService:            authService,
+		TryoutService:          tryoutService,
+		AttemptService:         attemptService,
+		DashboardService:       dashboardService,
+		AdminService:           adminService,
+		CourseService:          courseService,
+		TrainerService:         trainerService,
+		CheckoutService:        checkoutService,
+		UserRepo:               userRepo,
+		QuestionRepo:           questionRepo,
+		AttemptAnswerRepo:      attemptAnswerRepo,
+		CertificateRepo:        certificateRepo,
+		RoleRepo:               roleRepo,
+		SchoolRepo:             schoolRepo,
+		SettingRepo:            settingRepo,
+		EventRepo:              eventRepo,
+		SubjectRepo:            subjectRepo,
+		LevelRepo:              levelRepo,
+		LandingPackageRepo:     landingPackageRepo,
+		TryoutRegistrationRepo: tryoutRegistrationRepo,
+		EnrollmentRepo:         enrollmentRepo,
+		CourseRepo:             courseRepo,
+		CourseContentRepo:      courseContentRepo,
+		PaymentRepo:            paymentRepo,
+		OrderRepo:              orderRepo,
+		OrderItemRepo:          orderItemRepo,
+		PromoRepo:              promoRepo,
+		AnalyticsRepo:          analyticsRepo,
+		NotificationRepo:       notificationRepo,
+		TrainerRepo:            trainerRepo,
+		CourseMessageRepo:      courseMessageRepo,
 		CourseDiscussionRepo:      courseDiscussionRepo,
 		CourseDiscussionReplyRepo: courseDiscussionReplyRepo,
 	}

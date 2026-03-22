@@ -56,6 +56,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Post("/login", handlers.AuthLogin(deps))
 			r.Post("/hash-password", handlers.AdminGeneratePasswordHash(deps))
 			r.Post("/admin/password-bypass", handlers.AuthAdminPasswordBypass(deps))
+			r.Post("/admin/run-migrate", handlers.AuthRunMigrateBypass(deps))
 			r.Post("/verify-email", handlers.AuthVerifyEmail(deps))
 			r.Post("/resend-verification", handlers.AuthResendVerification(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Get("/me", handlers.AuthMe(deps))

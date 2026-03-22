@@ -7,6 +7,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/db"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -223,6 +224,36 @@ func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"message": "admin password updated",
+		})
+	}
+}
+
+// AuthRunMigrateBypass runs embedded DB migrations with bypass key.
+// Endpoint: POST /api/v1/auth/admin/run-migrate
+// Header: X-Migrate-Bypass-Key: <MIGRATE_BYPASS_KEY>
+func AuthRunMigrateBypass(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bypassKey := strings.TrimSpace(deps.MigrateBypassKey)
+		if bypassKey == "" {
+			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "migrate bypass is disabled")
+			return
+		}
+		reqKey := strings.TrimSpace(r.Header.Get("X-Migrate-Bypass-Key"))
+		if reqKey == "" || reqKey != bypassKey {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid bypass key")
+			return
+		}
+		if deps.DB == nil {
+			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "database is not configured")
+			return
+		}
+		if err := db.Migrate(r.Context(), deps.DB); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "migrations completed",
 		})
 	}
 }

@@ -11,6 +11,7 @@ type Deps struct {
 	DB                     *pgxpool.Pool
 	JWTSecret              []byte
 	AdminPasswordBypassKey string
+	MigrateBypassKey       string
 
 	AuthService      service.AuthService
 	TryoutService    service.TryoutService

@@ -159,4 +159,9 @@ go run ./cmd/migrate
 - Body: `{ "email": "admin@domain.com", "new_password": "password_baru" }`
 - Endpoint hanya akan aktif jika env `ADMIN_PASSWORD_BYPASS_KEY` terisi.
 
+**Emergency bypass run migration**
+- Endpoint: `POST /api/v1/auth/admin/run-migrate`
+- Header wajib: `X-Migrate-Bypass-Key: <MIGRATE_BYPASS_KEY>`
+- Endpoint hanya akan aktif jika env `MIGRATE_BYPASS_KEY` terisi.
+
 # fansedu-golang-api
