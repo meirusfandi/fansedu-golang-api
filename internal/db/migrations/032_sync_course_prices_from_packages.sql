@@ -3,7 +3,10 @@
 
 UPDATE courses c
 SET price = COALESCE(
-  (SELECT COALESCE(p.price_early_bird, p.price_normal)
+  (SELECT COALESCE(
+            NULLIF(REGEXP_REPLACE(COALESCE(p.price_early_bird::text, p.price_normal::text, '0'), '[^0-9]', '', 'g'), '')::BIGINT,
+            0
+          )
    FROM packages p
    WHERE p.slug = c.slug
    LIMIT 1),
@@ -16,7 +19,10 @@ WHERE (c.price = 0 OR c.price IS NULL)
 -- Also update courses where slug matches package slug and price differs significantly
 -- (in case previous lazy creation used wrong price)
 UPDATE courses c
-SET price = (SELECT COALESCE(p.price_early_bird, p.price_normal)
+SET price = (SELECT COALESCE(
+                       NULLIF(REGEXP_REPLACE(COALESCE(p.price_early_bird::text, p.price_normal::text, '0'), '[^0-9]', '', 'g'), '')::BIGINT,
+                       0
+                     )
              FROM packages p
              WHERE p.slug = c.slug
              LIMIT 1)
@@ -25,5 +31,8 @@ WHERE c.slug IS NOT NULL
   AND EXISTS (
     SELECT 1 FROM packages p
     WHERE p.slug = c.slug
-    AND COALESCE(p.price_early_bird, p.price_normal, 0) > 0
+    AND COALESCE(
+          NULLIF(REGEXP_REPLACE(COALESCE(p.price_early_bird::text, p.price_normal::text, '0'), '[^0-9]', '', 'g'), '')::BIGINT,
+          0
+        ) > 0
   );
