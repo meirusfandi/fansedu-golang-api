@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
@@ -47,6 +50,83 @@ func ListSchools(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
 	}
+}
+
+// SchoolGetPublic returns school detail by id (public). GET /api/v1/schools/{schoolId}
+func SchoolGetPublic(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "schoolId")
+		e, err := deps.SchoolRepo.GetByID(r.Context(), id)
+		if err != nil {
+			http.Error(w, "school not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.SchoolResponse{
+			ID:          e.ID,
+			Name:        e.Name,
+			Slug:        e.Slug,
+			Description: e.Description,
+			Address:     e.Address,
+			LogoURL:     e.LogoURL,
+			CreatedAt:   e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   e.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+// SchoolCreateByUser creates school by authenticated student/guru/instructor.
+// POST /api/v1/schools
+func SchoolCreateByUser(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		role, ok := middleware.GetRole(r.Context())
+		if !ok || !canCreateSchoolRole(strings.ToLower(strings.TrimSpace(role))) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+		var req dto.SchoolRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.Name) == "" {
+			http.Error(w, "name required", http.StatusBadRequest)
+			return
+		}
+		e := domain.School{
+			Name:        strings.TrimSpace(req.Name),
+			Slug:        ensureSlug(req.Slug, req.Name),
+			Description: req.Description,
+			Address:     req.Address,
+			LogoURL:     req.LogoURL,
+		}
+		created, err := deps.SchoolRepo.Create(r.Context(), e)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				http.Error(w, "school with this slug already exists", http.StatusConflict)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(dto.SchoolResponse{
+			ID:          created.ID,
+			Name:        created.Name,
+			Slug:        created.Slug,
+			Description: created.Description,
+			Address:     created.Address,
+			LogoURL:     created.LogoURL,
+			CreatedAt:   created.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   created.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func canCreateSchoolRole(role string) bool {
+	return role == domain.UserRoleStudent || role == domain.UserRoleGuru || role == "instructor"
 }
 
 // AuthChangePassword changes password for authenticated user. POST /api/v1/auth/change-password

@@ -49,6 +49,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		r.Get("/roles", handlers.ListRoles(deps))
 		r.Get("/schools", handlers.ListSchools(deps))
+		r.Get("/schools/{schoolId}", handlers.SchoolGetPublic(deps))
+		r.With(middleware.Auth(deps.JWTSecret)).Post("/schools", handlers.SchoolCreateByUser(deps))
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
@@ -236,8 +238,11 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("courses.manage")).Put("/courses/{courseId}/contents/{contentId}", handlers.AdminUpdateCourseContent(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Delete("/courses/{courseId}/contents/{contentId}", handlers.AdminDeleteCourseContent(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Get("/payments", handlers.AdminListPayments(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Get("/transactions/{orderId}", handlers.AdminTransactionDetail(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments", handlers.AdminCreatePayment(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Put("/payments/{paymentId}", handlers.AdminConfirmPayment(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/confirm", handlers.AdminConfirmPaymentByAction(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/reject", handlers.AdminRejectPaymentByAction(deps))
 			r.With(middleware.RequirePermission("orders.verify")).Put("/orders/{orderId}/verify", handlers.AdminVerifyOrder(deps))
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/summary", handlers.AdminAnalyticsSummary(deps))
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/visitors", handlers.AdminAnalyticsVisitors(deps))

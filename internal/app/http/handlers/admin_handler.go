@@ -975,6 +975,166 @@ func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// AdminConfirmPaymentByAction: POST /api/v1/admin/payments/:paymentId/confirm
+func AdminConfirmPaymentByAction(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		adminID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		paymentID := chi.URLParam(r, "paymentId")
+		if err := deps.AdminService.ConfirmPayment(r.Context(), paymentID, true, adminID, nil); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment confirmed"})
+	}
+}
+
+// AdminRejectPaymentByAction: POST /api/v1/admin/payments/:paymentId/reject
+// Body optional: { "reason": "..." }
+func AdminRejectPaymentByAction(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		adminID, ok := middleware.GetUserID(r.Context())
+		if !ok {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		paymentID := chi.URLParam(r, "paymentId")
+		var req struct {
+			Reason *string `json:"reason"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if err := deps.AdminService.ConfirmPayment(r.Context(), paymentID, false, adminID, req.Reason); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment rejected"})
+	}
+}
+
+// AdminTransactionDetail: GET /api/v1/admin/transactions/:orderId
+// Returns transaction detail for admin page (order, buyer, items, and latest payment by order).
+func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		orderID := chi.URLParam(r, "orderId")
+		if orderID == "" {
+			http.Error(w, "orderId required", http.StatusBadRequest)
+			return
+		}
+		order, err := deps.OrderRepo.GetByID(r.Context(), orderID)
+		if err != nil {
+			http.Error(w, "transaction not found", http.StatusNotFound)
+			return
+		}
+		user, err := deps.UserRepo.FindByID(r.Context(), order.UserID)
+		if err != nil {
+			http.Error(w, "buyer not found", http.StatusNotFound)
+			return
+		}
+		items, err := deps.OrderItemRepo.ListByOrderID(r.Context(), orderID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		type itemResp struct {
+			OrderItemID string `json:"order_item_id"`
+			CourseID    string `json:"course_id"`
+			CourseTitle string `json:"course_title"`
+			CourseSlug  string `json:"course_slug,omitempty"`
+			Price       int    `json:"price"`
+		}
+		itemOut := make([]itemResp, 0, len(items))
+		for _, it := range items {
+			courseTitle := ""
+			var courseSlug string
+			if c, err := deps.CourseRepo.GetByID(r.Context(), it.CourseID); err == nil {
+				courseTitle = c.Title
+				if c.Slug != nil {
+					courseSlug = *c.Slug
+				}
+			}
+			itemOut = append(itemOut, itemResp{
+				OrderItemID: it.ID,
+				CourseID:    it.CourseID,
+				CourseTitle: courseTitle,
+				CourseSlug:  courseSlug,
+				Price:       it.Price,
+			})
+		}
+
+		var paymentOut any
+		if p, err := deps.PaymentRepo.GetByOrderID(r.Context(), orderID); err == nil {
+			var paidAt *string
+			if p.PaidAt != nil {
+				s := p.PaidAt.Format(time.RFC3339)
+				paidAt = &s
+			}
+			var confirmedAt *string
+			if p.ConfirmedAt != nil {
+				s := p.ConfirmedAt.Format(time.RFC3339)
+				confirmedAt = &s
+			}
+			paymentOut = map[string]any{
+				"id":             p.ID,
+				"amount":         p.Amount,
+				"currency":       p.Currency,
+				"status":         p.Status,
+				"type":           p.Type,
+				"gateway":        p.Gateway,
+				"transaction_id": p.TransactionID,
+				"proof_url":      p.ProofURL,
+				"confirmed_by":   p.ConfirmedBy,
+				"confirmed_at":   confirmedAt,
+				"rejection_note": p.RejectionNote,
+				"paid_at":        paidAt,
+				"created_at":     p.CreatedAt.Format(time.RFC3339),
+				"updated_at":     p.UpdatedAt.Format(time.RFC3339),
+			}
+		}
+
+		var discountPercent *float64
+		if order.DiscountPercent != nil {
+			discountPercent = order.DiscountPercent
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"order": map[string]any{
+				"id":                order.ID,
+				"status":            order.Status,
+				"total_price":       order.TotalPrice,
+				"normal_price":      order.NormalPrice,
+				"discount":          order.Discount,
+				"discount_percent":  discountPercent,
+				"promo_code":        order.PromoCode,
+				"confirmation_code": order.ConfirmationCode,
+				"payment_method":    order.PaymentMethod,
+				"payment_reference": order.PaymentReference,
+				"payment_proof_url": order.PaymentProofURL,
+				"payment_proof_at":  order.PaymentProofAt,
+				"sender_account_no": order.SenderAccountNo,
+				"sender_name":       order.SenderName,
+				"role_hint":         order.RoleHint,
+				"buyer_email":       order.BuyerEmail,
+				"created_at":        order.CreatedAt.Format(time.RFC3339),
+				"updated_at":        order.UpdatedAt.Format(time.RFC3339),
+			},
+			"buyer": map[string]any{
+				"id":    user.ID,
+				"name":  user.Name,
+				"email": user.Email,
+				"role":  user.Role,
+			},
+			"items":   itemOut,
+			"payment": paymentOut,
+		})
+	}
+}
+
 // AdminVerifyOrder: PUT /api/v1/admin/orders/:orderId/verify — verifikasi pembayaran, enroll user, kirim email.
 func AdminVerifyOrder(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
