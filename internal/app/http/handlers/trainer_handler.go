@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,6 +14,15 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
+
+var trainerSchoolSlugClean = regexp.MustCompile(`[^a-z0-9-]+`)
+
+func slugFromSchoolName(name string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	s = strings.ReplaceAll(s, " ", "-")
+	s = trainerSchoolSlugClean.ReplaceAllString(s, "")
+	return s
+}
 
 // TrainerProfileGet returns guru profile: name, email, school.
 // Data sekolah yang terhubung dengan akun guru; jika user punya school_id dan sekolah ada, objek school diisi.
@@ -47,6 +57,8 @@ func TrainerProfileGet(deps *Deps) http.HandlerFunc {
 		resp.ParentName = u.ParentName
 		resp.ParentPhone = u.ParentPhone
 		resp.Instagram = u.Instagram
+		resp.SchoolID = u.SchoolID
+		resp.SubjectID = u.SubjectID
 		// Objek school diisi jika guru terhubung ke sekolah (school_id); frontend pakai untuk "Detail info sekolah".
 		if u.SchoolID != nil && *u.SchoolID != "" {
 			school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID)
@@ -99,6 +111,47 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 					return
 				}
 				u.SchoolID = &sid
+			}
+		}
+		if req.SchoolName != nil {
+			schoolName := strings.TrimSpace(*req.SchoolName)
+			if schoolName != "" {
+				slug := slugFromSchoolName(schoolName)
+				if slug == "" {
+					http.Error(w, "invalid school_name", http.StatusBadRequest)
+					return
+				}
+				school, err := deps.SchoolRepo.GetBySlug(r.Context(), slug)
+				if err != nil {
+					created, createErr := deps.SchoolRepo.Create(r.Context(), domain.School{
+						Name: schoolName,
+						Slug: slug,
+					})
+					if createErr == nil {
+						school = created
+					} else {
+						// kemungkinan race slug duplicate: coba get ulang by slug
+						existing, getErr := deps.SchoolRepo.GetBySlug(r.Context(), slug)
+						if getErr != nil {
+							http.Error(w, "failed to link school", http.StatusInternalServerError)
+							return
+						}
+						school = existing
+					}
+				}
+				u.SchoolID = &school.ID
+			}
+		}
+		if req.SubjectID != nil {
+			subjectID := strings.TrimSpace(*req.SubjectID)
+			if subjectID == "" {
+				u.SubjectID = nil
+			} else {
+				if _, err := deps.SubjectRepo.GetByID(r.Context(), subjectID); err != nil {
+					http.Error(w, "subject not found", http.StatusBadRequest)
+					return
+				}
+				u.SubjectID = &subjectID
 			}
 		}
 
@@ -176,6 +229,8 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 			ParentName: u.ParentName,
 			ParentPhone: u.ParentPhone,
 			Instagram:  u.Instagram,
+			SchoolID:   u.SchoolID,
+			SubjectID:  u.SubjectID,
 			School:      schoolProfile,
 		})
 	}

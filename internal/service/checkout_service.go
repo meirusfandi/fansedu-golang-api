@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	cryptorand "crypto/rand"
+	"encoding/json"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -36,10 +38,16 @@ type CheckoutInitiateResult struct {
 	IsNewUser        bool
 	CourseTitle      string
 	Price            int    // rupiah (harga course)
+	IsCollective     bool
+	Quantity         int
+	UnitPrice        int
+	Subtotal         int
+	UniqueCode       int
+	Students         []domain.OrderStudent
 }
 
 type CheckoutService interface {
-	Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint string) (*CheckoutInitiateResult, error)
+	Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error)
 	CreatePaymentSession(ctx context.Context, orderID, paymentMethod string) (paymentURL string, err error)
 	HandlePaymentWebhook(ctx context.Context, orderID string) error
 	SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
@@ -130,7 +138,7 @@ func NewCheckoutService(
 	}
 }
 
-func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint string) (*CheckoutInitiateResult, error) {
+func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error) {
 	course, err := s.courseRepo.GetBySlug(ctx, courseSlug)
 	if err != nil {
 		return nil, ErrCourseNotFound
@@ -170,41 +178,60 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 		}
 	}
 
+	effectiveBuyerRole := normalizeBuyerRole(buyerRole, roleHint, user.Role)
+	isCollective := effectiveBuyerRole == domain.UserRoleGuru && quantity > 1
+	if effectiveBuyerRole == domain.UserRoleStudent {
+		quantity = 1
+		isCollective = false
+	}
+	if quantity <= 0 {
+		quantity = 1
+	}
+
 	existingOrder, found, err := s.orderRepo.GetPendingByUserAndCourse(ctx, user.ID, course.ID)
 	if err != nil {
 		return nil, err
 	}
 	if found {
-		dp := 0.0
-		if existingOrder.DiscountPercent != nil {
-			dp = *existingOrder.DiscountPercent
+		if existingOrder.Quantity == quantity && existingOrder.IsCollective == isCollective {
+			dp := 0.0
+			if existingOrder.DiscountPercent != nil {
+				dp = *existingOrder.DiscountPercent
+			}
+			promoStr := ""
+			if existingOrder.PromoCode != nil {
+				promoStr = *existingOrder.PromoCode
+			}
+			confStr := ""
+			if existingOrder.ConfirmationCode != nil {
+				confStr = *existingOrder.ConfirmationCode
+			}
+			existingStudents := parseOrderStudents(existingOrder.StudentsJSON)
+			return &CheckoutInitiateResult{
+				OrderID:          existingOrder.ID,
+				UserID:           existingOrder.UserID,
+				TotalPrice:       existingOrder.TotalPrice,
+				NormalPrice:      existingOrder.NormalPrice,
+				PromoCode:        promoStr,
+				Discount:         existingOrder.Discount,
+				DiscountPercent:  dp,
+				FinalPrice:       existingOrder.TotalPrice,
+				ConfirmationCode: confStr,
+				IsNewUser:        isNewUser,
+				CourseTitle:      course.Title,
+				Price:            course.Price,
+				IsCollective:     existingOrder.IsCollective,
+				Quantity:         existingOrder.Quantity,
+				UnitPrice:        existingOrder.UnitPrice,
+				Subtotal:         existingOrder.Subtotal,
+				UniqueCode:       existingOrder.UniqueCode,
+				Students:         existingStudents,
+			}, nil
 		}
-		promoStr := ""
-		if existingOrder.PromoCode != nil {
-			promoStr = *existingOrder.PromoCode
-		}
-		confStr := ""
-		if existingOrder.ConfirmationCode != nil {
-			confStr = *existingOrder.ConfirmationCode
-		}
-		return &CheckoutInitiateResult{
-			OrderID:          existingOrder.ID,
-			UserID:           existingOrder.UserID,
-			TotalPrice:       existingOrder.TotalPrice,
-			NormalPrice:      existingOrder.NormalPrice,
-			PromoCode:        promoStr,
-			Discount:         existingOrder.Discount,
-			DiscountPercent:  dp,
-			FinalPrice:       existingOrder.TotalPrice,
-			ConfirmationCode: confStr,
-			IsNewUser:        isNewUser,
-			CourseTitle:      course.Title,
-			Price:            course.Price,
-		}, nil
 	}
 
 	// Semua harga dalam rupiah. Promo fixed: DiscountValue = rupiah.
-	normalRupiah := course.Price
+	normalRupiah := course.Price * quantity
 	discountRupiah := 0
 	var discountPercent *float64
 	appliedPromoCode := ""
@@ -257,6 +284,14 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 		finalRupiah = 0
 	}
 	confirmationCode := generateConfirmationCode()
+	uniqueCode := 0
+	_, _ = fmt.Sscanf(confirmationCode, "%d", &uniqueCode)
+	totalWithUniqueCode := finalRupiah + uniqueCode
+	unitPrice := finalRupiah / quantity
+	if unitPrice <= 0 {
+		unitPrice = course.Price
+	}
+	studentsJSON, _ := json.Marshal(students)
 
 	var promoCodePtr *string
 	if appliedPromoCode != "" {
@@ -269,8 +304,14 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	order, err := s.orderRepo.Create(ctx, domain.Order{
 		UserID:           user.ID,
 		Status:           domain.OrderStatusPending,
-		TotalPrice:       finalRupiah,
+		TotalPrice:       totalWithUniqueCode,
 		NormalPrice:      normalRupiah,
+		Quantity:         quantity,
+		UnitPrice:        unitPrice,
+		Subtotal:         finalRupiah,
+		UniqueCode:       uniqueCode,
+		IsCollective:     isCollective,
+		StudentsJSON:     studentsJSON,
 		PromoCode:        promoCodePtr,
 		Discount:         discountRupiah,
 		DiscountPercent:  discountPercent,
@@ -328,17 +369,51 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	return &CheckoutInitiateResult{
 		OrderID:          order.ID,
 		UserID:           user.ID,
-		TotalPrice:       finalRupiah,
+		TotalPrice:       totalWithUniqueCode,
 		NormalPrice:      normalRupiah,
 		PromoCode:        appliedPromoCode,
 		Discount:         discountRupiah,
 		DiscountPercent:  dp,
-		FinalPrice:       finalRupiah,
+		FinalPrice:       totalWithUniqueCode,
 		ConfirmationCode: confirmationCode,
 		IsNewUser:        isNewUser,
 		CourseTitle:      course.Title,
 		Price:            course.Price,
+		IsCollective:     isCollective,
+		Quantity:         quantity,
+		UnitPrice:        unitPrice,
+		Subtotal:         finalRupiah,
+		UniqueCode:       uniqueCode,
+		Students:         students,
 	}, nil
+}
+
+func parseOrderStudents(raw []byte) []domain.OrderStudent {
+	if len(raw) == 0 {
+		return nil
+	}
+	var out []domain.OrderStudent
+	_ = json.Unmarshal(raw, &out)
+	return out
+}
+
+func normalizeBuyerRole(buyerRole, roleHint, userRole string) string {
+	if strings.TrimSpace(userRole) != "" {
+		if userRole == domain.UserRoleGuru || userRole == "instructor" {
+			return domain.UserRoleGuru
+		}
+		return domain.UserRoleStudent
+	}
+	for _, v := range []string{buyerRole, roleHint} {
+		n := strings.ToLower(strings.TrimSpace(v))
+		if n == "guru" || n == "instructor" {
+			return domain.UserRoleGuru
+		}
+		if n == "student" || n == "siswa" {
+			return domain.UserRoleStudent
+		}
+	}
+	return domain.UserRoleStudent
 }
 
 func generateConfirmationCode() string {
@@ -399,21 +474,8 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 		return err
 	}
 
-	now := time.Now()
-	for _, item := range items {
-		_, err = s.enrollmentRepo.GetByUserAndCourse(ctx, order.UserID, item.CourseID)
-		if err == nil {
-			continue
-		}
-		_, err = s.enrollmentRepo.Create(ctx, domain.CourseEnrollment{
-			UserID:     order.UserID,
-			CourseID:   item.CourseID,
-			Status:     domain.EnrollmentStatusEnrolled,
-			EnrolledAt: now,
-		})
-		if err != nil {
-			return err
-		}
+	if err := s.enrollOrderTargets(ctx, order, items); err != nil {
+		return err
 	}
 
 	return nil
@@ -464,18 +526,8 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	for _, item := range items {
-		_, err = s.enrollmentRepo.GetByUserAndCourse(ctx, order.UserID, item.CourseID)
-		if err == nil {
-			continue
-		}
-		_, _ = s.enrollmentRepo.Create(ctx, domain.CourseEnrollment{
-			UserID:     order.UserID,
-			CourseID:   item.CourseID,
-			Status:     domain.EnrollmentStatusEnrolled,
-			EnrolledAt: now,
-		})
+	if err := s.enrollOrderTargets(ctx, order, items); err != nil {
+		return err
 	}
 	programName := ""
 	if len(items) > 0 {
@@ -499,4 +551,53 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 		_ = s.mailer.Send(user.Email, "Pembayaran Terverifikasi - "+programName, body)
 	}
 	return nil
+}
+
+// enrollOrderTargets enrolls buyer (default) or collective students (if provided).
+func (s *checkoutService) enrollOrderTargets(ctx context.Context, order domain.Order, items []domain.OrderItem) error {
+	targetUserIDs := collectOrderTargetUserIDs(order)
+	now := time.Now()
+	for _, targetUserID := range targetUserIDs {
+		for _, item := range items {
+			_, err := s.enrollmentRepo.GetByUserAndCourse(ctx, targetUserID, item.CourseID)
+			if err == nil {
+				continue
+			}
+			if _, err := s.enrollmentRepo.Create(ctx, domain.CourseEnrollment{
+				UserID:     targetUserID,
+				CourseID:   item.CourseID,
+				Status:     domain.EnrollmentStatusEnrolled,
+				EnrolledAt: now,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func collectOrderTargetUserIDs(order domain.Order) []string {
+	if order.IsCollective {
+		uniq := map[string]struct{}{}
+		out := make([]string, 0)
+		students := parseOrderStudents(order.StudentsJSON)
+		for _, st := range students {
+			if st.UserID == nil {
+				continue
+			}
+			userID := strings.TrimSpace(*st.UserID)
+			if userID == "" {
+				continue
+			}
+			if _, ok := uniq[userID]; ok {
+				continue
+			}
+			uniq[userID] = struct{}{}
+			out = append(out, userID)
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return []string{order.UserID}
 }

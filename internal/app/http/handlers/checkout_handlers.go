@@ -36,6 +36,10 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 			ExpectedTotalL int    `json:"expected_total"`
 			RoleHint       string `json:"roleHint"`
 			RoleHintL      string `json:"role_hint"`
+			BuyerRole      string `json:"buyerRole"`
+			BuyerRoleL     string `json:"buyer_role"`
+			Quantity       int    `json:"quantity"`
+			Students       []dto.CheckoutStudentItem `json:"students"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
@@ -136,7 +140,34 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 		if roleHint == "" {
 			roleHint = req.RoleHintL
 		}
-		result, err := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID, roleHint)
+		buyerRole := req.BuyerRole
+		if buyerRole == "" {
+			buyerRole = req.BuyerRoleL
+		}
+		students := make([]domain.OrderStudent, 0, len(req.Students))
+		for _, s := range req.Students {
+			userID := s.UserID
+			if userID == nil {
+				userID = s.UserIDCamel
+			}
+			students = append(students, domain.OrderStudent{
+				Name:   strings.TrimSpace(s.Name),
+				Email:  strings.TrimSpace(s.Email),
+				UserID: userID,
+			})
+		}
+		result, err := deps.CheckoutService.Initiate(
+			r.Context(),
+			courseSlug,
+			req.Email,
+			req.Name,
+			strings.TrimSpace(req.PromoCode),
+			loggedInUserID,
+			roleHint,
+			buyerRole,
+			req.Quantity,
+			students,
+		)
 		if err != nil {
 			// If course still not found, try one more time to create it lazily
 			// from landing packages (or using request price), then retry Initiate once.
@@ -162,7 +193,18 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 						Price:       priceForCreate,
 					}); createErr == nil {
 						// Retry once after successful create
-						if retryResult, retryErr := deps.CheckoutService.Initiate(r.Context(), courseSlug, req.Email, req.Name, strings.TrimSpace(req.PromoCode), loggedInUserID, roleHint); retryErr == nil {
+						if retryResult, retryErr := deps.CheckoutService.Initiate(
+							r.Context(),
+							courseSlug,
+							req.Email,
+							req.Name,
+							strings.TrimSpace(req.PromoCode),
+							loggedInUserID,
+							roleHint,
+							buyerRole,
+							req.Quantity,
+							students,
+						); retryErr == nil {
 							result = retryResult
 							err = nil
 						} else {
@@ -208,8 +250,29 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 			DiscountPercent: result.DiscountPercent,
 			FinalPrice:      result.FinalPrice,
 			ConfirmationCode: result.ConfirmationCode,
+			IsCollective:    result.IsCollective,
+			Quantity:        result.Quantity,
+			UnitPrice:       result.UnitPrice,
+			Subtotal:        result.Subtotal,
+			UniqueCode:      result.UniqueCode,
+			Students:        toCheckoutStudentItems(result.Students),
 		})
 	}
+}
+
+func toCheckoutStudentItems(students []domain.OrderStudent) []dto.CheckoutStudentItem {
+	if len(students) == 0 {
+		return nil
+	}
+	out := make([]dto.CheckoutStudentItem, 0, len(students))
+	for _, s := range students {
+		out = append(out, dto.CheckoutStudentItem{
+			Name:   s.Name,
+			Email:  s.Email,
+			UserID: s.UserID,
+		})
+	}
+	return out
 }
 
 // packagePriceRupiah returns price in rupiah from package (early bird preferred, then normal).

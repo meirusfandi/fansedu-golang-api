@@ -928,10 +928,40 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 			if o.ConfirmationCode != nil {
 				confCode = *o.ConfirmationCode
 			}
+			quantity := o.Quantity
+			if quantity <= 0 {
+				quantity = 1
+			}
+			unitPrice := o.UnitPrice
+			if unitPrice <= 0 {
+				unitPrice = o.NormalPrice
+			}
+			subtotal := o.Subtotal
+			if subtotal <= 0 {
+				subtotal = unitPrice * quantity
+			}
+			students := make([]dto.CheckoutStudentItem, 0)
+			if len(o.StudentsJSON) > 0 {
+				var orderStudents []domain.OrderStudent
+				if err := json.Unmarshal(o.StudentsJSON, &orderStudents); err == nil {
+					for _, s := range orderStudents {
+						students = append(students, dto.CheckoutStudentItem{
+							Name:   s.Name,
+							Email:  s.Email,
+							UserID: s.UserID,
+						})
+					}
+				}
+			}
 			data = append(data, dto.StudentTransactionItem{
 				ID:               o.ID,
 				OrderID:          o.ID,
 				Status:           o.Status,
+				IsCollective:     o.IsCollective,
+				Quantity:         quantity,
+				UnitPrice:        unitPrice,
+				Subtotal:         subtotal,
+				UniqueCode:       o.UniqueCode,
 				Total:            o.TotalPrice,
 				NormalPrice:      o.NormalPrice,
 				PromoCode:        promoCode,
@@ -939,6 +969,7 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 				DiscountPercent:  discountPct,
 				ConfirmationCode: confCode,
 				Programs:         programs,
+				Students:         students,
 				PaidAt:           paidAt,
 			})
 		}
@@ -966,28 +997,58 @@ func InstructorStudentsList(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		courses, err := deps.CourseRepo.ListByCreatedBy(r.Context(), userID)
+		instructor, err := deps.UserRepo.FindByID(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
-		var data []dto.InstructorStudentItem
-		for _, c := range courses {
-			enrollments, _ := deps.EnrollmentRepo.ListByCourseID(r.Context(), c.ID)
-			for _, e := range enrollments {
-				u, err := deps.UserRepo.FindByID(r.Context(), e.UserID)
-				if err != nil {
-					continue
-				}
-				data = append(data, dto.InstructorStudentItem{
-					UserID:          u.ID,
-					Name:            u.Name,
-					Email:           u.Email,
-					ProgramTitle:    c.Title,
-					ProgressPercent: enrollmentProgressPercent(e.Status),
-				})
-			}
+
+		// Untuk role guru/instructor: siswa ditentukan dari sekolah + subject yang sama.
+		if instructor.SchoolID == nil || *instructor.SchoolID == "" || instructor.SubjectID == nil || *instructor.SubjectID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: []dto.InstructorStudentItem{}})
+			return
 		}
+
+		allStudents, err := deps.UserRepo.List(r.Context(), domain.UserRoleStudent)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+
+		schoolName := ""
+		if school, err := deps.SchoolRepo.GetByID(r.Context(), *instructor.SchoolID); err == nil {
+			schoolName = school.Name
+		}
+		subjectName := ""
+		if subject, err := deps.SubjectRepo.GetByID(r.Context(), *instructor.SubjectID); err == nil {
+			subjectName = subject.Name
+		}
+		groupLabel := subjectName
+		if schoolName != "" && subjectName != "" {
+			groupLabel = schoolName + " - " + subjectName
+		}
+		if groupLabel == "" {
+			groupLabel = "Siswa se-sekolah & se-subject"
+		}
+
+		data := make([]dto.InstructorStudentItem, 0)
+		for _, s := range allStudents {
+			if s.SchoolID == nil || s.SubjectID == nil {
+				continue
+			}
+			if *s.SchoolID != *instructor.SchoolID || *s.SubjectID != *instructor.SubjectID {
+				continue
+			}
+			data = append(data, dto.InstructorStudentItem{
+				UserID:          s.ID,
+				Name:            s.Name,
+				Email:           s.Email,
+				ProgramTitle:    groupLabel,
+				ProgressPercent: 0,
+			})
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: data})
 	}

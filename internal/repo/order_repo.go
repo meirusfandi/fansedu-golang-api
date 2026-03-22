@@ -31,29 +31,52 @@ func (r *orderRepo) Create(ctx context.Context, o domain.Order) (domain.Order, e
 	if normalPrice == 0 && o.TotalPrice > 0 {
 		normalPrice = o.TotalPrice + o.Discount
 	}
+	quantity := o.Quantity
+	if quantity <= 0 {
+		quantity = 1
+	}
+	subtotal := o.Subtotal
+	if subtotal <= 0 {
+		subtotal = normalPrice
+	}
+	unitPrice := o.UnitPrice
+	if unitPrice <= 0 {
+		unitPrice = subtotal / quantity
+		if unitPrice <= 0 {
+			unitPrice = normalPrice
+		}
+	}
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO orders (id, user_id, status, total_price, normal_price, promo_code, discount, discount_percent, confirmation_code, payment_method, payment_reference, role_hint, buyer_email)
-		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO orders (
+			id, user_id, status, total_price, normal_price, quantity, unit_price, subtotal, unique_code, is_collective, students_json,
+			promo_code, discount, discount_percent, confirmation_code, payment_method, payment_reference, role_hint, buyer_email
+		)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING created_at, updated_at
-	`, id, o.UserID, o.Status, o.TotalPrice, normalPrice, o.PromoCode, o.Discount, o.DiscountPercent, o.ConfirmationCode, o.PaymentMethod, o.PaymentReference, o.RoleHint, o.BuyerEmail).Scan(&o.CreatedAt, &o.UpdatedAt)
+	`, id, o.UserID, o.Status, o.TotalPrice, normalPrice, quantity, unitPrice, subtotal, o.UniqueCode, o.IsCollective, o.StudentsJSON, o.PromoCode, o.Discount, o.DiscountPercent, o.ConfirmationCode, o.PaymentMethod, o.PaymentReference, o.RoleHint, o.BuyerEmail).Scan(&o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		return domain.Order{}, err
 	}
 	o.ID = id
 	o.NormalPrice = normalPrice
+	o.Quantity = quantity
+	o.UnitPrice = unitPrice
+	o.Subtotal = subtotal
 	return o, nil
 }
 
 func (r *orderRepo) GetByID(ctx context.Context, id string) (domain.Order, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, status, total_price, COALESCE(normal_price, total_price), promo_code, COALESCE(discount, 0), discount_percent, confirmation_code, payment_method, payment_reference,
+		SELECT id, user_id, status, total_price, COALESCE(normal_price, total_price), COALESCE(quantity, 1), COALESCE(unit_price, COALESCE(normal_price, total_price)),
+		       COALESCE(subtotal, total_price), COALESCE(unique_code, 0), COALESCE(is_collective, false), COALESCE(students_json, '[]'::jsonb),
+		       promo_code, COALESCE(discount, 0), discount_percent, confirmation_code, payment_method, payment_reference,
 		       payment_proof_url, payment_proof_at, sender_account_no, sender_name, role_hint, buyer_email, created_at, updated_at
 		FROM orders WHERE id = $1::uuid
 	`, id)
 	var o domain.Order
 	var promoCode, confCode *string
 	var discountPercent *float64
-	err := row.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference,
+	err := row.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &o.Quantity, &o.UnitPrice, &o.Subtotal, &o.UniqueCode, &o.IsCollective, &o.StudentsJSON, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference,
 		&o.PaymentProofURL, &o.PaymentProofAt, &o.SenderAccountNo, &o.SenderName, &o.RoleHint, &o.BuyerEmail, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		return domain.Order{}, err
@@ -66,7 +89,9 @@ func (r *orderRepo) GetByID(ctx context.Context, id string) (domain.Order, error
 
 func (r *orderRepo) ListByUserID(ctx context.Context, userID string) ([]domain.Order, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, status, total_price, COALESCE(normal_price, total_price), promo_code, COALESCE(discount, 0), discount_percent, confirmation_code, payment_method, payment_reference, created_at, updated_at
+		SELECT id, user_id, status, total_price, COALESCE(normal_price, total_price), COALESCE(quantity, 1), COALESCE(unit_price, COALESCE(normal_price, total_price)),
+		       COALESCE(subtotal, total_price), COALESCE(unique_code, 0), COALESCE(is_collective, false), COALESCE(students_json, '[]'::jsonb),
+		       promo_code, COALESCE(discount, 0), discount_percent, confirmation_code, payment_method, payment_reference, created_at, updated_at
 		FROM orders WHERE user_id = $1::uuid ORDER BY created_at DESC
 	`, userID)
 	if err != nil {
@@ -78,7 +103,7 @@ func (r *orderRepo) ListByUserID(ctx context.Context, userID string) ([]domain.O
 		var o domain.Order
 		var promoCode, confCode *string
 		var discountPercent *float64
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &o.Quantity, &o.UnitPrice, &o.Subtotal, &o.UniqueCode, &o.IsCollective, &o.StudentsJSON, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference, &o.CreatedAt, &o.UpdatedAt); err != nil {
 			return nil, err
 		}
 		o.PromoCode = promoCode
@@ -105,6 +130,12 @@ func (r *orderRepo) ListByUserIDWithFilters(ctx context.Context, userID, status,
 			o.status,
 			o.total_price,
 			COALESCE(o.normal_price, o.total_price),
+			COALESCE(o.quantity, 1),
+			COALESCE(o.unit_price, COALESCE(o.normal_price, o.total_price)),
+			COALESCE(o.subtotal, o.total_price),
+			COALESCE(o.unique_code, 0),
+			COALESCE(o.is_collective, false),
+			COALESCE(o.students_json, '[]'::jsonb),
 			o.promo_code,
 			COALESCE(o.discount, 0),
 			o.discount_percent,
@@ -149,7 +180,7 @@ func (r *orderRepo) ListByUserIDWithFilters(ctx context.Context, userID, status,
 		var discountPercent *float64
 		var rowTotal int
 		if err := rows.Scan(
-			&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice,
+			&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &o.Quantity, &o.UnitPrice, &o.Subtotal, &o.UniqueCode, &o.IsCollective, &o.StudentsJSON,
 			&promoCode, &o.Discount, &discountPercent, &confCode,
 			&o.CreatedAt, &o.UpdatedAt, &rowTotal,
 		); err != nil {
@@ -166,7 +197,10 @@ func (r *orderRepo) ListByUserIDWithFilters(ctx context.Context, userID, status,
 
 func (r *orderRepo) GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT o.id, o.user_id, o.status, o.total_price, COALESCE(o.normal_price, o.total_price), o.promo_code, COALESCE(o.discount, 0), o.discount_percent, o.confirmation_code, o.payment_method, o.payment_reference, o.created_at, o.updated_at
+		SELECT o.id, o.user_id, o.status, o.total_price, COALESCE(o.normal_price, o.total_price), COALESCE(o.quantity, 1),
+		       COALESCE(o.unit_price, COALESCE(o.normal_price, o.total_price)), COALESCE(o.subtotal, o.total_price),
+		       COALESCE(o.unique_code, 0), COALESCE(o.is_collective, false), COALESCE(o.students_json, '[]'::jsonb),
+		       o.promo_code, COALESCE(o.discount, 0), o.discount_percent, o.confirmation_code, o.payment_method, o.payment_reference, o.created_at, o.updated_at
 		FROM orders o
 		JOIN order_items oi ON oi.order_id = o.id AND oi.course_id = $2::uuid
 		WHERE o.user_id = $1::uuid AND o.status = 'pending'
@@ -176,7 +210,7 @@ func (r *orderRepo) GetPendingByUserAndCourse(ctx context.Context, userID, cours
 	var o domain.Order
 	var promoCode, confCode *string
 	var discountPercent *float64
-	err := row.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference, &o.CreatedAt, &o.UpdatedAt)
+	err := row.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalPrice, &o.NormalPrice, &o.Quantity, &o.UnitPrice, &o.Subtotal, &o.UniqueCode, &o.IsCollective, &o.StudentsJSON, &promoCode, &o.Discount, &discountPercent, &confCode, &o.PaymentMethod, &o.PaymentReference, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Order{}, false, nil

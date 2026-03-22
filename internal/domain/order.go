@@ -14,6 +14,12 @@ type Order struct {
 	Status           string
 	TotalPrice       int    // final amount (rupiah)
 	NormalPrice      int    // harga normal sebelum promo (rupiah)
+	Quantity         int    // jumlah item/siswa
+	UnitPrice        int    // harga per item setelah promo (tanpa unique code)
+	Subtotal         int    // UnitPrice * Quantity (tanpa unique code)
+	UniqueCode       int    // kode unik nominal transfer, 1x per order
+	IsCollective     bool   // pembelian kolektif (guru/instructor)
+	StudentsJSON     []byte // JSON metadata siswa kolektif
 	PromoCode        *string
 	Discount         int    // potongan (rupiah)
 	DiscountPercent  *float64
@@ -28,6 +34,12 @@ type Order struct {
 	BuyerEmail         *string // email pembeli untuk guest checkout
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+}
+
+type OrderStudent struct {
+	Name   string  `json:"name,omitempty"`
+	Email  string  `json:"email,omitempty"`
+	UserID *string `json:"user_id,omitempty"`
 }
 
 type OrderItem struct {

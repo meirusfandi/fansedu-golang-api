@@ -42,6 +42,8 @@ type TrainerProfileResponse struct {
 	ParentName *string    `json:"parentName,omitempty"`
 	ParentPhone *string  `json:"parentPhone,omitempty"`
 	Instagram *string    `json:"instagram,omitempty"`
+	SchoolID *string     `json:"school_id,omitempty"`
+	SubjectID *string    `json:"subject_id,omitempty"`
 	School *SchoolProfile `json:"school,omitempty"`
 }
 
@@ -71,6 +73,8 @@ type TrainerProfileUpdateRequest struct {
 	ParentPhone *string `json:"parentPhone,omitempty"`
 	Instagram *string `json:"instagram,omitempty"`
 	SchoolID *string `json:"school_id,omitempty"` // optional
+	SchoolName *string `json:"school_name,omitempty"` // optional: create/link by name
+	SubjectID *string `json:"subject_id,omitempty"` // optional
 }
 
 // TrainerStudentItem minimal student data for trainer screens.

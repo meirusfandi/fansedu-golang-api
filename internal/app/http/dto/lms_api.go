@@ -104,6 +104,11 @@ type StudentTransactionItem struct {
 	ID                string                     `json:"id"`
 	OrderID           string                     `json:"orderId"`
 	Status            string                     `json:"status"`
+	IsCollective      bool                       `json:"is_collective"`
+	Quantity          int                        `json:"quantity"`
+	UnitPrice         int                        `json:"unit_price"`
+	Subtotal          int                        `json:"subtotal"`
+	UniqueCode        int                        `json:"unique_code"`
 	Total             int                        `json:"total"`
 	NormalPrice       int                        `json:"normalPrice"`
 	PromoCode         string                     `json:"promoCode"`
@@ -111,6 +116,7 @@ type StudentTransactionItem struct {
 	DiscountPercent   float64                    `json:"discountPercent"`
 	ConfirmationCode  string                     `json:"confirmationCode"`
 	Programs          []StudentTransactionProgram `json:"programs"`
+	Students          []CheckoutStudentItem      `json:"students,omitempty"`
 	PaidAt            string                     `json:"paidAt"`
 }
 
@@ -148,6 +154,16 @@ type CheckoutInitiateRequestLMS struct {
 	Name        string `json:"name"`
 	Email       string `json:"email"`
 	PromoCode   string `json:"promoCode"`
+	Quantity    int    `json:"quantity,omitempty"`
+	BuyerRole   string `json:"buyerRole,omitempty"`
+	Students    []CheckoutStudentItem `json:"students,omitempty"`
+}
+
+type CheckoutStudentItem struct {
+	Name        string  `json:"name,omitempty"`
+	Email       string  `json:"email,omitempty"`
+	UserID      *string `json:"user_id,omitempty"`
+	UserIDCamel *string `json:"userId,omitempty"`
 }
 
 type CheckoutInitiateResponseLMS struct {
@@ -161,6 +177,12 @@ type CheckoutInitiateResponseLMS struct {
 	DiscountPercent  float64              `json:"discountPercent"`
 	FinalPrice       int                  `json:"finalPrice"`
 	ConfirmationCode string               `json:"confirmationCode"`
+	IsCollective     bool                 `json:"is_collective"`
+	Quantity         int                  `json:"quantity"`
+	UnitPrice        int                  `json:"unit_price"`
+	Subtotal         int                  `json:"subtotal"`
+	UniqueCode       int                  `json:"unique_code"`
+	Students         []CheckoutStudentItem `json:"students,omitempty"`
 }
 
 type CheckoutProgramInfo struct {
