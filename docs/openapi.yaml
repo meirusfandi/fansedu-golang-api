@@ -1,0 +1,55 @@
+openapi: 3.0.3
+info:
+  title: FansEdu API (subset — Geo)
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/api/v1
+paths:
+  /geo/provinces:
+    get:
+      summary: Daftar provinsi (format emsifa)
+      operationId: geoProvinces
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeoItem'
+        '502':
+          description: Upstream error
+  /geo/regencies/{provinceId}:
+    get:
+      summary: Kabupaten/kota per provinsi
+      operationId: geoRegencies
+      parameters:
+        - name: provinceId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "11"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeoItem'
+        '404':
+          description: Provinsi tidak ditemukan
+        '502':
+          description: Upstream error
+components:
+  schemas:
+    GeoItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string

@@ -21,6 +21,7 @@ type Deps struct {
 	CourseService    service.CourseService
 	TrainerService   service.TrainerService
 	CheckoutService  service.CheckoutService
+	GeoService       service.GeoService
 
 	UserRepo                 repo.UserRepo
 	QuestionRepo             repo.QuestionRepo

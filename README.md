@@ -17,6 +17,16 @@ Aplikasi memuat env dari file:
 | `development`  | Opsional     | Default boleh (warning) |
 | `production`   | **Wajib**    | **Wajib**, harus kuat (bukan default) |
 
+**Geo / Redis (opsional)** — cache wilayah Indonesia di API:
+
+| Variable | Keterangan |
+|----------|------------|
+| `REDIS_URL` | Contoh `redis://localhost:6379/0`. Kosong = endpoint geo tetap jalan, tanpa cache (selalu hit upstream). |
+| `GEO_UPSTREAM_BASE_URL` | Default `https://www.emsifa.com/api-wilayah-indonesia/api` |
+| `GEO_CACHE_TTL_SECONDS` | Default 30 hari (`2592000`) |
+
+Detail key Redis & alur cache-aside: **`docs/GEO_REDIS_BACKEND.md`**.
+
 **Jangan commit `.env` atau `.env.dev`** — keduanya ada di `.gitignore`. Pakai `.env.development.example` sebagai template: salin ke `.env.dev`, lalu isi `JWT_SECRET` sendiri (mis. `openssl rand -base64 32`). Jika `.env.dev` pernah ikut ter-commit, untrack dengan: `git rm --cached .env.dev`.
 
 ## Run (local)
@@ -61,6 +71,10 @@ go run ./cmd/migrate
 
 **Health**
 - `GET /api/v1/health`
+
+**Geo / wilayah (public, format emsifa; Redis opsional)**
+- `GET /api/v1/geo/provinces` — daftar provinsi
+- `GET /api/v1/geo/regencies/{provinceId}` — kab/kota (contoh: `11` untuk Aceh)
 
 **Auth**
 - `POST /api/v1/auth/register` — Body: `{ "name", "email", "password" }` → `{ "user", "token" }`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +19,21 @@ func getEnv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// allowMinimalAPI allows /health and /geo without PostgreSQL (e.g. geo + Redis only).
+func allowMinimalAPI(path string) bool {
+	p := strings.TrimSuffix(path, "/")
+	if p == "" {
+		p = path
+	}
+	if p == "/api/v1/health" {
+		return true
+	}
+	if strings.HasPrefix(p, "/api/v1/geo") {
+		return true
+	}
+	return false
 }
 
 func NewRouter(deps *handlers.Deps) http.Handler {
@@ -35,16 +51,22 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 	registerV1 := func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				if deps == nil {
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusServiceUnavailable)
-					_, _ = w.Write([]byte(`{"error":"Service unavailable: database not configured. Set DATABASE_URL in .env or .env.dev."}`))
+				if deps != nil && deps.DB != nil {
+					next.ServeHTTP(w, req)
 					return
 				}
-				next.ServeHTTP(w, req)
+				if deps != nil && allowMinimalAPI(req.URL.Path) {
+					next.ServeHTTP(w, req)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"error":"Service unavailable: database not configured. Set DATABASE_URL in .env or .env.dev."}`))
 			})
 		})
 		r.Get("/health", handlers.Health())
+		r.Get("/geo/provinces", handlers.GeoProvinces(deps))
+		r.Get("/geo/regencies/{provinceId}", handlers.GeoRegencies(deps))
 		r.Get("/dashboard", handlers.DashboardGeneral(deps))
 
 		r.Get("/roles", handlers.ListRoles(deps))

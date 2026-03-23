@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	httpapi "github.com/meirusfandi/fansedu-golang-api/internal/app/http"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/handlers"
@@ -56,13 +57,21 @@ func main() {
 		log.Fatal("production: DATABASE_URL is required")
 	}
 
-	var router http.Handler
-	if pool == nil {
-		router = httpapi.NewRouter(nil)
-	} else {
-		deps := buildDeps(pool, []byte(cfg.JWTSecret), cfg.OpenAIAPIKey, cfg.AppURL, cfg.AdminPasswordBypassKey, cfg.MigrateBypassKey)
-		router = httpapi.NewRouter(deps)
+	var rdb *redis.Client
+	if cfg.RedisURL != "" {
+		opt, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			log.Printf("warning: REDIS_URL invalid (%v) — geo cache disabled", err)
+		} else {
+			rdb = redis.NewClient(opt)
+		}
 	}
+	if rdb != nil {
+		defer func() { _ = rdb.Close() }()
+	}
+
+	deps := buildDeps(pool, cfg, rdb)
+	router := httpapi.NewRouter(deps)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr(),
@@ -84,7 +93,24 @@ func main() {
 	log.Printf("shutdown complete")
 }
 
-func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, adminPasswordBypassKey, migrateBypassKey string) *handlers.Deps {
+func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handlers.Deps {
+	ttl := time.Duration(cfg.GeoCacheTTLSeconds) * time.Second
+	geoSvc := service.NewGeoService(rdb, cfg.GeoUpstreamBaseURL, ttl)
+	jwtSecret := []byte(cfg.JWTSecret)
+	openAIAPIKey := cfg.OpenAIAPIKey
+	appURL := cfg.AppURL
+	adminPasswordBypassKey := cfg.AdminPasswordBypassKey
+	migrateBypassKey := cfg.MigrateBypassKey
+
+	if pool == nil {
+		return &handlers.Deps{
+			GeoService:             geoSvc,
+			JWTSecret:              jwtSecret,
+			AdminPasswordBypassKey: adminPasswordBypassKey,
+			MigrateBypassKey:       migrateBypassKey,
+		}
+	}
+
 	userRepo := repo.NewUserRepo(pool)
 	tryoutRepo := repo.NewTryoutRepo(pool)
 	questionRepo := repo.NewQuestionRepo(pool)
@@ -153,6 +179,7 @@ func buildDeps(pool *pgxpool.Pool, jwtSecret []byte, openAIAPIKey, appURL, admin
 		JWTSecret:               jwtSecret,
 		AdminPasswordBypassKey: adminPasswordBypassKey,
 		MigrateBypassKey:       migrateBypassKey,
+		GeoService:             geoSvc,
 		AuthService:            authService,
 		TryoutService:          tryoutService,
 		AttemptService:         attemptService,

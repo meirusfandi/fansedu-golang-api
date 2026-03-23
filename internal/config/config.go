@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -25,6 +26,13 @@ type Config struct {
 	AppURL                 string // URL frontend/app untuk link di email (contoh: https://app.fansedu.com)
 	AdminPasswordBypassKey string // opsional: kunci khusus untuk emergency reset password admin
 	MigrateBypassKey       string // opsional: kunci khusus untuk emergency run migrate via API
+
+	// Redis (opsional): cache geo wilayah, dll.
+	RedisURL string
+	// Geo: upstream format emsifa (default https://www.emsifa.com/api-wilayah-indonesia/api)
+	GeoUpstreamBaseURL string
+	// GeoCacheTTLSeconds TTL cache Redis untuk data provinsi/kabkota (default 30 hari).
+	GeoCacheTTLSeconds int
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -47,6 +55,13 @@ func Load() Config {
 		env = EnvDevelopment
 	}
 
+	geoTTL := 30 * 24 * 3600 // 30 days
+	if v := getenv("GEO_CACHE_TTL_SECONDS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			geoTTL = n
+		}
+	}
+
 	cfg := Config{
 		Env:                    env,
 		Port:                   getenv("PORT", "8080"),
@@ -56,6 +71,9 @@ func Load() Config {
 		AppURL:                 getenv("APP_URL", "http://localhost:5173"),
 		AdminPasswordBypassKey: getenv("ADMIN_PASSWORD_BYPASS_KEY", ""),
 		MigrateBypassKey:       getenv("MIGRATE_BYPASS_KEY", ""),
+		RedisURL:               getenv("REDIS_URL", ""),
+		GeoUpstreamBaseURL:     getenv("GEO_UPSTREAM_BASE_URL", "https://www.emsifa.com/api-wilayah-indonesia/api"),
+		GeoCacheTTLSeconds:     geoTTL,
 	}
 
 	if cfg.Env == EnvProduction {
