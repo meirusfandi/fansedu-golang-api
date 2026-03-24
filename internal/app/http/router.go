@@ -113,6 +113,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/", handlers.TryoutList(deps))
 			r.Get("/open", handlers.TryoutListOpen(deps))
 			r.Get("/{tryoutId}", handlers.TryoutGetByID(deps))
+			r.Get("/{tryoutId}/leaderboard/top", handlers.TryoutLeaderboardTop(deps))
+			r.With(middleware.Auth(deps.JWTSecret)).Get("/{tryoutId}/leaderboard/rank", handlers.TryoutLeaderboardMyRank(deps))
 			r.Get("/{tryoutId}/leaderboard", handlers.TryoutLeaderboard(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{tryoutId}/register", handlers.TryoutRegister(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{tryoutId}/start", handlers.TryoutStart(deps))

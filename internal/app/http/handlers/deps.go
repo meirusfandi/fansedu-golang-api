@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
@@ -9,6 +12,9 @@ import (
 
 type Deps struct {
 	DB                     *pgxpool.Pool
+	Redis                  *redis.Client
+	SchoolListCacheTTL     time.Duration
+	PackagesListCacheTTL   time.Duration
 	JWTSecret              []byte
 	AdminPasswordBypassKey string
 	MigrateBypassKey       string

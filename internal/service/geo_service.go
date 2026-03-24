@@ -10,15 +10,12 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 )
 
 // ErrGeoNotFound is returned when province/regency data is not found upstream.
 var ErrGeoNotFound = errors.New("geo: not found")
-
-const (
-	geoKeyProvinces = "fansedu:geo:provinces:v1"
-	geoKeyRegencies = "fansedu:geo:regencies:v1" // use fmt.Sprintf("%s:%s", geoKeyRegencies, provinceID)
-)
 
 // GeoService serves Indonesian provinces/regencies (emsifa-compatible JSON) with optional Redis cache-aside.
 type GeoService interface {
@@ -40,7 +37,7 @@ func NewGeoService(rdb *redis.Client, upstreamBaseURL string, cacheTTL time.Dura
 		base = "https://www.emsifa.com/api-wilayah-indonesia/api"
 	}
 	if cacheTTL <= 0 {
-		cacheTTL = 30 * 24 * time.Hour
+		cacheTTL = 7 * 24 * time.Hour // default 7 hari (sesuai rekomendasi cache wilayah)
 	}
 	return &geoService{
 		rdb:      rdb,
@@ -53,7 +50,7 @@ func NewGeoService(rdb *redis.Client, upstreamBaseURL string, cacheTTL time.Dura
 }
 
 func (s *geoService) ProvincesJSON(ctx context.Context) ([]byte, error) {
-	return s.cacheAside(ctx, geoKeyProvinces, s.upstream+"/provinces.json")
+	return s.cacheAside(ctx, cache.KeyProvinceList, s.upstream+"/provinces.json")
 }
 
 func (s *geoService) RegenciesJSON(ctx context.Context, provinceID string) ([]byte, error) {
@@ -61,7 +58,7 @@ func (s *geoService) RegenciesJSON(ctx context.Context, provinceID string) ([]by
 	if pid == "" {
 		return nil, ErrGeoNotFound
 	}
-	key := fmt.Sprintf("%s:%s", geoKeyRegencies, pid)
+	key := cache.CityListKey(pid)
 	url := fmt.Sprintf("%s/regencies/%s.json", s.upstream, pid)
 	return s.cacheAside(ctx, key, url)
 }

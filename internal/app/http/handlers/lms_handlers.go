@@ -14,6 +14,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -36,20 +37,55 @@ func ListRoles(deps *Deps) http.HandlerFunc {
 }
 
 // ListSchools returns all schools (public, for profile dropdown). GET /api/v1/schools
+// Optional ?q= filter nama (case-insensitive). Cache Redis key: school:list (12 jam default).
 func ListSchools(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := deps.SchoolRepo.List(r.Context())
+		q := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+		var list []domain.School
+		var err error
+
+		if deps.Redis != nil {
+			var cached []domain.School
+			if hit, _ := cache.GetJSON(r.Context(), deps.Redis, cache.KeySchoolList, &cached); hit && len(cached) > 0 {
+				list = filterSchoolsByName(cached, q)
+				writeSchoolItems(w, list)
+				return
+			}
+		}
+
+		list, err = deps.SchoolRepo.List(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		out := make([]dto.SchoolItem, len(list))
-		for i := range list {
-			out[i] = dto.SchoolItem{ID: list[i].ID, Name: list[i].Name, Slug: list[i].Slug}
+		if deps.Redis != nil && deps.SchoolListCacheTTL > 0 {
+			_ = cache.SetJSON(r.Context(), deps.Redis, cache.KeySchoolList, list, deps.SchoolListCacheTTL)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(out)
+		list = filterSchoolsByName(list, q)
+		writeSchoolItems(w, list)
 	}
+}
+
+func filterSchoolsByName(all []domain.School, qLower string) []domain.School {
+	if qLower == "" {
+		return all
+	}
+	out := make([]domain.School, 0, len(all))
+	for _, s := range all {
+		if strings.Contains(strings.ToLower(s.Name), qLower) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func writeSchoolItems(w http.ResponseWriter, list []domain.School) {
+	out := make([]dto.SchoolItem, len(list))
+	for i := range list {
+		out[i] = dto.SchoolItem{ID: list[i].ID, Name: list[i].Name, Slug: list[i].Slug}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // SchoolGetPublic returns school detail by id (public). GET /api/v1/schools/{schoolId}
@@ -110,6 +146,7 @@ func SchoolCreateByUser(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		cache.InvalidateSchoolList(r.Context(), deps.Redis)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(dto.SchoolResponse{
@@ -1081,8 +1118,17 @@ func InstructorEarningsList(deps *Deps) http.HandlerFunc {
 
 // PackagesListLanding returns packages for landing page "Program yang Sedang Dibuka". GET /api/v1/packages
 // Response: array of objects with snake_case (id, name, slug, price_early_bird, price_normal, ...).
+// Cache Redis key: packages:list (TTL default 12 jam).
 func PackagesListLanding(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.Redis != nil && deps.LandingPackageRepo != nil {
+			var cached []domain.LandingPackage
+			if hit, _ := cache.GetJSON(r.Context(), deps.Redis, cache.KeyPackagesList, &cached); hit {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(cached)
+				return
+			}
+		}
 		var list []domain.LandingPackage
 		if deps.LandingPackageRepo != nil {
 			var err error
@@ -1094,6 +1140,9 @@ func PackagesListLanding(deps *Deps) http.HandlerFunc {
 		}
 		if list == nil {
 			list = []domain.LandingPackage{}
+		}
+		if deps.Redis != nil && deps.PackagesListCacheTTL > 0 {
+			_ = cache.SetJSON(r.Context(), deps.Redis, cache.KeyPackagesList, list, deps.PackagesListCacheTTL)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(list)

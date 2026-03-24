@@ -33,8 +33,12 @@ type Config struct {
 	GeoUpstreamBaseURL string
 	// GeoCacheTTLSeconds TTL cache Redis untuk data provinsi/kabkota (default 30 hari).
 	GeoCacheTTLSeconds int
-	// LeaderboardCacheTTLSeconds TTL cache Redis untuk GET leaderboard per tryout (default 1 jam; di-invalidate saat submit/register).
+	// LeaderboardCacheTTLSeconds (legacy JSON cache — tidak dipakai jika pakai sorted set; tetap ada untuk kompatibilitas env).
 	LeaderboardCacheTTLSeconds int
+	// SchoolListCacheSeconds TTL cache GET /schools (default 12 jam).
+	SchoolListCacheSeconds int
+	// PackagesListCacheSeconds TTL cache GET /packages (default 12 jam).
+	PackagesListCacheSeconds int
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -57,17 +61,30 @@ func Load() Config {
 		env = EnvDevelopment
 	}
 
-	geoTTL := 30 * 24 * 3600 // 30 days
+	geoTTL := 7 * 24 * 3600 // 7 hari — cache provinsi/kabkota
 	if v := getenv("GEO_CACHE_TTL_SECONDS", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			geoTTL = n
 		}
 	}
 
-	lbTTL := 3600 // 1 hour (invalidated on leaderboard-changing events)
+	lbTTL := 3600 // legacy env
 	if v := getenv("LEADERBOARD_CACHE_TTL_SECONDS", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			lbTTL = n
+		}
+	}
+
+	schoolCache := 12 * 3600 // 12 jam
+	if v := getenv("SCHOOL_LIST_CACHE_SECONDS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			schoolCache = n
+		}
+	}
+	packagesCache := 12 * 3600
+	if v := getenv("PACKAGES_LIST_CACHE_SECONDS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			packagesCache = n
 		}
 	}
 
@@ -82,8 +99,10 @@ func Load() Config {
 		MigrateBypassKey:       getenv("MIGRATE_BYPASS_KEY", ""),
 		RedisURL:               getenv("REDIS_URL", ""),
 		GeoUpstreamBaseURL:     getenv("GEO_UPSTREAM_BASE_URL", "https://www.emsifa.com/api-wilayah-indonesia/api"),
-		GeoCacheTTLSeconds:     geoTTL,
+		GeoCacheTTLSeconds:         geoTTL,
 		LeaderboardCacheTTLSeconds: lbTTL,
+		SchoolListCacheSeconds:     schoolCache,
+		PackagesListCacheSeconds:   packagesCache,
 	}
 
 	if cfg.Env == EnvProduction {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -489,7 +491,6 @@ func TryoutRegister(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), tryoutID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "registered"})
@@ -521,6 +522,77 @@ func TryoutLeaderboard(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// TryoutLeaderboardTop GET /api/v1/tryouts/{tryoutId}/leaderboard/top — top N dari Redis sorted set (cepat).
+// Query: limit (default 10, max 100).
+func TryoutLeaderboardTop(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		if tryoutID == "" {
+			http.Error(w, "tryout id required", http.StatusBadRequest)
+			return
+		}
+		if _, err := deps.TryoutService.GetByID(r.Context(), tryoutID); err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		limit := 10
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+				limit = n
+			}
+		}
+		zs, err := cache.LeaderboardTop(r.Context(), deps.Redis, tryoutID, limit)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.LeaderboardTopRow, 0, len(zs))
+		for i, z := range zs {
+			uid, _ := z.Member.(string)
+			name := uid
+			if u, err := deps.UserRepo.FindByID(r.Context(), uid); err == nil {
+				name = u.Name
+			}
+			out = append(out, dto.LeaderboardTopRow{
+				Rank:     i + 1,
+				UserID:   uid,
+				UserName: name,
+				Score:    z.Score,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// TryoutLeaderboardMyRank GET /api/v1/tryouts/{tryoutId}/leaderboard/rank — peringkat user dari ZSET (Bearer).
+func TryoutLeaderboardMyRank(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if _, err := deps.TryoutService.GetByID(r.Context(), tryoutID); err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		rank0, score, ok, err := cache.LeaderboardUserRankScore(r.Context(), deps.Redis, tryoutID, userID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp := dto.LeaderboardRankResponse{InLeaderboard: ok}
+		if ok {
+			resp.Rank = int(rank0) + 1
+			resp.Score = score
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
 func TryoutStart(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tryoutID := chi.URLParam(r, "tryoutId")
@@ -545,7 +617,6 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 		}
 		// Auto-register ke tryout agar masuk leaderboard bila belum terdaftar
 		_ = deps.TryoutRegistrationRepo.Register(r.Context(), userID, tryoutID)
-		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), tryoutID)
 		attempt, err := deps.AttemptService.Start(r.Context(), userID, tryoutID)
 		if err != nil {
 			if err == service.ErrAlreadySubmitted {

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -175,6 +176,7 @@ func AdminCreateSchool(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		cache.InvalidateSchoolList(r.Context(), deps.Redis)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(schoolToResp(created))
@@ -212,11 +214,20 @@ func AdminUpdateSchool(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		cache.InvalidateSchoolList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusOK)
 	}
 }
 func AdminDeleteSchool(deps *Deps) http.HandlerFunc {
-	return deleteMaster(deps.SchoolRepo.Delete)
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if err := deps.SchoolRepo.Delete(r.Context(), id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		cache.InvalidateSchoolList(r.Context(), deps.Redis)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 func schoolToResp(e domain.School) dto.SchoolResponse {
 	return dto.SchoolResponse{

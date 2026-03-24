@@ -9,6 +9,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -142,7 +143,9 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), a.TryoutSessionID)
+		if a.Score != nil {
+			_ = cache.LeaderboardZAdd(r.Context(), deps.Redis, a.TryoutSessionID, userID, *a.Score)
+		}
 
 		// Progress notification -> notify all trainers (guru/instructor) linked to this student.
 		// We trigger it when an attempt is successfully submitted.

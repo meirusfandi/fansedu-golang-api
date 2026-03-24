@@ -104,6 +104,9 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 
 	if pool == nil {
 		return &handlers.Deps{
+			Redis:                  rdb,
+			SchoolListCacheTTL:     time.Duration(cfg.SchoolListCacheSeconds) * time.Second,
+			PackagesListCacheTTL:   time.Duration(cfg.PackagesListCacheSeconds) * time.Second,
 			GeoService:             geoSvc,
 			JWTSecret:              jwtSecret,
 			AdminPasswordBypassKey: adminPasswordBypassKey,
@@ -145,8 +148,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 
 	userInviteRepo := repo.NewUserInviteRepo(pool)
 	authService := service.NewAuthService(userRepo, emailVerificationTokenRepo, userInviteRepo, jwtSecret)
-	lbCacheTTL := time.Duration(cfg.LeaderboardCacheTTLSeconds) * time.Second
-	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo, rdb, lbCacheTTL)
+	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo, feedbackGen)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo, questionRepo, attemptAnswerRepo)
 	adminService := service.NewAdminService(
@@ -177,6 +179,9 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 
 	return &handlers.Deps{
 		DB:                      pool,
+		Redis:                   rdb,
+		SchoolListCacheTTL:      time.Duration(cfg.SchoolListCacheSeconds) * time.Second,
+		PackagesListCacheTTL:    time.Duration(cfg.PackagesListCacheSeconds) * time.Second,
 		JWTSecret:               jwtSecret,
 		AdminPasswordBypassKey: adminPasswordBypassKey,
 		MigrateBypassKey:       migrateBypassKey,

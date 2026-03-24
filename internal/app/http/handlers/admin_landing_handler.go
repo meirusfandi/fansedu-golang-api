@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -353,6 +354,7 @@ func AdminLandingPackageCreate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
+		cache.InvalidatePackagesList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -466,6 +468,7 @@ func AdminLandingPackageUpdate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not_found", "package not found")
 			return
 		}
+		cache.InvalidatePackagesList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -486,6 +489,7 @@ func AdminLandingPackageDelete(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not_found", "package not found")
 			return
 		}
+		cache.InvalidatePackagesList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
