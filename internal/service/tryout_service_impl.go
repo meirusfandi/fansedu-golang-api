@@ -5,14 +5,15 @@ import (
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 )
 
 type tryoutService struct {
-	tryoutRepo   TryoutRepo
-	registration TryoutRegistrationRepo
+	tryoutRepo   repo.TryoutRepo
+	registration repo.TryoutRegistrationRepo
 }
 
-func NewTryoutService(tryoutRepo TryoutRepo, registration TryoutRegistrationRepo) TryoutService {
+func NewTryoutService(tryoutRepo repo.TryoutRepo, registration repo.TryoutRegistrationRepo) TryoutService {
 	return &tryoutService{tryoutRepo: tryoutRepo, registration: registration}
 }
 

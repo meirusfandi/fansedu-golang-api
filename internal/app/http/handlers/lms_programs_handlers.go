@@ -145,7 +145,7 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 					if pkg.ShortDescription != nil {
 						shortDesc = *pkg.ShortDescription
 					}
-					priceRupiah := packagePriceRupiah(pkg)
+					priceRupiah := domain.LandingPackagePriceRupiah(pkg)
 					priceDisplay := formatRupiah(priceRupiah)
 					dur := "-"
 					if pkg.Durasi != nil {

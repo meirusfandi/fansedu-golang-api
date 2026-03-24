@@ -247,13 +247,16 @@ func AuthRunMigrateBypass(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "database is not configured")
 			return
 		}
-		if err := db.Migrate(r.Context(), deps.DB); err != nil {
+		applied, err := db.Migrate(r.Context(), deps.DB)
+		if err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"message": "migrations completed",
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"message":    "migrations completed",
+			"migrations": applied,
+			"count":      len(applied),
 		})
 	}
 }

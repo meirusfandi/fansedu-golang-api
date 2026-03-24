@@ -9,6 +9,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 )
 
 var (
@@ -22,7 +23,7 @@ type attemptService struct {
 	answerRepo        AttemptAnswerRepo
 	feedbackRepo      FeedbackRepo
 	questionRepo      QuestionRepo
-	tryoutRepo        TryoutRepo
+	tryoutRepo        repo.TryoutRepo
 	feedbackGenerator ai.FeedbackGenerator
 }
 
@@ -49,7 +50,7 @@ type QuestionRepo interface {
 	GetByID(ctx context.Context, id string) (domain.Question, error)
 }
 
-func NewAttemptService(attemptRepo AttemptRepo, answerRepo AttemptAnswerRepo, feedbackRepo FeedbackRepo, questionRepo QuestionRepo, tryoutRepo TryoutRepo, feedbackGenerator ai.FeedbackGenerator) AttemptService {
+func NewAttemptService(attemptRepo AttemptRepo, answerRepo AttemptAnswerRepo, feedbackRepo FeedbackRepo, questionRepo QuestionRepo, tryoutRepo repo.TryoutRepo, feedbackGenerator ai.FeedbackGenerator) AttemptService {
 	if feedbackGenerator == nil {
 		feedbackGenerator = ai.NewFallbackFeedbackGenerator()
 	}

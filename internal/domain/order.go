@@ -32,6 +32,7 @@ type Order struct {
 	SenderName         *string
 	RoleHint           *string // student|instructor for auto-create user
 	BuyerEmail         *string // email pembeli untuk guest checkout
+	PackageID          *string // paket landing jika checkout bundle / multi-kelas
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }

@@ -98,7 +98,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 
 		if needsUpdate && deps.LandingPackageRepo != nil {
 			if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
-				priceRupiah := packagePriceRupiah(pkg)
+				priceRupiah := domain.LandingPackagePriceRupiah(pkg)
 				// Jika package tidak punya harga, gunakan dari request
 				if priceRupiah == 0 {
 					priceRupiah = reqNormalPrice
@@ -156,82 +156,130 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 				UserID: userID,
 			})
 		}
-		result, err := deps.CheckoutService.Initiate(
-			r.Context(),
-			courseSlug,
-			req.Email,
-			req.Name,
-			strings.TrimSpace(req.PromoCode),
-			loggedInUserID,
-			roleHint,
-			buyerRole,
-			req.Quantity,
-			students,
-		)
-		if err != nil {
-			// If course still not found, try one more time to create it lazily
-			// from landing packages (or using request price), then retry Initiate once.
-			if err == service.ErrCourseNotFound {
-				priceForCreate := reqNormalPrice
-				titleForCreate := courseSlug
-				var descForCreate *string
-				if deps.LandingPackageRepo != nil {
-					if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
-						pkgPrice := packagePriceRupiah(pkg)
-						if pkgPrice > 0 {
-							priceForCreate = pkgPrice
-						}
-						titleForCreate = pkg.Name
-						descForCreate = pkg.ShortDescription
-					}
-				}
-				if priceForCreate > 0 {
-					if _, createErr := deps.CourseRepo.Create(r.Context(), domain.Course{
-						Title:       titleForCreate,
-						Slug:        &courseSlug,
-						Description: descForCreate,
-						Price:       priceForCreate,
-					}); createErr == nil {
-						// Retry once after successful create
-						if retryResult, retryErr := deps.CheckoutService.Initiate(
-							r.Context(),
-							courseSlug,
-							req.Email,
-							req.Name,
-							strings.TrimSpace(req.PromoCode),
-							loggedInUserID,
-							roleHint,
-							buyerRole,
-							req.Quantity,
-							students,
-						); retryErr == nil {
-							result = retryResult
-							err = nil
-						} else {
-							err = retryErr
-						}
-					}
+		var result *service.CheckoutInitiateResult
+		var err error
+		packageTried := false
+		if deps.LandingPackageRepo != nil {
+			if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
+				if linked, lerr := deps.LandingPackageRepo.ListLinkedCourses(r.Context(), pkg.ID); lerr == nil && len(linked) > 0 {
+					packageTried = true
+					result, err = deps.CheckoutService.InitiatePackage(
+						r.Context(),
+						courseSlug,
+						req.Email,
+						req.Name,
+						strings.TrimSpace(req.PromoCode),
+						loggedInUserID,
+						roleHint,
+						buyerRole,
+						req.Quantity,
+						students,
+					)
 				}
 			}
-			if err != nil {
-				if err == service.ErrCourseNotFound {
-					writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
-					return
-				}
-				if err == service.ErrPromoInvalid {
-					writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
-					return
-				}
-				if err == service.ErrPromoExpired {
-					writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
-					return
-				}
-				if err == service.ErrPromoMaxUses {
-					writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		}
+		if packageTried && err != nil {
+			if err == service.ErrCourseNotFound {
+				writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
 				return
+			}
+			if err == service.ErrPromoInvalid {
+				writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
+				return
+			}
+			if err == service.ErrPromoExpired {
+				writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
+				return
+			}
+			if err == service.ErrPromoMaxUses {
+				writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
+				return
+			}
+			if err == service.ErrPackageNoLinkedCourses {
+				writeError(w, http.StatusBadRequest, "package_no_classes", "paket belum dihubungkan ke kelas")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		if result == nil {
+			result, err = deps.CheckoutService.Initiate(
+				r.Context(),
+				courseSlug,
+				req.Email,
+				req.Name,
+				strings.TrimSpace(req.PromoCode),
+				loggedInUserID,
+				roleHint,
+				buyerRole,
+				req.Quantity,
+				students,
+			)
+			if err != nil {
+				// If course still not found, try one more time to create it lazily
+				// from landing packages (or using request price), then retry Initiate once.
+				if err == service.ErrCourseNotFound {
+					priceForCreate := reqNormalPrice
+					titleForCreate := courseSlug
+					var descForCreate *string
+					if deps.LandingPackageRepo != nil {
+						if pkg, pkgErr := deps.LandingPackageRepo.GetBySlug(r.Context(), courseSlug); pkgErr == nil {
+							pkgPrice := domain.LandingPackagePriceRupiah(pkg)
+							if pkgPrice > 0 {
+								priceForCreate = pkgPrice
+							}
+							titleForCreate = pkg.Name
+							descForCreate = pkg.ShortDescription
+						}
+					}
+					if priceForCreate > 0 {
+						if _, createErr := deps.CourseRepo.Create(r.Context(), domain.Course{
+							Title:       titleForCreate,
+							Slug:        &courseSlug,
+							Description: descForCreate,
+							Price:       priceForCreate,
+						}); createErr == nil {
+							// Retry once after successful create
+							if retryResult, retryErr := deps.CheckoutService.Initiate(
+								r.Context(),
+								courseSlug,
+								req.Email,
+								req.Name,
+								strings.TrimSpace(req.PromoCode),
+								loggedInUserID,
+								roleHint,
+								buyerRole,
+								req.Quantity,
+								students,
+							); retryErr == nil {
+								result = retryResult
+								err = nil
+							} else {
+								err = retryErr
+							}
+						}
+					}
+				}
+				if err != nil {
+					if err == service.ErrCourseNotFound {
+						writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
+						return
+					}
+					if err == service.ErrPromoInvalid {
+						writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
+						return
+					}
+					if err == service.ErrPromoExpired {
+						writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
+						return
+					}
+					if err == service.ErrPromoMaxUses {
+						writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
+						return
+					}
+					writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+					return
+				}
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -273,17 +321,6 @@ func toCheckoutStudentItems(students []domain.OrderStudent) []dto.CheckoutStuden
 		})
 	}
 	return out
-}
-
-// packagePriceRupiah returns price in rupiah from package (early bird preferred, then normal).
-func packagePriceRupiah(pkg domain.LandingPackage) int {
-	if pkg.PriceEarlyBird != nil && *pkg.PriceEarlyBird > 0 {
-		return int(*pkg.PriceEarlyBird)
-	}
-	if pkg.PriceNormal != nil {
-		return int(*pkg.PriceNormal)
-	}
-	return 0
 }
 
 // CheckoutPaymentSession creates gateway session and returns payment URL. POST /api/v1/checkout/payment-session

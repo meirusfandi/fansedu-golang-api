@@ -294,6 +294,8 @@ type adminLandingPackageRequest struct {
 	Materi            []string `json:"materi"`
 	Fasilitas         []string `json:"fasilitas"`
 	Bonus             []string `json:"bonus"`
+	// LinkedCourseIDs urutan = sort_order; omit pada update jika tidak mengubah relasi kelas.
+	LinkedCourseIDs *[]string `json:"linked_course_ids,omitempty"`
 }
 
 func AdminLandingPackagesList(deps *Deps) http.HandlerFunc {
@@ -339,7 +341,8 @@ func AdminLandingPackageCreate(deps *Deps) http.HandlerFunc {
 		materiJSON, _ := json.Marshal(req.Materi)
 		fasilitasJSON, _ := json.Marshal(req.Fasilitas)
 		bonusJSON, _ := json.Marshal(req.Bonus)
-		_, err := deps.DB.Exec(r.Context(), `
+		var newID string
+		err := deps.DB.QueryRow(r.Context(), `
 			INSERT INTO packages (
 				name, slug, short_description, price_early_bird, price_normal,
 				cta_label, wa_message_template, cta_url, is_open, is_bundle, bundle_subtitle, durasi,
@@ -348,11 +351,18 @@ func AdminLandingPackageCreate(deps *Deps) http.HandlerFunc {
 				$1, $2, $3, $4, $5,
 				$6, $7, $8, $9, $10, $11, $12,
 				$13::jsonb, $14::jsonb, $15::jsonb, NOW()
-			)
-		`, req.Name, req.Slug, req.ShortDescription, req.PriceEarlyBird, req.PriceNormal, ctaLabel, req.WAMessageTemplate, req.CTAURL, isOpen, isBundle, req.BundleSubtitle, req.Durasi, materiJSON, fasilitasJSON, bonusJSON)
+			) RETURNING id::text
+		`, req.Name, req.Slug, req.ShortDescription, req.PriceEarlyBird, req.PriceNormal, ctaLabel, req.WAMessageTemplate, req.CTAURL, isOpen, isBundle, req.BundleSubtitle, req.Durasi, materiJSON, fasilitasJSON, bonusJSON).Scan(&newID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
+		}
+		if deps.LandingPackageRepo != nil {
+			ids := []string{}
+			if req.LinkedCourseIDs != nil {
+				ids = *req.LinkedCourseIDs
+			}
+			_ = deps.LandingPackageRepo.ReplaceLinkedCourses(r.Context(), newID, ids)
 		}
 		cache.InvalidatePackagesList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusCreated)
@@ -467,6 +477,9 @@ func AdminLandingPackageUpdate(deps *Deps) http.HandlerFunc {
 		if ct.RowsAffected() == 0 {
 			writeError(w, http.StatusNotFound, "not_found", "package not found")
 			return
+		}
+		if deps.LandingPackageRepo != nil && req.LinkedCourseIDs != nil {
+			_ = deps.LandingPackageRepo.ReplaceLinkedCourses(r.Context(), id, *req.LinkedCourseIDs)
 		}
 		cache.InvalidatePackagesList(r.Context(), deps.Redis)
 		w.WriteHeader(http.StatusNoContent)

@@ -23,6 +23,7 @@ var (
 	ErrPromoInvalid    = errors.New("kode promo tidak valid")
 	ErrPromoExpired    = errors.New("kode promo sudah kadaluarsa")
 	ErrPromoMaxUses    = errors.New("kode promo sudah mencapai batas penggunaan")
+	ErrPackageNoLinkedCourses = errors.New("paket belum dihubungkan ke kelas manapun")
 )
 
 type CheckoutInitiateResult struct {
@@ -48,6 +49,8 @@ type CheckoutInitiateResult struct {
 
 type CheckoutService interface {
 	Initiate(ctx context.Context, courseSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error)
+	// InitiatePackage checkout berdasarkan slug paket landing; satu pembayaran meng-enroll ke semua kelas di package_courses.
+	InitiatePackage(ctx context.Context, packageSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error)
 	CreatePaymentSession(ctx context.Context, orderID, paymentMethod string) (paymentURL string, err error)
 	HandlePaymentWebhook(ctx context.Context, orderID string) error
 	SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
@@ -56,6 +59,7 @@ type CheckoutService interface {
 
 type checkoutService struct {
 	courseRepo     courseRepoForCheckout
+	landingRepo    landingRepoForCheckout
 	userRepo       userRepoForCheckout
 	orderRepo      orderRepoForCheckout
 	orderItemRepo  orderItemRepoForCheckout
@@ -65,6 +69,12 @@ type checkoutService struct {
 	mailer         mail.Mailer
 	inviteRepo     inviteRepoForCheckout
 	appURL         string
+}
+
+type landingRepoForCheckout interface {
+	GetBySlug(ctx context.Context, slug string) (domain.LandingPackage, error)
+	GetByID(ctx context.Context, id string) (domain.LandingPackage, error)
+	ListLinkedCourses(ctx context.Context, packageID string) ([]domain.PackageLinkedCourse, error)
 }
 
 type inviteRepoForCheckout interface {
@@ -92,6 +102,7 @@ type orderRepoForCheckout interface {
 	Create(ctx context.Context, o domain.Order) (domain.Order, error)
 	GetByID(ctx context.Context, id string) (domain.Order, error)
 	GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error)
+	GetPendingByUserAndPackage(ctx context.Context, userID, packageID string) (domain.Order, bool, error)
 	UpdateStatus(ctx context.Context, id, status string) error
 	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
 }
@@ -114,6 +125,7 @@ type enrollmentRepoForCheckout interface {
 
 func NewCheckoutService(
 	courseRepo courseRepoForCheckout,
+	landingRepo landingRepoForCheckout,
 	userRepo userRepoForCheckout,
 	orderRepo orderRepoForCheckout,
 	orderItemRepo orderItemRepoForCheckout,
@@ -126,6 +138,7 @@ func NewCheckoutService(
 ) CheckoutService {
 	return &checkoutService{
 		courseRepo:     courseRepo,
+		landingRepo:    landingRepo,
 		userRepo:       userRepo,
 		orderRepo:      orderRepo,
 		orderItemRepo:  orderItemRepo,
@@ -388,6 +401,270 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	}, nil
 }
 
+func (s *checkoutService) InitiatePackage(ctx context.Context, packageSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error) {
+	if s.landingRepo == nil {
+		return nil, ErrCourseNotFound
+	}
+	pkg, err := s.landingRepo.GetBySlug(ctx, packageSlug)
+	if err != nil {
+		return nil, ErrCourseNotFound
+	}
+	linked, err := s.landingRepo.ListLinkedCourses(ctx, pkg.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(linked) == 0 {
+		return nil, ErrPackageNoLinkedCourses
+	}
+
+	var user domain.User
+	isNewUser := false
+	if optionalLoggedInUserID != "" {
+		user, err = s.userRepo.FindByID(ctx, optionalLoggedInUserID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		user, err = s.userRepo.FindByEmail(ctx, email)
+		if err != nil {
+			now := time.Now()
+			role := domain.UserRoleStudent
+			if roleHint == "instructor" || roleHint == "guru" {
+				role = domain.UserRoleGuru
+			}
+			user, err = s.userRepo.Create(ctx, domain.User{
+				Email:           email,
+				Name:            name,
+				PasswordHash:    "",
+				Role:            role,
+				EmailVerified:   true,
+				EmailVerifiedAt: &now,
+				MustSetPassword: true,
+			})
+			if err != nil {
+				return nil, err
+			}
+			isNewUser = true
+		}
+	}
+
+	effectiveBuyerRole := normalizeBuyerRole(buyerRole, roleHint, user.Role)
+	isCollective := effectiveBuyerRole == domain.UserRoleGuru && quantity > 1
+	if effectiveBuyerRole == domain.UserRoleStudent {
+		quantity = 1
+		isCollective = false
+	}
+	if quantity <= 0 {
+		quantity = 1
+	}
+
+	unitPrice := domain.LandingPackagePriceRupiah(pkg)
+
+	existingOrder, found, err := s.orderRepo.GetPendingByUserAndPackage(ctx, user.ID, pkg.ID)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		if existingOrder.Quantity == quantity && existingOrder.IsCollective == isCollective {
+			dp := 0.0
+			if existingOrder.DiscountPercent != nil {
+				dp = *existingOrder.DiscountPercent
+			}
+			promoStr := ""
+			if existingOrder.PromoCode != nil {
+				promoStr = *existingOrder.PromoCode
+			}
+			confStr := ""
+			if existingOrder.ConfirmationCode != nil {
+				confStr = *existingOrder.ConfirmationCode
+			}
+			existingStudents := parseOrderStudents(existingOrder.StudentsJSON)
+			return &CheckoutInitiateResult{
+				OrderID:          existingOrder.ID,
+				UserID:           existingOrder.UserID,
+				TotalPrice:       existingOrder.TotalPrice,
+				NormalPrice:      existingOrder.NormalPrice,
+				PromoCode:        promoStr,
+				Discount:         existingOrder.Discount,
+				DiscountPercent:  dp,
+				FinalPrice:       existingOrder.TotalPrice,
+				ConfirmationCode: confStr,
+				IsNewUser:        isNewUser,
+				CourseTitle:      pkg.Name,
+				Price:            unitPrice,
+				IsCollective:     existingOrder.IsCollective,
+				Quantity:         existingOrder.Quantity,
+				UnitPrice:        existingOrder.UnitPrice,
+				Subtotal:         existingOrder.Subtotal,
+				UniqueCode:       existingOrder.UniqueCode,
+				Students:         existingStudents,
+			}, nil
+		}
+	}
+
+	normalRupiah := unitPrice * quantity
+	discountRupiah := 0
+	var discountPercent *float64
+	appliedPromoCode := ""
+
+	if promoCode != "" && s.promoRepo != nil {
+		promo, err := s.promoRepo.GetByCode(ctx, promoCode)
+		if err != nil {
+			return nil, ErrPromoInvalid
+		}
+		now := time.Now()
+		if now.Before(promo.ValidFrom) {
+			return nil, ErrPromoInvalid
+		}
+		if promo.ValidUntil != nil && now.After(*promo.ValidUntil) {
+			return nil, ErrPromoExpired
+		}
+		if promo.MaxUses != nil && promo.UsedCount >= *promo.MaxUses {
+			return nil, ErrPromoMaxUses
+		}
+		switch promo.DiscountType {
+		case domain.PromoDiscountTypePercent:
+			if promo.DiscountValue <= 0 || promo.DiscountValue > 100 {
+				return nil, ErrPromoInvalid
+			}
+			discountRupiah = normalRupiah * promo.DiscountValue / 100
+			p := float64(promo.DiscountValue)
+			discountPercent = &p
+		case domain.PromoDiscountTypeFixed:
+			if promo.DiscountValue <= 0 {
+				return nil, ErrPromoInvalid
+			}
+			discountValRupiah := promo.DiscountValue
+			if discountValRupiah >= normalRupiah {
+				discountRupiah = normalRupiah
+				p := 100.0
+				discountPercent = &p
+			} else {
+				discountRupiah = discountValRupiah
+				p := float64(discountValRupiah*100) / float64(normalRupiah)
+				discountPercent = &p
+			}
+		default:
+			return nil, ErrPromoInvalid
+		}
+		appliedPromoCode = promo.Code
+	}
+
+	finalRupiah := normalRupiah - discountRupiah
+	if finalRupiah < 0 {
+		finalRupiah = 0
+	}
+	confirmationCode := generateConfirmationCode()
+	uniqueCode := 0
+	_, _ = fmt.Sscanf(confirmationCode, "%d", &uniqueCode)
+	totalWithUniqueCode := finalRupiah + uniqueCode
+	unitPriceAfter := finalRupiah / quantity
+	if unitPriceAfter <= 0 {
+		unitPriceAfter = unitPrice
+	}
+	studentsJSON, _ := json.Marshal(students)
+
+	var promoCodePtr *string
+	if appliedPromoCode != "" {
+		promoCodePtr = &appliedPromoCode
+	}
+	var roleHintPtr *string
+	if roleHint != "" {
+		roleHintPtr = &roleHint
+	}
+	pkgID := pkg.ID
+	order, err := s.orderRepo.Create(ctx, domain.Order{
+		UserID:           user.ID,
+		Status:           domain.OrderStatusPending,
+		TotalPrice:       totalWithUniqueCode,
+		NormalPrice:      normalRupiah,
+		Quantity:         quantity,
+		UnitPrice:        unitPriceAfter,
+		Subtotal:         finalRupiah,
+		UniqueCode:       uniqueCode,
+		IsCollective:     isCollective,
+		StudentsJSON:     studentsJSON,
+		PromoCode:        promoCodePtr,
+		Discount:         discountRupiah,
+		DiscountPercent:  discountPercent,
+		ConfirmationCode: &confirmationCode,
+		RoleHint:         roleHintPtr,
+		BuyerEmail:       &email,
+		PackageID:        &pkgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for i, lc := range linked {
+		linePrice := 0
+		if i == 0 {
+			linePrice = normalRupiah
+		}
+		_, err = s.orderItemRepo.Create(ctx, domain.OrderItem{
+			OrderID:  order.ID,
+			CourseID: lc.ID,
+			Price:    linePrice,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if appliedPromoCode != "" && s.promoRepo != nil {
+		promo, _ := s.promoRepo.GetByCode(ctx, appliedPromoCode)
+		_ = s.promoRepo.IncrementUsedCount(ctx, promo.ID)
+	}
+
+	dp := 0.0
+	if discountPercent != nil {
+		dp = *discountPercent
+	}
+
+	registerLink := ""
+	if isNewUser && s.inviteRepo != nil {
+		token := generateInviteToken()
+		orderIDStr := order.ID
+		inv := domain.UserInvite{
+			UserID:    user.ID,
+			OrderID:   &orderIDStr,
+			Email:     email,
+			Name:      name,
+			Token:     token,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		}
+		if _, err := s.inviteRepo.Create(ctx, inv); err == nil {
+			registerLink = s.appURL + "/#/register?token=" + url.QueryEscape(token) + "&email=" + url.QueryEscape(email)
+		}
+	}
+
+	if s.mailer != nil {
+		body := mail.OrderConfirmationBody(order.ID, pkg.Name, finalRupiah, confirmationCode, registerLink)
+		_ = s.mailer.Send(email, "Konfirmasi Pesanan - "+pkg.Name, body)
+	}
+
+	return &CheckoutInitiateResult{
+		OrderID:          order.ID,
+		UserID:           user.ID,
+		TotalPrice:       totalWithUniqueCode,
+		NormalPrice:      normalRupiah,
+		PromoCode:        appliedPromoCode,
+		Discount:         discountRupiah,
+		DiscountPercent:  dp,
+		FinalPrice:       totalWithUniqueCode,
+		ConfirmationCode: confirmationCode,
+		IsNewUser:        isNewUser,
+		CourseTitle:      pkg.Name,
+		Price:            unitPrice,
+		IsCollective:     isCollective,
+		Quantity:         quantity,
+		UnitPrice:        unitPriceAfter,
+		Subtotal:         finalRupiah,
+		UniqueCode:       uniqueCode,
+		Students:         students,
+	}, nil
+}
+
 func parseOrderStudents(raw []byte) []domain.OrderStudent {
 	if len(raw) == 0 {
 		return nil
@@ -493,15 +770,8 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 	if err := s.orderRepo.UpdatePaymentProof(ctx, orderID, proofURL, senderAccountNo, senderName); err != nil {
 		return err
 	}
-	programName := ""
-	if items, err := s.orderItemRepo.ListByOrderID(ctx, orderID); err == nil && len(items) > 0 {
-		if course, err := s.courseRepo.GetByID(ctx, items[0].CourseID); err == nil {
-			programName = course.Title
-		}
-	}
-	if programName == "" {
-		programName = "Program"
-	}
+	items, _ := s.orderItemRepo.ListByOrderID(ctx, orderID)
+	programName := s.orderProgramTitle(ctx, order, items)
 	user, _ := s.userRepo.FindByID(ctx, order.UserID)
 	if s.mailer != nil && user.Email != "" {
 		body := mail.PaymentProofReceivedBody(orderID, programName)
@@ -529,15 +799,7 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 	if err := s.enrollOrderTargets(ctx, order, items); err != nil {
 		return err
 	}
-	programName := ""
-	if len(items) > 0 {
-		if course, err := s.courseRepo.GetByID(ctx, items[0].CourseID); err == nil {
-			programName = course.Title
-		}
-	}
-	if programName == "" {
-		programName = "Program"
-	}
+	programName := s.orderProgramTitle(ctx, order, items)
 	user, _ := s.userRepo.FindByID(ctx, order.UserID)
 	registerLink := ""
 	if s.inviteRepo != nil && user.Email != "" {
@@ -551,6 +813,20 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 		_ = s.mailer.Send(user.Email, "Pembayaran Terverifikasi - "+programName, body)
 	}
 	return nil
+}
+
+func (s *checkoutService) orderProgramTitle(ctx context.Context, order domain.Order, items []domain.OrderItem) string {
+	if order.PackageID != nil && s.landingRepo != nil {
+		if pkg, err := s.landingRepo.GetByID(ctx, *order.PackageID); err == nil && pkg.Name != "" {
+			return pkg.Name
+		}
+	}
+	if len(items) > 0 {
+		if course, err := s.courseRepo.GetByID(ctx, items[0].CourseID); err == nil {
+			return course.Title
+		}
+	}
+	return "Program"
 }
 
 // enrollOrderTargets enrolls buyer (default) or collective students (if provided).

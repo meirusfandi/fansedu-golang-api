@@ -24,9 +24,10 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool); err != nil {
+	applied, err := db.Migrate(ctx, pool)
+	if err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
-	log.Println("migrations completed")
+	log.Printf("migrations completed (%d files): %v", len(applied), applied)
 	os.Exit(0)
 }

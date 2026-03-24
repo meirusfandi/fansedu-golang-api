@@ -1,5 +1,12 @@
 package domain
 
+// PackageLinkedCourse is an LMS course attached to a landing package (for bundles / multi-class access).
+type PackageLinkedCourse struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Slug  string `json:"slug,omitempty"`
+}
+
 // LandingPackage is a package/program for the landing page (snake_case in API response).
 type LandingPackage struct {
 	ID                   string   `json:"id"`
@@ -18,4 +25,16 @@ type LandingPackage struct {
 	Materi             []string `json:"materi,omitempty"`
 	Fasilitas          []string `json:"fasilitas,omitempty"`
 	Bonus              []string `json:"bonus,omitempty"`
+	LinkedCourses      []PackageLinkedCourse `json:"linked_courses,omitempty"`
+}
+
+// LandingPackagePriceRupiah returns display/checkout price: early bird if set, else normal.
+func LandingPackagePriceRupiah(pkg LandingPackage) int {
+	if pkg.PriceEarlyBird != nil && *pkg.PriceEarlyBird > 0 {
+		return int(*pkg.PriceEarlyBird)
+	}
+	if pkg.PriceNormal != nil && *pkg.PriceNormal > 0 {
+		return int(*pkg.PriceNormal)
+	}
+	return 0
 }
