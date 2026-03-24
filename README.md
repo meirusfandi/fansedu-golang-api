@@ -24,8 +24,20 @@ Aplikasi memuat env dari file:
 | `REDIS_URL` | Contoh `redis://localhost:6379/0`. Kosong = endpoint geo tetap jalan, tanpa cache (selalu hit upstream). |
 | `GEO_UPSTREAM_BASE_URL` | Default `https://www.emsifa.com/api-wilayah-indonesia/api` |
 | `GEO_CACHE_TTL_SECONDS` | Default 30 hari (`2592000`) |
+| `LEADERBOARD_CACHE_TTL_SECONDS` | Default 1 jam (`3600`); cache leaderboard per tryout, dihapus otomatis saat submit/register |
 
 Detail key Redis & alur cache-aside: **`docs/GEO_REDIS_BACKEND.md`**.
+
+### Docker Compose (Redis + API satu stack)
+
+Tanpa Redis terpisah di VPS lain: gunakan `docker-compose.yml` — service `redis` dan `api` dalam satu jaringan internal. **Keduanya memakai file `.env` yang sama** (`env_file: .env`); isi `REDIS_URL` (dan opsional `REDIS_PASSWORD` + URL dengan password) di file itu — lihat `.env.docker.example`.
+
+```bash
+cp .env.docker.example .env   # edit DATABASE_URL, JWT_SECRET, APP_URL, REDIS_URL, …
+docker compose up -d --build
+```
+
+Health: `GET http://localhost:8080/api/v1/health` (ganti port jika `API_PORT` di `.env`).
 
 **Jangan commit `.env` atau `.env.dev`** — keduanya ada di `.gitignore`. Pakai `.env.development.example` sebagai template: salin ke `.env.dev`, lalu isi `JWT_SECRET` sendiri (mis. `openssl rand -base64 32`). Jika `.env.dev` pernah ikut ter-commit, untrack dengan: `git rm --cached .env.dev`.
 

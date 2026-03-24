@@ -33,6 +33,8 @@ type Config struct {
 	GeoUpstreamBaseURL string
 	// GeoCacheTTLSeconds TTL cache Redis untuk data provinsi/kabkota (default 30 hari).
 	GeoCacheTTLSeconds int
+	// LeaderboardCacheTTLSeconds TTL cache Redis untuk GET leaderboard per tryout (default 1 jam; di-invalidate saat submit/register).
+	LeaderboardCacheTTLSeconds int
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -62,6 +64,13 @@ func Load() Config {
 		}
 	}
 
+	lbTTL := 3600 // 1 hour (invalidated on leaderboard-changing events)
+	if v := getenv("LEADERBOARD_CACHE_TTL_SECONDS", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			lbTTL = n
+		}
+	}
+
 	cfg := Config{
 		Env:                    env,
 		Port:                   getenv("PORT", "8080"),
@@ -74,6 +83,7 @@ func Load() Config {
 		RedisURL:               getenv("REDIS_URL", ""),
 		GeoUpstreamBaseURL:     getenv("GEO_UPSTREAM_BASE_URL", "https://www.emsifa.com/api-wilayah-indonesia/api"),
 		GeoCacheTTLSeconds:     geoTTL,
+		LeaderboardCacheTTLSeconds: lbTTL,
 	}
 
 	if cfg.Env == EnvProduction {

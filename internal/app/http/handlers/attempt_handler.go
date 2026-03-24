@@ -142,6 +142,8 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), a.TryoutSessionID)
+
 		// Progress notification -> notify all trainers (guru/instructor) linked to this student.
 		// We trigger it when an attempt is successfully submitted.
 		if a.Status == domain.AttemptStatusSubmitted && a.SubmittedAt != nil {

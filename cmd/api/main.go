@@ -57,17 +57,17 @@ func main() {
 		log.Fatal("production: DATABASE_URL is required")
 	}
 
-	var rdb *redis.Client
-	if cfg.RedisURL != "" {
-		opt, err := redis.ParseURL(cfg.RedisURL)
-		if err != nil {
-			log.Printf("warning: REDIS_URL invalid (%v) — geo cache disabled", err)
-		} else {
-			rdb = redis.NewClient(opt)
-		}
+	rdb, err := config.NewRedisClient(cfg)
+	if err != nil {
+		log.Fatalf("redis: %v", err)
 	}
 	if rdb != nil {
 		defer func() { _ = rdb.Close() }()
+		if err := config.PingRedis(ctx, rdb); err != nil {
+			log.Printf("warning: redis ping failed (%v) — geo & leaderboard cache may not work", err)
+		} else {
+			log.Printf("redis: connected")
+		}
 	}
 
 	deps := buildDeps(pool, cfg, rdb)
@@ -145,7 +145,8 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 
 	userInviteRepo := repo.NewUserInviteRepo(pool)
 	authService := service.NewAuthService(userRepo, emailVerificationTokenRepo, userInviteRepo, jwtSecret)
-	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo)
+	lbCacheTTL := time.Duration(cfg.LeaderboardCacheTTLSeconds) * time.Second
+	tryoutService := service.NewTryoutService(tryoutRepo, tryoutRegistrationRepo, rdb, lbCacheTTL)
 	attemptService := service.NewAttemptService(attemptRepo, attemptAnswerRepo, feedbackRepo, questionRepo, tryoutRepo, feedbackGen)
 	dashboardService := service.NewDashboardService(userRepo, attemptRepo, tryoutRepo, feedbackRepo, questionRepo, attemptAnswerRepo)
 	adminService := service.NewAdminService(

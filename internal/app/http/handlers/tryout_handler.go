@@ -489,6 +489,7 @@ func TryoutRegister(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), tryoutID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "registered"})
@@ -544,6 +545,7 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 		}
 		// Auto-register ke tryout agar masuk leaderboard bila belum terdaftar
 		_ = deps.TryoutRegistrationRepo.Register(r.Context(), userID, tryoutID)
+		deps.TryoutService.InvalidateLeaderboardCache(r.Context(), tryoutID)
 		attempt, err := deps.AttemptService.Start(r.Context(), userID, tryoutID)
 		if err != nil {
 			if err == service.ErrAlreadySubmitted {

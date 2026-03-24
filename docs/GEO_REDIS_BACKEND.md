@@ -29,6 +29,7 @@ Upstream default:
 |------|-----|-------------|
 | Provinsi | `fansedu:geo:provinces:v1` | 30 hari (`GEO_CACHE_TTL_SECONDS`) |
 | Kab/kota per provinsi | `fansedu:geo:regencies:v1:{provinceId}` | sama |
+| Leaderboard tryout | `fansedu:leaderboard:tryout:v1:{tryoutId}` | 1 jam (`LEADERBOARD_CACHE_TTL_SECONDS`); **dihapus** saat siswa submit attempt atau register tryout agar data segar. |
 
 Versi `:v1` memungkinkan invalidasi massal dengan mengganti versi di kode jika format berubah.
 
@@ -39,6 +40,7 @@ Versi `:v1` memungkinkan invalidasi massal dengan mengganti versi di kode jika f
 | `REDIS_URL` | `redis://localhost:6379/0` | Kosong = **tanpa cache** (selalu hit upstream). |
 | `GEO_UPSTREAM_BASE_URL` | `https://www.emsifa.com/api-wilayah-indonesia/api` | Optional. |
 | `GEO_CACHE_TTL_SECONDS` | `2592000` | 30 hari = 30×24×3600. |
+| `LEADERBOARD_CACHE_TTL_SECONDS` | `3600` | Cache JSON leaderboard per tryout; invalidasi otomatis saat ada submit/register. |
 
 ## Pseudo-code
 

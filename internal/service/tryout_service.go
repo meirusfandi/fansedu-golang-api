@@ -16,4 +16,6 @@ type TryoutService interface {
 	Delete(ctx context.Context, id string) error
 	Register(ctx context.Context, userID, tryoutID string) error
 	GetLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error)
+	// InvalidateLeaderboardCache hapus cache Redis untuk tryout (no-op jika Redis tidak dipakai).
+	InvalidateLeaderboardCache(ctx context.Context, tryoutID string)
 }

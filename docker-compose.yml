@@ -1,0 +1,51 @@
+# Redis + API Go — keduanya memakai file .env yang sama (env_file).
+# Variabel di .env dipakai untuk interpolasi ${VAR} saat `docker compose up`.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Pakai REDIS_PASSWORD dari .env (opsional). Tanpa password: Redis tanpa auth.
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        exec redis-server --appendonly yes;
+      fi'
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      # Override / default (nilai dari .env tetap dipakai via interpolasi di bawah)
+      PORT: "8080"
+      ENV: ${ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # URL publik frontend — di server isi domain HTTPS di .env
+      APP_URL: ${APP_URL:-http://localhost:5173}
+      # Sama-sama dari .env; default tanpa password ke service name redis
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      GEO_CACHE_TTL_SECONDS: ${GEO_CACHE_TTL_SECONDS:-2592000}
+      LEADERBOARD_CACHE_TTL_SECONDS: ${LEADERBOARD_CACHE_TTL_SECONDS:-3600}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      - redis
+    networks:
+      - internal
+
+volumes:
+  redis_data:
+
+networks:
+  internal:
