@@ -21,6 +21,46 @@ type landingResourceDef struct {
 	OrderBy    string
 }
 
+// remapLandingJSONToDBColumns: body API camelCase → nama kolom DB untuk insert/update generik.
+func remapLandingJSONToDBColumns(m map[string]interface{}) {
+	for from, to := range map[string]string{
+		"sortOrder":  "sort_order",
+		"stepNumber": "step_number",
+		"isActive":   "is_active",
+		"isVisible":  "is_visible",
+	} {
+		if v, ok := m[from]; ok {
+			if _, has := m[to]; !has {
+				m[to] = v
+			}
+			delete(m, from)
+		}
+	}
+}
+
+func landingRowToAPIKeys(row map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(row))
+	for k, v := range row {
+		switch k {
+		case "sort_order":
+			out["sortOrder"] = v
+		case "step_number":
+			out["stepNumber"] = v
+		case "is_active":
+			out["isActive"] = v
+		case "is_visible":
+			out["isVisible"] = v
+		case "created_at":
+			out["createdAt"] = v
+		case "updated_at":
+			out["updatedAt"] = v
+		default:
+			out[k] = v
+		}
+	}
+	return out
+}
+
 var landingResourceDefs = map[string]landingResourceDef{
 	"hero-badges": {
 		Table:      "hero_badges",
@@ -159,8 +199,17 @@ func AdminLandingResourceList(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
+		var rows []map[string]interface{}
+		if err := json.Unmarshal(raw, &rows); err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
+		}
+		out := make([]map[string]interface{}, len(rows))
+		for i := range rows {
+			out[i] = landingRowToAPIKeys(rows[i])
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(raw)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }
 
@@ -176,6 +225,7 @@ func AdminLandingResourceCreate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
+		remapLandingJSONToDBColumns(payload)
 		for req := range def.Required {
 			if _, ok := payload[req]; !ok {
 				writeError(w, http.StatusBadRequest, "validation_error", req+" is required")
@@ -221,6 +271,7 @@ func AdminLandingResourceUpdate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
+		remapLandingJSONToDBColumns(payload)
 		sets := make([]string, 0, len(def.InsertCols))
 		values := make([]interface{}, 0, len(def.InsertCols)+1)
 		arg := 1
@@ -279,23 +330,22 @@ func AdminLandingResourceDelete(deps *Deps) http.HandlerFunc {
 }
 
 type adminLandingPackageRequest struct {
-	Name              string   `json:"name"`
-	Slug              string   `json:"slug"`
-	ShortDescription  *string  `json:"short_description"`
-	PriceEarlyBird    *int64   `json:"price_early_bird"`
-	PriceNormal       *int64   `json:"price_normal"`
-	CTALabel          *string  `json:"cta_label"`
-	WAMessageTemplate *string  `json:"wa_message_template"`
-	CTAURL            *string  `json:"cta_url"`
-	IsOpen            *bool    `json:"is_open"`
-	IsBundle          *bool    `json:"is_bundle"`
-	BundleSubtitle    *string  `json:"bundle_subtitle"`
-	Durasi            *string  `json:"durasi"`
-	Materi            []string `json:"materi"`
-	Fasilitas         []string `json:"fasilitas"`
-	Bonus             []string `json:"bonus"`
-	// LinkedCourseIDs urutan = sort_order; omit pada update jika tidak mengubah relasi kelas.
-	LinkedCourseIDs *[]string `json:"linked_course_ids,omitempty"`
+	Name              string    `json:"name"`
+	Slug              string    `json:"slug"`
+	ShortDescription  *string   `json:"shortDescription"`
+	PriceEarlyBird    *int64    `json:"priceEarlyBird"`
+	PriceNormal       *int64    `json:"priceNormal"`
+	CTALabel          *string   `json:"ctaLabel"`
+	WAMessageTemplate *string   `json:"waMessageTemplate"`
+	CTAURL            *string   `json:"ctaUrl"`
+	IsOpen            *bool     `json:"isOpen"`
+	IsBundle          *bool     `json:"isBundle"`
+	BundleSubtitle    *string   `json:"bundleSubtitle"`
+	Durasi            *string   `json:"durasi"`
+	Materi            []string  `json:"materi"`
+	Fasilitas         []string  `json:"fasilitas"`
+	Bonus             []string  `json:"bonus"`
+	LinkedCourseIDs   *[]string `json:"linkedCourseIds,omitempty"`
 }
 
 func AdminLandingPackagesList(deps *Deps) http.HandlerFunc {

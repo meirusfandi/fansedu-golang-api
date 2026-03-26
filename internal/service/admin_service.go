@@ -8,13 +8,13 @@ import (
 )
 
 type AdminOverview struct {
-	TotalStudents     int     `json:"total_students"`
-	TotalUsers        int     `json:"total_users"`
-	ActiveTryouts     int     `json:"active_tryouts"`
-	TotalCourses      int     `json:"total_courses"`
-	TotalEnrollments  int     `json:"total_enrollments"`
-	AvgScore          float64 `json:"avg_score"`
-	TotalCertificates int     `json:"total_certificates"`
+	TotalStudents     int     `json:"totalStudents"`
+	TotalUsers        int     `json:"totalUsers"`
+	ActiveTryouts     int     `json:"activeTryouts"`
+	TotalCourses      int     `json:"totalCourses"`
+	TotalEnrollments  int     `json:"totalEnrollments"`
+	AvgScore          float64 `json:"avgScore"`
+	TotalCertificates int     `json:"totalCertificates"`
 }
 
 type AdminService interface {
@@ -56,80 +56,80 @@ type AdminService interface {
 }
 
 type MonthlyReport struct {
-	Year               int   `json:"year"`
-	Month              int   `json:"month"`
-	NewEnrollments     int   `json:"new_enrollments"`
-	PaymentsCount      int   `json:"payments_count"`
-	TotalRevenue int64 `json:"total_revenue"`
+	Year           int   `json:"year"`
+	Month          int   `json:"month"`
+	NewEnrollments int   `json:"newEnrollments"`
+	PaymentsCount  int   `json:"paymentsCount"`
+	TotalRevenue   int64 `json:"totalRevenue"`
 }
 
 // QuestionStats response for GET /admin/tryouts/:tryoutId/questions/:questionId/stats
 type QuestionStats struct {
-	ParticipantsCount int     `json:"participants_count"`
-	AnsweredCount     int     `json:"answered_count"`
-	CorrectCount      int     `json:"correct_count"`
-	WrongCount        int     `json:"wrong_count"`
-	CorrectPercent    float64 `json:"correct_percent"`
-	WrongPercent      float64 `json:"wrong_percent"`
+	ParticipantsCount int     `json:"participantsCount"`
+	AnsweredCount     int     `json:"answeredCount"`
+	CorrectCount      int     `json:"correctCount"`
+	WrongCount        int     `json:"wrongCount"`
+	CorrectPercent    float64 `json:"correctPercent"`
+	WrongPercent      float64 `json:"wrongPercent"`
 }
 
 // QuestionStatsItem one question in bulk stats
 type QuestionStatsItem struct {
-	QuestionID    string  `json:"question_id"`
-	AnsweredCount int     `json:"answered_count"`
-	CorrectCount  int     `json:"correct_count"`
-	WrongCount    int     `json:"wrong_count"`
-	CorrectPercent float64 `json:"correct_percent"`
-	WrongPercent   float64 `json:"wrong_percent"`
+	QuestionID     string  `json:"questionId"`
+	AnsweredCount  int     `json:"answeredCount"`
+	CorrectCount   int     `json:"correctCount"`
+	WrongCount     int     `json:"wrongCount"`
+	CorrectPercent float64 `json:"correctPercent"`
+	WrongPercent   float64 `json:"wrongPercent"`
 }
 
 // QuestionStatsBulk response for GET /admin/tryouts/:tryoutId/questions/stats
 type QuestionStatsBulk struct {
-	ParticipantsCount int                `json:"participants_count"`
+	ParticipantsCount int                 `json:"participantsCount"`
 	Questions         []QuestionStatsItem `json:"questions"`
 }
 
 // TryoutAnalysis response for GET /admin/tryouts/:tryoutId/analysis (grafik & analisis per soal)
 type TryoutAnalysis struct {
-	TryoutID           string                    `json:"tryout_id"`
-	TryoutTitle        string                    `json:"tryout_title"`
-	ParticipantsCount  int                       `json:"participants_count"`
-	Questions          []TryoutAnalysisQuestion  `json:"questions"`
+	TryoutID          string                   `json:"tryoutId"`
+	TryoutTitle       string                   `json:"tryoutTitle"`
+	ParticipantsCount int                      `json:"participantsCount"`
+	Questions         []TryoutAnalysisQuestion `json:"questions"`
 }
 
 // TryoutAnalysisQuestion satu soal dalam analisis tryout (siap untuk grafik)
 type TryoutAnalysisQuestion struct {
-	QuestionNumber     int                `json:"question_number"`
-	QuestionID         string             `json:"question_id"`
-	QuestionType       string             `json:"question_type"`
-	AnsweredCount     int                `json:"answered_count"`
-	UnansweredCount   int                `json:"unanswered_count"`
-	CorrectCount      int                `json:"correct_count"`
-	WrongCount        int                `json:"wrong_count"`
-	CorrectPercent    float64            `json:"correct_percent"`
-	WrongPercent      float64            `json:"wrong_percent"`
-	OptionDistribution map[string]int    `json:"option_distribution"` // A, B, C, D, ...
+	QuestionNumber     int                `json:"questionNumber"`
+	QuestionID         string             `json:"questionId"`
+	QuestionType       string             `json:"questionType"`
+	AnsweredCount      int                `json:"answeredCount"`
+	UnansweredCount    int                `json:"unansweredCount"`
+	CorrectCount       int                `json:"correctCount"`
+	WrongCount         int                `json:"wrongCount"`
+	CorrectPercent     float64            `json:"correctPercent"`
+	WrongPercent       float64            `json:"wrongPercent"`
+	OptionDistribution map[string]int     `json:"optionDistribution"`
 }
 
 // TryoutStudentItem satu siswa yang submit tryout (untuk daftar + link ke analisis AI)
 type TryoutStudentItem struct {
-	UserID       string   `json:"user_id"`
-	UserName     string   `json:"user_name"`
-	UserEmail    string   `json:"user_email"`
-	AttemptID    string   `json:"attempt_id"`
-	Score        *float64 `json:"score"`
-	MaxScore     *float64 `json:"max_score"`
-	Percentile   *float64 `json:"percentile"`
-	SubmittedAt  *string  `json:"submitted_at"`
+	UserID      string   `json:"userId"`
+	UserName    string   `json:"userName"`
+	UserEmail   string   `json:"userEmail"`
+	AttemptID   string   `json:"attemptId"`
+	Score       *float64 `json:"score"`
+	MaxScore    *float64 `json:"maxScore"`
+	Percentile  *float64 `json:"percentile"`
+	SubmittedAt *string  `json:"submittedAt"`
 }
 
 // AttemptAIAnalysisResponse analisis AI per attempt (per siswa)
 type AttemptAIAnalysisResponse struct {
-	AttemptID        string   `json:"attempt_id"`
+	AttemptID        string   `json:"attemptId"`
 	Summary          string   `json:"summary"`
 	Recap            string   `json:"recap"`
-	StrengthAreas    []string `json:"strength_areas"`
-	ImprovementAreas []string `json:"improvement_areas"`
+	StrengthAreas    []string `json:"strengthAreas"`
+	ImprovementAreas []string `json:"improvementAreas"`
 	Recommendation   string   `json:"recommendation"`
 }
 

@@ -3,12 +3,51 @@ package repo
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
+
+// Cache lookup role by user_role_code (kunci lower(trim)) — mengurangi query berulang di /auth/me & profil.
+var userRoleCodeRoleCache sync.Map
+
+func invalidateUserRoleCodeCache() {
+	userRoleCodeRoleCache.Range(func(key, _ any) bool {
+		userRoleCodeRoleCache.Delete(key)
+		return true
+	})
+}
+
+func cacheKeysForRole(e domain.Role) []string {
+	seen := make(map[string]struct{})
+	var out []string
+	add := func(s string) {
+		k := strings.ToLower(strings.TrimSpace(s))
+		if k == "" {
+			return
+		}
+		if _, ok := seen[k]; ok {
+			return
+		}
+		seen[k] = struct{}{}
+		out = append(out, k)
+	}
+	add(e.UserRoleCode)
+	add(e.Slug)
+	return out
+}
+
+func storeRoleByCodeKeys(e domain.Role, queryKey string) {
+	if k := strings.ToLower(strings.TrimSpace(queryKey)); k != "" {
+		userRoleCodeRoleCache.Store(k, e)
+	}
+	for _, ck := range cacheKeysForRole(e) {
+		userRoleCodeRoleCache.Store(ck, e)
+	}
+}
 
 type RoleRepo interface {
 	Create(ctx context.Context, e domain.Role) (domain.Role, error)
@@ -41,6 +80,7 @@ func (r *roleRepo) Create(ctx context.Context, e domain.Role) (domain.Role, erro
 	}
 	e.ID = id
 	e.UserRoleCode = code
+	invalidateUserRoleCodeCache()
 	return e, nil
 }
 
@@ -65,6 +105,14 @@ func (r *roleRepo) GetBySlug(ctx context.Context, slug string) (domain.Role, err
 }
 
 func (r *roleRepo) GetByUserRoleCode(ctx context.Context, code string) (domain.Role, error) {
+	k := strings.ToLower(strings.TrimSpace(code))
+	if k != "" {
+		if v, ok := userRoleCodeRoleCache.Load(k); ok {
+			if e, ok := v.(domain.Role); ok {
+				return e, nil
+			}
+		}
+	}
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, name, slug, COALESCE(NULLIF(trim(user_role_code), ''), slug), description, icon_url, created_at, updated_at
 		FROM roles
@@ -74,7 +122,11 @@ func (r *roleRepo) GetByUserRoleCode(ctx context.Context, code string) (domain.R
 	`, code)
 	var e domain.Role
 	err := row.Scan(&e.ID, &e.Name, &e.Slug, &e.UserRoleCode, &e.Description, &e.IconURL, &e.CreatedAt, &e.UpdatedAt)
-	return e, err
+	if err != nil {
+		return domain.Role{}, err
+	}
+	storeRoleByCodeKeys(e, code)
+	return e, nil
 }
 
 func (r *roleRepo) List(ctx context.Context) ([]domain.Role, error) {
@@ -105,10 +157,18 @@ func (r *roleRepo) Update(ctx context.Context, e domain.Role) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE roles SET name=$2, slug=$3, description=$4, icon_url=$5, user_role_code=NULLIF(trim($6), '') WHERE id = $1::uuid
 	`, e.ID, e.Name, e.Slug, e.Description, e.IconURL, code)
-	return err
+	if err != nil {
+		return err
+	}
+	invalidateUserRoleCodeCache()
+	return nil
 }
 
 func (r *roleRepo) Delete(ctx context.Context, id string) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM roles WHERE id = $1::uuid`, id)
-	return err
+	if err != nil {
+		return err
+	}
+	invalidateUserRoleCodeCache()
+	return nil
 }

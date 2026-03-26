@@ -175,8 +175,8 @@ func AuthChangePassword(deps *Deps) http.HandlerFunc {
 			return
 		}
 		var req struct {
-			CurrentPassword string `json:"current_password"`
-			NewPassword     string `json:"new_password"`
+			CurrentPassword string `json:"currentPassword"`
+			NewPassword     string `json:"newPassword"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -291,9 +291,9 @@ func PaymentCreate(deps *Deps) http.HandlerFunc {
 		var req struct {
 			Amount      int     `json:"amount"`
 			Type        string  `json:"type"`
-			ReferenceID *string `json:"reference_id"`
+			ReferenceID *string `json:"referenceId"`
 			Description *string `json:"description"`
-			ProofURL    *string `json:"proof_url"`
+			ProofURL    *string `json:"proofUrl"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -805,7 +805,7 @@ func StudentProfileGet(deps *Deps) http.HandlerFunc {
 	return AuthMe(deps)
 }
 
-// StudentProfileUpdate updates current user name/email. PUT /api/v1/student/profile
+// StudentProfileUpdate updates student profile (same fields as trainer profile). PUT /api/v1/student/profile
 func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
@@ -813,10 +813,7 @@ func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		var req struct {
-			Name  string `json:"name"`
-			Email string `json:"email"`
-		}
+		var req dto.UserProfileUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
@@ -826,23 +823,21 @@ func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not_found", "user not found")
 			return
 		}
-		if req.Name != "" {
-			u.Name = req.Name
-		}
-		if req.Email != "" {
-			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
-			if err == nil && existing.ID != userID {
-				writeError(w, http.StatusConflict, "conflict", "email already in use")
-				return
-			}
-			u.Email = req.Email
+		if err := ApplyUserProfileUpdate(r.Context(), deps, &u, &req); err != nil {
+			writeErrorFromProfileApply(w, err)
+			return
 		}
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
+			writeErrorFromUserRepoUpdate(w, err)
+			return
+		}
+		u2, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
+		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(authUserResponse(r.Context(), deps.RoleRepo, u))
+		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u2, school))
 	}
 }
 

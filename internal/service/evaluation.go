@@ -9,19 +9,19 @@ import (
 
 // QuestionScoreDetail satu soal dalam detail penilaian attempt
 type QuestionScoreDetail struct {
-	QuestionID   string  `json:"question_id"`
-	QuestionType string  `json:"question_type"`
-	MaxScore     float64 `json:"max_score"`
-	ScoreGot     float64 `json:"score_got"`
-	Status       string  `json:"status"` // "correct" | "partial" | "wrong" | "unanswered"
+	QuestionID   string  `json:"questionId"`
+	QuestionType string  `json:"questionType"`
+	MaxScore     float64 `json:"maxScore"`
+	ScoreGot     float64 `json:"scoreGot"`
+	Status       string  `json:"status"`
 }
 
 // AttemptEvaluation hasil analisis attempt + rekomendasi (untuk dashboard)
 type AttemptEvaluation struct {
-	AttemptID        string                `json:"attempt_id,omitempty"`
-	AnswerBreakdown  []QuestionScoreDetail `json:"answer_breakdown"`
-	StrengthAreas    []string              `json:"strength_areas"`
-	ImprovementAreas []string              `json:"improvement_areas"`
+	AttemptID        string                `json:"attemptId,omitempty"`
+	AnswerBreakdown  []QuestionScoreDetail `json:"answerBreakdown"`
+	StrengthAreas    []string              `json:"strengthAreas"`
+	ImprovementAreas []string              `json:"improvementAreas"`
 	Recommendation   string                `json:"recommendation"`
 }
 

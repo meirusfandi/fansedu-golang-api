@@ -3,9 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,15 +12,6 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
-var trainerSchoolSlugClean = regexp.MustCompile(`[^a-z0-9-]+`)
-
-func slugFromSchoolName(name string) string {
-	s := strings.ToLower(strings.TrimSpace(name))
-	s = strings.ReplaceAll(s, " ", "-")
-	s = trainerSchoolSlugClean.ReplaceAllString(s, "")
-	return s
-}
-
 // TrainerProfileGet returns guru profile: name, email, school.
 // Data sekolah yang terhubung dengan akun guru; jika user punya school_id dan sekolah ada, objek school diisi.
 // GET /api/v1/trainer/profile
@@ -31,43 +19,16 @@ func TrainerProfileGet(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		u, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "not_found", "user not found")
 			return
-		}
-		resp := dto.TrainerProfileResponse{
-			Name:  u.Name,
-			Email: u.Email,
-		}
-		resp.Phone = u.Phone
-		resp.Whatsapp = u.Whatsapp
-		resp.ClassLevel = u.ClassLevel
-		resp.City = u.City
-		resp.Province = u.Province
-		resp.Gender = u.Gender
-		if u.BirthDate != nil {
-			s := u.BirthDate.UTC().Format("2006-01-02")
-			resp.BirthDate = &s
-		}
-		resp.Bio = u.Bio
-		resp.ParentName = u.ParentName
-		resp.ParentPhone = u.ParentPhone
-		resp.Instagram = u.Instagram
-		resp.SchoolID = u.SchoolID
-		resp.SubjectID = u.SubjectID
-		// Objek school diisi jika guru terhubung ke sekolah (school_id); frontend pakai untuk "Detail info sekolah".
-		if u.SchoolID != nil && *u.SchoolID != "" {
-			school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID)
-			if err == nil {
-				resp.School = schoolToProfile(school)
-			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u, school))
 	}
 }
 
@@ -76,163 +37,34 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
 		var req dto.TrainerProfileUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
 		u, err := deps.UserRepo.FindByID(r.Context(), userID)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "not_found", "user not found")
 			return
 		}
-		if req.Name != "" {
-			u.Name = req.Name
-		}
-		if req.Email != "" {
-			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
-			if err == nil && existing.ID != u.ID {
-				http.Error(w, "email already in use", http.StatusConflict)
-				return
-			}
-			u.Email = req.Email
-		}
-
-		if req.SchoolID != nil {
-			sid := strings.TrimSpace(*req.SchoolID)
-			if sid == "" {
-				u.SchoolID = nil
-			} else {
-				if _, err := deps.SchoolRepo.GetByID(r.Context(), sid); err != nil {
-					http.Error(w, "school not found", http.StatusBadRequest)
-					return
-				}
-				u.SchoolID = &sid
-			}
-		}
-		if req.SchoolName != nil {
-			schoolName := strings.TrimSpace(*req.SchoolName)
-			if schoolName != "" {
-				slug := slugFromSchoolName(schoolName)
-				if slug == "" {
-					http.Error(w, "invalid school_name", http.StatusBadRequest)
-					return
-				}
-				school, err := deps.SchoolRepo.GetBySlug(r.Context(), slug)
-				if err != nil {
-					created, createErr := deps.SchoolRepo.Create(r.Context(), domain.School{
-						Name: schoolName,
-						Slug: slug,
-					})
-					if createErr == nil {
-						school = created
-					} else {
-						// kemungkinan race slug duplicate: coba get ulang by slug
-						existing, getErr := deps.SchoolRepo.GetBySlug(r.Context(), slug)
-						if getErr != nil {
-							http.Error(w, "failed to link school", http.StatusInternalServerError)
-							return
-						}
-						school = existing
-					}
-				}
-				u.SchoolID = &school.ID
-			}
-		}
-		if req.SubjectID != nil {
-			subjectID := strings.TrimSpace(*req.SubjectID)
-			if subjectID == "" {
-				u.SubjectID = nil
-			} else {
-				if _, err := deps.SubjectRepo.GetByID(r.Context(), subjectID); err != nil {
-					http.Error(w, "subject not found", http.StatusBadRequest)
-					return
-				}
-				u.SubjectID = &subjectID
-			}
-		}
-
-		if req.Phone != nil {
-			u.Phone = req.Phone
-		}
-		if req.Whatsapp != nil {
-			u.Whatsapp = req.Whatsapp
-		}
-		if req.ClassLevel != nil {
-			u.ClassLevel = req.ClassLevel
-		}
-		if req.City != nil {
-			u.City = req.City
-		}
-		if req.Province != nil {
-			u.Province = req.Province
-		}
-		if req.Gender != nil {
-			u.Gender = req.Gender
-		}
-		if req.BirthDate != nil {
-			b := strings.TrimSpace(*req.BirthDate)
-			if b == "" {
-				u.BirthDate = nil
-			} else {
-				parsed, err := time.Parse("2006-01-02", b)
-				if err != nil {
-					http.Error(w, "invalid birthDate format; expected YYYY-MM-DD", http.StatusBadRequest)
-					return
-				}
-				u.BirthDate = &parsed
-			}
-		}
-		if req.Bio != nil {
-			u.Bio = req.Bio
-		}
-		if req.ParentName != nil {
-			u.ParentName = req.ParentName
-		}
-		if req.ParentPhone != nil {
-			u.ParentPhone = req.ParentPhone
-		}
-		if req.Instagram != nil {
-			u.Instagram = req.Instagram
+		if err := ApplyUserProfileUpdate(r.Context(), deps, &u, &req); err != nil {
+			writeErrorFromProfileApply(w, err)
+			return
 		}
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeErrorFromUserRepoUpdate(w, err)
 			return
 		}
-		var schoolProfile *dto.SchoolProfile
-		if u.SchoolID != nil && *u.SchoolID != "" {
-			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
-				schoolProfile = schoolToProfile(school)
-			}
+		u2, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			return
 		}
-		var birthDateStr *string
-		if u.BirthDate != nil {
-			s := u.BirthDate.UTC().Format("2006-01-02")
-			birthDateStr = &s
-		}
-
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.TrainerProfileResponse{
-			Name:        u.Name,
-			Email:       u.Email,
-			Phone:       u.Phone,
-			Whatsapp:    u.Whatsapp,
-			ClassLevel:  u.ClassLevel,
-			City:        u.City,
-			Province:    u.Province,
-			Gender:      u.Gender,
-			BirthDate:  birthDateStr,
-			Bio:         u.Bio,
-			ParentName: u.ParentName,
-			ParentPhone: u.ParentPhone,
-			Instagram:  u.Instagram,
-			SchoolID:   u.SchoolID,
-			SubjectID:  u.SubjectID,
-			School:      schoolProfile,
-		})
+		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u2, school))
 	}
 }
 
@@ -280,22 +112,6 @@ func InstructorProfilePassword(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "password updated"})
 	}
-}
-
-// schoolToProfile maps domain.School to frontend-normalized SchoolProfile (nama_sekolah, alamat, dll).
-func schoolToProfile(s domain.School) *dto.SchoolProfile {
-	p := &dto.SchoolProfile{
-		ID:            s.ID,
-		NamaSekolah:   s.Name,
-		NPSN:          "",
-		KabupatenKota: "",
-		Alamat:        "",
-		Telepon:       "",
-	}
-	if s.Address != nil {
-		p.Alamat = *s.Address
-	}
-	return p
 }
 
 // TrainerStatus returns paid_slots, registered_students_count, and optional students. GET /api/v1/trainer/status
@@ -513,7 +329,7 @@ func TrainerStudentUpdate(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeErrorFromUserRepoUpdate(w, err)
 			return
 		}
 

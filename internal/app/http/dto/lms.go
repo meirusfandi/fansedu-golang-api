@@ -5,7 +5,7 @@ type RoleItem struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	Slug         string `json:"slug"`
-	UserRoleCode string `json:"user_role_code"` // nilai yang dipakai di JWT/users.role setelah pilih slug ini
+	UserRoleCode string `json:"userRoleCode"`
 }
 
 // SchoolItem for public GET /schools
@@ -21,50 +21,50 @@ type NotificationItem struct {
 	Title     string `json:"title"`
 	Body      string `json:"body"`
 	Type      string `json:"type"`
-	ReadAt    string `json:"read_at,omitempty"`
-	CreatedAt string `json:"created_at"`
+	ReadAt    string `json:"readAt,omitempty"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // UserPaymentResponse for GET /payments (my payments)
 type UserPaymentResponse struct {
-	ID           string `json:"id"`
-	UserID       string `json:"user_id"`
-	Amount       int    `json:"amount"`
-	Currency     string `json:"currency"`
-	Status       string `json:"status"`
-	Type         string `json:"type"`
-	ReferenceID  string `json:"reference_id,omitempty"`
-	Description  *string `json:"description,omitempty"`
-	ProofURL     string `json:"proof_url,omitempty"`
-	PaidAt       string `json:"paid_at,omitempty"`
-	CreatedAt    string `json:"created_at"`
+	ID          string  `json:"id"`
+	UserID      string  `json:"userId"`
+	Amount      int     `json:"amount"`
+	Currency    string  `json:"currency"`
+	Status      string  `json:"status"`
+	Type        string  `json:"type"`
+	ReferenceID string  `json:"referenceId,omitempty"`
+	Description *string `json:"description,omitempty"`
+	ProofURL    string  `json:"proofUrl,omitempty"`
+	PaidAt      string  `json:"paidAt,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
 }
 
 // CourseMessageItem for course chat
 type CourseMessageItem struct {
 	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
+	UserID    string `json:"userId"`
 	Message   string `json:"message"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // DiscussionItem for course discussions
 type DiscussionItem struct {
 	ID        string `json:"id"`
-	CourseID  string `json:"course_id"`
-	UserID    string `json:"user_id"`
+	CourseID  string `json:"courseId"`
+	UserID    string `json:"userId"`
 	Title     string `json:"title"`
 	Body      string `json:"body"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // DiscussionReplyItem for discussion replies
 type DiscussionReplyItem struct {
-	ID            string `json:"id"`
-	DiscussionID  string `json:"discussion_id"`
-	UserID        string `json:"user_id"`
-	Body          string `json:"body"`
-	CreatedAt     string `json:"created_at"`
+	ID           string `json:"id"`
+	DiscussionID string `json:"discussionId"`
+	UserID       string `json:"userId"`
+	Body         string `json:"body"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 // CourseItem for list responses
@@ -72,7 +72,7 @@ type CourseItem struct {
 	ID          string  `json:"id"`
 	Title       string  `json:"title"`
 	Description string  `json:"description,omitempty"`
-	SubjectID   *string `json:"subject_id,omitempty"`
-	CreatedBy   *string `json:"created_by,omitempty"`
-	CreatedAt   string  `json:"created_at"`
+	SubjectID   *string `json:"subjectId,omitempty"`
+	CreatedBy   *string `json:"createdBy,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
 }

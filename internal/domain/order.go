@@ -40,7 +40,7 @@ type Order struct {
 type OrderStudent struct {
 	Name   string  `json:"name,omitempty"`
 	Email  string  `json:"email,omitempty"`
-	UserID *string `json:"user_id,omitempty"`
+	UserID *string `json:"userId,omitempty"`
 }
 
 type OrderItem struct {

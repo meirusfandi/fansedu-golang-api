@@ -7,25 +7,25 @@ type PackageLinkedCourse struct {
 	Slug  string `json:"slug,omitempty"`
 }
 
-// LandingPackage is a package/program for the landing page (snake_case in API response).
+// LandingPackage is a package/program for the landing page (JSON camelCase).
 type LandingPackage struct {
-	ID                   string   `json:"id"`
-	Name                 string   `json:"name"`
-	Slug                 string   `json:"slug"`
-	ShortDescription     *string  `json:"short_description,omitempty"`
-	PriceEarlyBird  *int64   `json:"price_early_bird,omitempty"`  // nominal dalam rupiah
-	PriceNormal     *int64   `json:"price_normal,omitempty"`     // nominal dalam rupiah
-	CTALabel             string   `json:"cta_label"`
-	WAMessageTemplate  *string  `json:"wa_message_template,omitempty"`
-	CTAURL             *string  `json:"cta_url,omitempty"`
-	IsOpen             bool     `json:"is_open"`
-	IsBundle           bool     `json:"is_bundle"`
-	BundleSubtitle     *string  `json:"bundle_subtitle,omitempty"`
-	Durasi             *string  `json:"durasi,omitempty"`
-	Materi             []string `json:"materi,omitempty"`
-	Fasilitas          []string `json:"fasilitas,omitempty"`
-	Bonus              []string `json:"bonus,omitempty"`
-	LinkedCourses      []PackageLinkedCourse `json:"linked_courses,omitempty"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Slug              string                `json:"slug"`
+	ShortDescription  *string               `json:"shortDescription,omitempty"`
+	PriceEarlyBird    *int64                `json:"priceEarlyBird,omitempty"`
+	PriceNormal       *int64                `json:"priceNormal,omitempty"`
+	CTALabel          string                `json:"ctaLabel"`
+	WAMessageTemplate *string               `json:"waMessageTemplate,omitempty"`
+	CTAURL            *string               `json:"ctaUrl,omitempty"`
+	IsOpen            bool                  `json:"isOpen"`
+	IsBundle          bool                  `json:"isBundle"`
+	BundleSubtitle    *string               `json:"bundleSubtitle,omitempty"`
+	Durasi            *string               `json:"durasi,omitempty"`
+	Materi            []string              `json:"materi,omitempty"`
+	Fasilitas         []string              `json:"fasilitas,omitempty"`
+	Bonus             []string              `json:"bonus,omitempty"`
+	LinkedCourses     []PackageLinkedCourse `json:"linkedCourses,omitempty"`
 }
 
 // LandingPackagePriceRupiah returns display/checkout price: early bird if set, else normal.

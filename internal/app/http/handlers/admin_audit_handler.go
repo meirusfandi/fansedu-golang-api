@@ -44,15 +44,15 @@ func AdminAuditLogsList(deps *Deps) http.HandlerFunc {
 				return
 			}
 			out = append(out, map[string]interface{}{
-				"id":            id,
-				"admin_user_id": adminUserID,
-				"role":          role,
-				"method":        method,
-				"path":          path,
-				"status_code":   statusCode,
-				"duration_ms":   durationMs,
-				"request_id":    requestID,
-				"created_at":    createdAt.Format(time.RFC3339),
+				"id":           id,
+				"adminUserId":  adminUserID,
+				"role":         role,
+				"method":       method,
+				"path":         path,
+				"statusCode":   statusCode,
+				"durationMs":   durationMs,
+				"requestId":    requestID,
+				"createdAt":    createdAt.Format(time.RFC3339),
 			})
 		}
 		if err := rows.Err(); err != nil {

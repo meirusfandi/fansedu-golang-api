@@ -21,25 +21,20 @@ import (
 func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ProgramID      string `json:"programId"`
-			ProgramSlug    string `json:"programSlug"`
-			CourseSlug     string `json:"course_slug"`
-			Name           string `json:"name"`
-			Email          string `json:"email"`
-			PromoCode      string `json:"promoCode"`
-			NormalPrice    int    `json:"normalPrice"`
-			NormalPriceL   int    `json:"normal_price"`
-			Price          int    `json:"price"`
-			FinalPrice     int    `json:"finalPrice"`
-			FinalPriceL    int    `json:"final_price"`
-			ExpectedTotal  int    `json:"expectedTotal"`
-			ExpectedTotalL int    `json:"expected_total"`
-			RoleHint       string `json:"roleHint"`
-			RoleHintL      string `json:"role_hint"`
-			BuyerRole      string `json:"buyerRole"`
-			BuyerRoleL     string `json:"buyer_role"`
-			Quantity       int    `json:"quantity"`
-			Students       []dto.CheckoutStudentItem `json:"students"`
+			ProgramID     string                    `json:"programId"`
+			ProgramSlug   string                    `json:"programSlug"`
+			CourseSlug    string                    `json:"courseSlug"`
+			Name          string                    `json:"name"`
+			Email         string                    `json:"email"`
+			PromoCode     string                    `json:"promoCode"`
+			NormalPrice   int                       `json:"normalPrice"`
+			Price         int                       `json:"price"`
+			FinalPrice    int                       `json:"finalPrice"`
+			ExpectedTotal int                       `json:"expectedTotal"`
+			RoleHint      string                    `json:"roleHint"`
+			BuyerRole     string                    `json:"buyerRole"`
+			Quantity      int                       `json:"quantity"`
+			Students      []dto.CheckoutStudentItem `json:"students"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
@@ -64,27 +59,18 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 			courseSlug = req.CourseSlug
 		}
 		if courseSlug == "" {
-			writeError(w, http.StatusBadRequest, "bad_request", "programId, programSlug, or course_slug required")
+			writeError(w, http.StatusBadRequest, "bad_request", "programId, programSlug, or courseSlug required")
 			return
 		}
 
 		// Harga dari request sebagai fallback jika DB tidak punya
 		reqNormalPrice := req.NormalPrice
-		if reqNormalPrice == 0 {
-			reqNormalPrice = req.NormalPriceL
-		}
 		reqPrice := req.Price
 		if reqPrice == 0 {
 			reqPrice = req.FinalPrice
 		}
 		if reqPrice == 0 {
-			reqPrice = req.FinalPriceL
-		}
-		if reqPrice == 0 {
 			reqPrice = req.ExpectedTotal
-		}
-		if reqPrice == 0 {
-			reqPrice = req.ExpectedTotalL
 		}
 		if reqNormalPrice == 0 && reqPrice > 0 {
 			reqNormalPrice = reqPrice
@@ -137,23 +123,13 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 
 		loggedInUserID, _ := middleware.GetUserID(r.Context())
 		roleHint := req.RoleHint
-		if roleHint == "" {
-			roleHint = req.RoleHintL
-		}
 		buyerRole := req.BuyerRole
-		if buyerRole == "" {
-			buyerRole = req.BuyerRoleL
-		}
 		students := make([]domain.OrderStudent, 0, len(req.Students))
 		for _, s := range req.Students {
-			userID := s.UserID
-			if userID == nil {
-				userID = s.UserIDCamel
-			}
 			students = append(students, domain.OrderStudent{
 				Name:   strings.TrimSpace(s.Name),
 				Email:  strings.TrimSpace(s.Email),
-				UserID: userID,
+				UserID: s.UserID,
 			})
 		}
 		var result *service.CheckoutInitiateResult
@@ -327,11 +303,10 @@ func toCheckoutStudentItems(students []domain.OrderStudent) []dto.CheckoutStuden
 func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			CheckoutID     string `json:"checkoutId"`
-			OrderID        string `json:"order_id"`
-			PaymentMethod  string `json:"paymentMethod"`
-			PaymentMethodL string `json:"payment_method"`
-			PromoCode      string `json:"promoCode"`
+			CheckoutID    string `json:"checkoutId"`
+			OrderID       string `json:"orderId"`
+			PaymentMethod string `json:"paymentMethod"`
+			PromoCode     string `json:"promoCode"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
@@ -342,9 +317,6 @@ func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 			orderID = req.OrderID
 		}
 		pm := req.PaymentMethod
-		if pm == "" {
-			pm = req.PaymentMethodL
-		}
 		if orderID == "" || pm == "" {
 			writeError(w, http.StatusBadRequest, "bad_request", "checkoutId and paymentMethod required")
 			return
@@ -381,14 +353,14 @@ func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 func PaymentWebhook(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			OrderID string `json:"order_id"`
+			OrderID string `json:"orderId"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "invalid body", http.StatusBadRequest)
 			return
 		}
 		if body.OrderID == "" {
-			http.Error(w, "order_id required", http.StatusBadRequest)
+			http.Error(w, "orderId required", http.StatusBadRequest)
 			return
 		}
 		// TODO: verify gateway signature (Midtrans/Stripe) using header or body
@@ -545,7 +517,7 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 		if !isNewUser && user.PasswordHash == "" {
 			user.MustSetPassword = true
 			if err := deps.UserRepo.Update(r.Context(), user); err != nil {
-				writeError(w, http.StatusInternalServerError, "internal_error", "gagal update user")
+				writeErrorFromUserRepoUpdate(w, err)
 				return
 			}
 		}

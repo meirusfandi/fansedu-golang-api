@@ -34,12 +34,20 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		var err error
 		if slug == "" {
 			roleCode, err = defaultUserRoleCode(ctx, deps.RoleRepo)
+			if errors.Is(err, errRolesTableEmpty) {
+				roleCode, err = domain.UserRoleStudent, nil
+			}
 		} else {
 			roleCode, err = resolveUserRoleCodeForUserTable(ctx, deps.RoleRepo, slug)
+			if errors.Is(err, errUnknownRoleSlug) {
+				if fb, ok := registerFallbackUserRoleCode(slug); ok {
+					roleCode, err = fb, nil
+				}
+			}
 		}
 		if err != nil {
 			if errors.Is(err, errUnknownRoleSlug) {
-				writeError(w, http.StatusBadRequest, "validation_error", "role must be a slug from GET /api/v1/roles")
+				writeError(w, http.StatusBadRequest, "validation_error", "unknown role: use a value from table roles or student/guru/instructor/trainer")
 				return
 			}
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
@@ -51,7 +59,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			return
 		}
 		// Auto-daftarkan siswa ke semua tryout yang akan datang (bukan draft)
-		if u.Role == domain.UserRoleStudent {
+		if u.Role == domain.UserRoleStudent && deps.TryoutRegistrationRepo != nil {
 			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), u.ID)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -116,20 +124,20 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
 			return
 		}
 		if req.Email == "" || req.Password == "" {
-			http.Error(w, "email and password required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "validation_error", "email and password required")
 			return
 		}
 		u, token, err := deps.AuthService.Login(r.Context(), req.Email, req.Password)
 		if err != nil {
 			if err == service.ErrInvalidCreds {
-				http.Error(w, "invalid email or password", http.StatusUnauthorized)
+				writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -160,13 +168,13 @@ func AuthMe(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not logged in")
 			return
 		}
-		u, err := deps.UserRepo.FindByID(r.Context(), userID)
+		u, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "user not found")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(authUserResponse(r.Context(), deps.RoleRepo, u))
+		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u, school))
 	}
 }
 
@@ -189,7 +197,7 @@ func AuthResetPassword(_ *Deps) http.HandlerFunc {
 // AuthAdminPasswordBypass resets admin password using emergency bypass key.
 // Endpoint: POST /api/v1/auth/admin/password-bypass
 // Header: X-Admin-Bypass-Key: <ADMIN_PASSWORD_BYPASS_KEY>
-// Body: { "email": "...", "new_password": "..." }
+// Body: { "email": "...", "newPassword": "..." }
 func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bypassKey := strings.TrimSpace(deps.AdminPasswordBypassKey)
@@ -204,7 +212,7 @@ func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
 		}
 		var req struct {
 			Email       string `json:"email"`
-			NewPassword string `json:"new_password"`
+			NewPassword string `json:"newPassword"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", "invalid body")
@@ -212,7 +220,7 @@ func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
 		}
 		email := strings.TrimSpace(strings.ToLower(req.Email))
 		if email == "" || len(req.NewPassword) < 6 {
-			writeError(w, http.StatusBadRequest, "validation_error", "email and new_password (min 6 chars) required")
+			writeError(w, http.StatusBadRequest, "validation_error", "email and newPassword (min 6 chars) required")
 			return
 		}
 		u, err := deps.UserRepo.FindByEmail(r.Context(), email)

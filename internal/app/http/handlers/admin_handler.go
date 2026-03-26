@@ -133,7 +133,7 @@ func AdminCreateUser(deps *Deps) http.HandlerFunc {
 			roleCode, err = resolveUserRoleCodeForUserTable(r.Context(), deps.RoleRepo, slug)
 			if err != nil {
 				if errors.Is(err, errUnknownRoleSlug) {
-					http.Error(w, "invalid role: use slug from GET /api/v1/roles", http.StatusBadRequest)
+					http.Error(w, "invalid role: must match table roles (slug or user_role_code)", http.StatusBadRequest)
 					return
 				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -208,7 +208,7 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 			roleCode, err := resolveUserRoleCodeForUserTable(r.Context(), deps.RoleRepo, *req.Role)
 			if err != nil {
 				if errors.Is(err, errUnknownRoleSlug) {
-					http.Error(w, "invalid role: use slug from GET /api/v1/roles", http.StatusBadRequest)
+					http.Error(w, "invalid role: must match table roles (slug or user_role_code)", http.StatusBadRequest)
 					return
 				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -733,9 +733,9 @@ func AdminIssueCertificate(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":         created.ID,
-			"user_id":    created.UserID,
-			"issued_at":  created.IssuedAt.Format(time.RFC3339),
+			"id":        created.ID,
+			"userId":    created.UserID,
+			"issuedAt":  created.IssuedAt.Format(time.RFC3339),
 		})
 	}
 }
@@ -968,7 +968,7 @@ func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
 		paymentID := chi.URLParam(r, "paymentId")
 		var req struct {
 			Confirmed     bool    `json:"confirmed"`
-			RejectionNote *string `json:"rejection_note"`
+			RejectionNote *string `json:"rejectionNote"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -1050,10 +1050,10 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 		}
 
 		type itemResp struct {
-			OrderItemID string `json:"order_item_id"`
-			CourseID    string `json:"course_id"`
-			CourseTitle string `json:"course_title"`
-			CourseSlug  string `json:"course_slug,omitempty"`
+			OrderItemID string `json:"orderItemId"`
+			CourseID    string `json:"courseId"`
+			CourseTitle string `json:"courseTitle"`
+			CourseSlug  string `json:"courseSlug,omitempty"`
 			Price       int    `json:"price"`
 		}
 		itemOut := make([]itemResp, 0, len(items))
@@ -1088,20 +1088,20 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 				confirmedAt = &s
 			}
 			paymentOut = map[string]any{
-				"id":             p.ID,
-				"amount":         p.Amount,
-				"currency":       p.Currency,
-				"status":         p.Status,
-				"type":           p.Type,
-				"gateway":        p.Gateway,
-				"transaction_id": p.TransactionID,
-				"proof_url":      p.ProofURL,
-				"confirmed_by":   p.ConfirmedBy,
-				"confirmed_at":   confirmedAt,
-				"rejection_note": p.RejectionNote,
-				"paid_at":        paidAt,
-				"created_at":     p.CreatedAt.Format(time.RFC3339),
-				"updated_at":     p.UpdatedAt.Format(time.RFC3339),
+				"id":              p.ID,
+				"amount":          p.Amount,
+				"currency":        p.Currency,
+				"status":          p.Status,
+				"type":            p.Type,
+				"gateway":         p.Gateway,
+				"transactionId":   p.TransactionID,
+				"proofUrl":        p.ProofURL,
+				"confirmedBy":     p.ConfirmedBy,
+				"confirmedAt":     confirmedAt,
+				"rejectionNote":   p.RejectionNote,
+				"paidAt":          paidAt,
+				"createdAt":       p.CreatedAt.Format(time.RFC3339),
+				"updatedAt":       p.UpdatedAt.Format(time.RFC3339),
 			}
 		}
 
@@ -1112,24 +1112,24 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"order": map[string]any{
-				"id":                order.ID,
-				"status":            order.Status,
-				"total_price":       order.TotalPrice,
-				"normal_price":      order.NormalPrice,
-				"discount":          order.Discount,
-				"discount_percent":  discountPercent,
-				"promo_code":        order.PromoCode,
-				"confirmation_code": order.ConfirmationCode,
-				"payment_method":    order.PaymentMethod,
-				"payment_reference": order.PaymentReference,
-				"payment_proof_url": order.PaymentProofURL,
-				"payment_proof_at":  order.PaymentProofAt,
-				"sender_account_no": order.SenderAccountNo,
-				"sender_name":       order.SenderName,
-				"role_hint":         order.RoleHint,
-				"buyer_email":       order.BuyerEmail,
-				"created_at":        order.CreatedAt.Format(time.RFC3339),
-				"updated_at":        order.UpdatedAt.Format(time.RFC3339),
+				"id":                 order.ID,
+				"status":             order.Status,
+				"totalPrice":         order.TotalPrice,
+				"normalPrice":        order.NormalPrice,
+				"discount":           order.Discount,
+				"discountPercent":    discountPercent,
+				"promoCode":          order.PromoCode,
+				"confirmationCode":   order.ConfirmationCode,
+				"paymentMethod":      order.PaymentMethod,
+				"paymentReference":   order.PaymentReference,
+				"paymentProofUrl":    order.PaymentProofURL,
+				"paymentProofAt":     order.PaymentProofAt,
+				"senderAccountNo":    order.SenderAccountNo,
+				"senderName":         order.SenderName,
+				"roleHint":           order.RoleHint,
+				"buyerEmail":         order.BuyerEmail,
+				"createdAt":          order.CreatedAt.Format(time.RFC3339),
+				"updatedAt":          order.UpdatedAt.Format(time.RFC3339),
 			},
 			"buyer": map[string]any{
 				"id":    user.ID,

@@ -7,19 +7,19 @@ import (
 )
 
 type DashboardSummary struct {
-	TotalAttempts  int     `json:"total_attempts"`
-	AvgScore       float64 `json:"avg_score"`
-	AvgPercentile  float64 `json:"avg_percentile"`
+	TotalAttempts int     `json:"totalAttempts"`
+	AvgScore      float64 `json:"avgScore"`
+	AvgPercentile float64 `json:"avgPercentile"`
 }
 
 type DashboardResponse struct {
 	Summary            DashboardSummary       `json:"summary"`
-	OpenTryouts        []domain.TryoutSession `json:"open_tryouts"`
-	RecentAttempts     []domain.Attempt       `json:"recent_attempts"`
-	StrengthAreas      []string               `json:"strength_areas"`
-	ImprovementAreas   []string               `json:"improvement_areas"`
+	OpenTryouts        []domain.TryoutSession `json:"openTryouts"`
+	RecentAttempts     []domain.Attempt       `json:"recentAttempts"`
+	StrengthAreas      []string               `json:"strengthAreas"`
+	ImprovementAreas   []string               `json:"improvementAreas"`
 	Recommendation     string                 `json:"recommendation"`
-	LearningEvaluation *AttemptEvaluation     `json:"learning_evaluation,omitempty"`
+	LearningEvaluation *AttemptEvaluation     `json:"learningEvaluation,omitempty"`
 }
 
 type DashboardService interface {

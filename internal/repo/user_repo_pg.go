@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -168,6 +169,136 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (domain.User, error)
 	return out, nil
 }
 
+func (r *userRepo) MustSetPasswordByID(ctx context.Context, id string) (bool, error) {
+	var m bool
+	err := r.pool.QueryRow(ctx, `SELECT must_set_password FROM users WHERE id = $1::uuid`, id).Scan(&m)
+	return m, err
+}
+
+func (r *userRepo) FindByIDProfile(ctx context.Context, id string) (domain.User, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, email, name, role, avatar_url, school_id, subject_id,
+		       email_verified, email_verified_at, must_set_password,
+		       phone, whatsapp, class_level, city, province, gender, birth_date, bio, parent_name, parent_phone, instagram,
+		       created_at, updated_at
+		FROM users WHERE id = $1::uuid
+	`, id)
+	var out domain.User
+	out.PasswordHash = ""
+	var avatarURL, schoolID, subjectID *string
+	var emailVerifiedAt *time.Time
+	var emailVerified, mustSetPassword bool
+	var phone, whatsapp, classLevel, city, province, gender *string
+	var bio, parentName, parentPhone, instagram *string
+	var birthDate *time.Time
+	err := row.Scan(
+		&out.ID, &out.Email, &out.Name, &out.Role,
+		&avatarURL, &schoolID, &subjectID,
+		&emailVerified, &emailVerifiedAt, &mustSetPassword,
+		&phone, &whatsapp, &classLevel, &city, &province, &gender, &birthDate, &bio, &parentName, &parentPhone, &instagram,
+		&out.CreatedAt, &out.UpdatedAt,
+	)
+	if err != nil {
+		return domain.User{}, err
+	}
+	out.AvatarURL = avatarURL
+	out.SchoolID = schoolID
+	out.SubjectID = subjectID
+	out.EmailVerified = emailVerified
+	out.EmailVerifiedAt = emailVerifiedAt
+	out.MustSetPassword = mustSetPassword
+	out.Phone = phone
+	out.Whatsapp = whatsapp
+	out.ClassLevel = classLevel
+	out.City = city
+	out.Province = province
+	out.Gender = gender
+	out.BirthDate = birthDate
+	out.Bio = bio
+	out.ParentName = parentName
+	out.ParentPhone = parentPhone
+	out.Instagram = instagram
+	return out, nil
+}
+
+func (r *userRepo) FindByIDProfileWithSchool(ctx context.Context, id string) (domain.User, *domain.School, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT
+			u.id, u.email, u.name, u.role, u.avatar_url, u.school_id, u.subject_id,
+			u.email_verified, u.email_verified_at, u.must_set_password,
+			u.phone, u.whatsapp, u.class_level, u.city, u.province, u.gender, u.birth_date, u.bio, u.parent_name, u.parent_phone, u.instagram,
+			u.created_at, u.updated_at,
+			s.id, s.name, s.slug, s.description, s.address, s.logo_url, s.created_at, s.updated_at
+		FROM users u
+		LEFT JOIN schools s ON s.id = u.school_id
+		WHERE u.id = $1::uuid
+	`, id)
+	var out domain.User
+	out.PasswordHash = ""
+	var avatarURL, schoolID, subjectID *string
+	var emailVerifiedAt *time.Time
+	var emailVerified, mustSetPassword bool
+	var phone, whatsapp, classLevel, city, province, gender *string
+	var bio, parentName, parentPhone, instagram *string
+	var birthDate *time.Time
+	var sid, sname, sslug *string
+	var sdesc, saddr, slog *string
+	var screated, supdated *time.Time
+	err := row.Scan(
+		&out.ID, &out.Email, &out.Name, &out.Role,
+		&avatarURL, &schoolID, &subjectID,
+		&emailVerified, &emailVerifiedAt, &mustSetPassword,
+		&phone, &whatsapp, &classLevel, &city, &province, &gender, &birthDate, &bio, &parentName, &parentPhone, &instagram,
+		&out.CreatedAt, &out.UpdatedAt,
+		&sid, &sname, &sslug, &sdesc, &saddr, &slog, &screated, &supdated,
+	)
+	if err != nil {
+		return domain.User{}, nil, err
+	}
+	out.AvatarURL = avatarURL
+	out.SchoolID = schoolID
+	out.SubjectID = subjectID
+	out.EmailVerified = emailVerified
+	out.EmailVerifiedAt = emailVerifiedAt
+	out.MustSetPassword = mustSetPassword
+	out.Phone = phone
+	out.Whatsapp = whatsapp
+	out.ClassLevel = classLevel
+	out.City = city
+	out.Province = province
+	out.Gender = gender
+	out.BirthDate = birthDate
+	out.Bio = bio
+	out.ParentName = parentName
+	out.ParentPhone = parentPhone
+	out.Instagram = instagram
+	var school *domain.School
+	if sid != nil && *sid != "" && sname != nil {
+		school = &domain.School{
+			ID:          *sid,
+			Name:        *sname,
+			Slug:        derefString(sslug),
+			Description: sdesc,
+			Address:     saddr,
+			LogoURL:     slog,
+		}
+		if screated != nil {
+			school.CreatedAt = *screated
+		}
+		if supdated != nil {
+			school.UpdatedAt = *supdated
+		}
+	}
+	return out, school, nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func (r *userRepo) CountByRole(ctx context.Context, role string) (int, error) {
 	var n int
 	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = $1::user_role`, role).Scan(&n)
@@ -241,7 +372,8 @@ func (r *userRepo) List(ctx context.Context, role string) ([]domain.User, error)
 }
 
 func (r *userRepo) Update(ctx context.Context, u domain.User) error {
-	_, err := r.pool.Exec(ctx, `
+	// Jangan timpa password_hash dengan string kosong (mis. bila hash tidak ter-load ke struct).
+	ct, err := r.pool.Exec(ctx, `
 		UPDATE users SET
 			name = $2,
 			email = $3,
@@ -249,7 +381,10 @@ func (r *userRepo) Update(ctx context.Context, u domain.User) error {
 			avatar_url = $5,
 			school_id = $6::uuid,
 			subject_id = $7::uuid,
-			password_hash = $8,
+			password_hash = CASE
+				WHEN NULLIF(trim($8::text), '') IS NULL THEN password_hash
+				ELSE $8
+			END,
 			email_verified = $9,
 			email_verified_at = $10,
 			must_set_password = $11,
@@ -268,5 +403,11 @@ func (r *userRepo) Update(ctx context.Context, u domain.User) error {
 		WHERE id = $1::uuid
 	`, u.ID, u.Name, u.Email, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.PasswordHash, u.EmailVerified, u.EmailVerifiedAt, u.MustSetPassword,
 		u.Phone, u.Whatsapp, u.ClassLevel, u.City, u.Province, u.Gender, u.BirthDate, u.Bio, u.ParentName, u.ParentPhone, u.Instagram)
-	return err
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }

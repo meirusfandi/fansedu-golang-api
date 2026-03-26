@@ -20,7 +20,7 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tokenStr, ok := bearerToken(r.Header.Get("Authorization"))
 			if !ok {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				WriteJSONError(w, http.StatusUnauthorized, "unauthorized", "Authorization header required")
 				return
 			}
 
@@ -31,13 +31,13 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 				return jwtSecret, nil
 			})
 			if err != nil || token == nil || !token.Valid {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				WriteJSONError(w, http.StatusUnauthorized, "unauthorized", "Invalid or expired token")
 				return
 			}
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				WriteJSONError(w, http.StatusUnauthorized, "unauthorized", "Invalid token claims")
 				return
 			}
 
@@ -55,7 +55,7 @@ func AdminOnly() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
 			if !isAdminRole(role) {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				WriteJSONError(w, http.StatusForbidden, "forbidden", "Admin access required")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -91,6 +91,7 @@ var rolePermissions = map[string]map[string]struct{}{
 		"reports.read":        {},
 		"analytics.read":      {},
 		"admin.audit.read":    {},
+		"errors.read":         {},
 	},
 	domain.UserRoleAcademicAdmin: {
 		"admin.overview.read": {},
@@ -102,6 +103,8 @@ var rolePermissions = map[string]map[string]struct{}{
 		"analytics.read":      {},
 		"master-data.manage":  {},
 		"admin.audit.read":    {},
+		"errors.read":         {},
+		"errors.manage":       {},
 	},
 	domain.UserRoleContentAdmin: {
 		"admin.overview.read": {},
@@ -110,6 +113,7 @@ var rolePermissions = map[string]map[string]struct{}{
 		"landing.manage":      {},
 		"master-data.manage":  {},
 		"admin.audit.read":    {},
+		"errors.read":         {},
 	},
 }
 
@@ -130,7 +134,7 @@ func RequirePermission(permission string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
 			if !HasPermission(role, permission) {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				WriteJSONError(w, http.StatusForbidden, "forbidden", "Insufficient permission")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -182,7 +186,7 @@ func TrainerOnly() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
 			if !domain.IsTeachingStaffRoleCode(role) {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				WriteJSONError(w, http.StatusForbidden, "forbidden", "Trainer or instructor access required")
 				return
 			}
 			next.ServeHTTP(w, r)

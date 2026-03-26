@@ -2,9 +2,9 @@ package dto
 
 // TrainerStatusResponse for GET /api/v1/trainer/status
 type TrainerStatusResponse struct {
-	PaidSlots             int        `json:"paid_slots"`
-	RegisteredStudentsCount int      `json:"registered_students_count"`
-	Students              []UserInfo `json:"students,omitempty"`
+	PaidSlots               int        `json:"paidSlots"`
+	RegisteredStudentsCount int        `json:"registeredStudentsCount"`
+	Students                []UserInfo `json:"students,omitempty"`
 }
 
 // UserInfo minimal user for list responses (no password)
@@ -42,39 +42,19 @@ type TrainerProfileResponse struct {
 	ParentName *string    `json:"parentName,omitempty"`
 	ParentPhone *string  `json:"parentPhone,omitempty"`
 	Instagram *string    `json:"instagram,omitempty"`
-	SchoolID *string     `json:"school_id,omitempty"`
-	SubjectID *string    `json:"subject_id,omitempty"`
-	School *SchoolProfile `json:"school,omitempty"`
+	SchoolID  *string         `json:"schoolId,omitempty"`
+	SubjectID *string         `json:"subjectId,omitempty"`
+	School    *SchoolProfile `json:"school,omitempty"`
 }
 
-// SchoolProfile objek sekolah untuk response (nama field dinormalisasi untuk frontend)
+// SchoolProfile nested school; seluruh key camelCase.
 type SchoolProfile struct {
-	ID             string `json:"id"`
-	NamaSekolah    string `json:"nama_sekolah"`
-	NPSN           string `json:"npsn"`
-	KabupatenKota  string `json:"kabupaten_kota"`
-	Alamat         string `json:"alamat"`
-	Telepon        string `json:"telepon"`
-}
-
-// TrainerProfileUpdateRequest for PUT /api/v1/trainer/profile
-type TrainerProfileUpdateRequest struct {
-	Name  string  `json:"name"`
-	Email string  `json:"email"`
-	Phone *string `json:"phone,omitempty"`
-	Whatsapp *string `json:"whatsapp,omitempty"`
-	ClassLevel *string `json:"classLevel,omitempty"`
-	City *string `json:"city,omitempty"`
-	Province *string `json:"province,omitempty"`
-	Gender *string `json:"gender,omitempty"`
-	BirthDate *string `json:"birthDate,omitempty"` // YYYY-MM-DD
-	Bio *string `json:"bio,omitempty"`
-	ParentName *string `json:"parentName,omitempty"`
-	ParentPhone *string `json:"parentPhone,omitempty"`
-	Instagram *string `json:"instagram,omitempty"`
-	SchoolID *string `json:"school_id,omitempty"` // optional
-	SchoolName *string `json:"school_name,omitempty"` // optional: create/link by name
-	SubjectID *string `json:"subject_id,omitempty"` // optional
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	NPSN        string `json:"npsn,omitempty"`
+	RegencyCity string `json:"regencyCity,omitempty"`
+	Address     string `json:"address,omitempty"`
+	Phone       string `json:"phone,omitempty"`
 }
 
 // TrainerStudentItem minimal student data for trainer screens.

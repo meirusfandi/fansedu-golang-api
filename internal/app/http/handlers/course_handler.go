@@ -108,8 +108,8 @@ func CertificateList(deps *Deps) http.HandlerFunc {
 		for i := range list {
 			out[i] = map[string]interface{}{
 				"id":         list[i].ID,
-				"user_id":    list[i].UserID,
-				"issued_at":  list[i].IssuedAt.Format("2006-01-02T15:04:05Z07:00"),
+				"userId":   list[i].UserID,
+				"issuedAt": list[i].IssuedAt.Format("2006-01-02T15:04:05Z07:00"),
 			}
 			if list[i].TryoutSessionID != nil {
 				out[i]["tryout_session_id"] = *list[i].TryoutSessionID

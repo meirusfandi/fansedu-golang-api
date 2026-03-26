@@ -170,6 +170,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	orderItemRepo := repo.NewOrderItemRepo(pool)
 	promoRepo := repo.NewPromoRepo(pool)
 	analyticsRepo := repo.NewAnalyticsRepo(pool)
+	appErrLogRepo := repo.NewApplicationErrorLogRepo(pool)
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 	courseAdminLinkRepo := repo.NewCourseAdminLinkRepo(pool)
 	mailer := mail.NewLogMailer()
@@ -216,6 +217,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		OrderItemRepo:          orderItemRepo,
 		PromoRepo:              promoRepo,
 		AnalyticsRepo:          analyticsRepo,
+		ApplicationErrorLogRepo: appErrLogRepo,
 		NotificationRepo:       notificationRepo,
 		TrainerRepo:            trainerRepo,
 		CourseMessageRepo:      courseMessageRepo,

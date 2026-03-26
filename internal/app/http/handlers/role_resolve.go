@@ -12,26 +12,55 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 )
 
-var errUnknownRoleSlug = errors.New("unknown role slug")
+var (
+	errUnknownRoleSlug  = errors.New("unknown role slug")
+	errRolesTableEmpty  = errors.New("roles table is empty")
+)
 
-// resolveUserRoleCodeForUserTable maps slug publik (GET /api/v1/roles) → nilai users.role / JWT (user_role enum).
-func resolveUserRoleCodeForUserTable(ctx context.Context, rr repo.RoleRepo, publicSlug string) (string, error) {
-	publicSlug = strings.TrimSpace(publicSlug)
-	if publicSlug == "" {
+// registerFallbackUserRoleCode dipakai hanya untuk self-register publik bila tidak ada baris cocok di tabel roles
+// (mis. migrasi/seed belum jalan), tetap membatasi ke peran non-admin yang valid di enum user_role.
+func registerFallbackUserRoleCode(input string) (string, bool) {
+	h := strings.ToLower(strings.TrimSpace(input))
+	switch h {
+	case "student", "siswa":
+		return domain.UserRoleStudent, true
+	case "guru", "pengajar", "pembimbing":
+		return domain.UserRoleGuru, true
+	case "instructor":
+		return "instructor", true
+	case "trainer":
+		return domain.UserRoleTrainer, true
+	default:
+		return "", false
+	}
+}
+
+func storedUserRoleCodeFromRow(e domain.Role) string {
+	code := strings.TrimSpace(e.UserRoleCode)
+	if code == "" {
+		code = strings.TrimSpace(e.Slug)
+	}
+	return code
+}
+
+// resolveUserRoleCodeForUserTable maps input ke users.role / JWT: cocokkan ke baris roles
+// lewat slug ATAU lewat nilai efektif user_role_code (enum), case-insensitive.
+func resolveUserRoleCodeForUserTable(ctx context.Context, rr repo.RoleRepo, input string) (string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
 		return "", errUnknownRoleSlug
 	}
-	roleRow, err := rr.GetBySlug(ctx, publicSlug)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", errUnknownRoleSlug
-		}
+	if row, err := rr.GetBySlug(ctx, input); err == nil {
+		return storedUserRoleCodeFromRow(row), nil
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
-	code := strings.TrimSpace(roleRow.UserRoleCode)
-	if code == "" {
-		code = strings.TrimSpace(roleRow.Slug)
+	if row, err := rr.GetByUserRoleCode(ctx, input); err == nil {
+		return storedUserRoleCodeFromRow(row), nil
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
 	}
-	return code, nil
+	return "", errUnknownRoleSlug
 }
 
 // defaultUserRoleCode picks default registration / admin user role from tabel roles (siswa lalu student).
@@ -47,7 +76,7 @@ func defaultUserRoleCode(ctx context.Context, rr repo.RoleRepo) (string, error) 
 		return "", err
 	}
 	if len(list) == 0 {
-		return "", errors.New("roles table is empty")
+		return "", errRolesTableEmpty
 	}
 	code := strings.TrimSpace(list[0].UserRoleCode)
 	if code == "" {
@@ -146,15 +175,15 @@ func userAuthMap(ctx context.Context, rr repo.RoleRepo, u domain.User) map[strin
 		"name":            u.Name,
 		"email":           u.Email,
 		"role":            domain.DisplayRoleForAPI(u.Role),
-		"role_code":       u.Role,
+		"roleCode":        u.Role,
 		"mustSetPassword": u.MustSetPassword,
 	}
 	if u.AvatarURL != nil {
-		m["avatar_url"] = *u.AvatarURL
+		m["avatarUrl"] = *u.AvatarURL
 	}
 	if rr != nil {
 		if row, err := rr.GetByUserRoleCode(ctx, u.Role); err == nil {
-			m["role_slug"] = row.Slug
+			m["roleSlug"] = row.Slug
 		}
 	}
 	return m

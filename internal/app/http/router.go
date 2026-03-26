@@ -37,18 +37,23 @@ func allowMinimalAPI(path string) bool {
 }
 
 func NewRouter(deps *handlers.Deps) http.Handler {
+	var appErrInserter middleware.ApplicationErrorLogInserter
+	if deps != nil {
+		appErrInserter = deps.ApplicationErrorLogRepo
+	}
 	r := chi.NewRouter()
 
 	// CORS: default allow frontend (Vite http://localhost:5173) and all; set CORS_ORIGINS to restrict.
 	r.Use(middleware.CORS(getEnv("CORS_ORIGINS", "http://localhost:5173,*")))
 	r.Use(middleware.RequestID())
-	r.Use(middleware.Recover())
+	r.Use(middleware.Recover(appErrInserter))
 	// Redirect trailing slashes so both "/x" and "/x/" can match.
 	r.Use(chimw.RedirectSlashes)
 	r.Use(chimw.RealIP)
 	r.Use(middleware.Logger())
 
 	registerV1 := func(r chi.Router) {
+		r.Use(middleware.ErrorResponseLogger(appErrInserter))
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if deps != nil && deps.DB != nil {
@@ -128,11 +133,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 
 		// Helper untuk PasswordSetupGuard
 		passwordGuard := middleware.PasswordSetupGuard(func(ctx context.Context, id string) (bool, error) {
-			u, err := deps.UserRepo.FindByID(ctx, id)
-			if err != nil {
-				return false, err
-			}
-			return u.MustSetPassword, nil
+			return deps.UserRepo.MustSetPasswordByID(ctx, id)
 		})
 
 		r.Route("/student", func(r chi.Router) {
@@ -274,6 +275,12 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/summary", handlers.AdminAnalyticsSummary(deps))
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/visitors", handlers.AdminAnalyticsVisitors(deps))
 			r.With(middleware.RequirePermission("admin.audit.read")).Get("/audit-logs", handlers.AdminAuditLogsList(deps))
+			r.Route("/error-logs", func(r chi.Router) {
+				r.With(middleware.RequirePermission("errors.read")).Get("/analytics", handlers.AdminErrorLogsAnalytics(deps))
+				r.With(middleware.RequirePermission("errors.read")).Get("/", handlers.AdminErrorLogsList(deps))
+				r.With(middleware.RequirePermission("errors.read")).Get("/{id}", handlers.AdminErrorLogGet(deps))
+				r.With(middleware.RequirePermission("errors.manage")).Patch("/{id}", handlers.AdminErrorLogPatch(deps))
+			})
 			r.With(middleware.RequirePermission("reports.read")).Get("/reports/monthly", handlers.AdminReportMonthly(deps))
 			r.With(middleware.RequirePermission("reports.read")).Get("/reports/courses/{courseId}", handlers.AdminCourseReport(deps))
 			r.With(middleware.RequirePermission("master-data.manage")).Get("/roles", handlers.AdminListRoles(deps))

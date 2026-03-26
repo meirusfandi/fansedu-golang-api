@@ -15,8 +15,8 @@ import (
 type GeneratedFeedback struct {
 	Summary          string   `json:"summary"`
 	Recap            string   `json:"recap"`
-	StrengthAreas    []string `json:"strength_areas"`
-	ImprovementAreas []string `json:"improvement_areas"`
+	StrengthAreas    []string `json:"strengthAreas"`
+	ImprovementAreas []string `json:"improvementAreas"`
 	Recommendation   string   `json:"recommendation"`
 }
 

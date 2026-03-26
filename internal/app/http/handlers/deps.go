@@ -57,4 +57,6 @@ type Deps struct {
 	LevelRepo         repo.LevelRepo
 	LandingPackageRepo     repo.LandingPackageRepo
 	CourseAdminLinkRepo    repo.CourseAdminLinkRepo
+
+	ApplicationErrorLogRepo repo.ApplicationErrorLogRepo
 }
