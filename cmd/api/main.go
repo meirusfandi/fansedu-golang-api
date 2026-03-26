@@ -171,6 +171,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	promoRepo := repo.NewPromoRepo(pool)
 	analyticsRepo := repo.NewAnalyticsRepo(pool)
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
+	courseAdminLinkRepo := repo.NewCourseAdminLinkRepo(pool)
 	mailer := mail.NewLogMailer()
 	if appURL == "" {
 		appURL = "http://localhost:5173"
@@ -205,6 +206,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		SubjectRepo:            subjectRepo,
 		LevelRepo:              levelRepo,
 		LandingPackageRepo:     landingPackageRepo,
+		CourseAdminLinkRepo:    courseAdminLinkRepo,
 		TryoutRegistrationRepo: tryoutRegistrationRepo,
 		EnrollmentRepo:         enrollmentRepo,
 		CourseRepo:             courseRepo,

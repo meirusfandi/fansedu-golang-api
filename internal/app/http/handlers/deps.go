@@ -55,5 +55,6 @@ type Deps struct {
 	EventRepo   repo.EventRepo
 	SubjectRepo       repo.SubjectRepo
 	LevelRepo         repo.LevelRepo
-	LandingPackageRepo repo.LandingPackageRepo
+	LandingPackageRepo     repo.LandingPackageRepo
+	CourseAdminLinkRepo    repo.CourseAdminLinkRepo
 }

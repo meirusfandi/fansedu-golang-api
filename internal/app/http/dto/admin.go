@@ -110,6 +110,54 @@ type CourseContentResponse struct {
 	CreatedAt   string      `json:"created_at"`
 }
 
+// AdminCourseLinkedPackage — paket landing yang berisi kelas ini (package_courses).
+type AdminCourseLinkedPackage struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// AdminCourseLinkedTryout — tryout terhubung ke kelas (course_tryouts).
+type AdminCourseLinkedTryout struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	OpensAt   string `json:"opens_at"`
+	ClosesAt  string `json:"closes_at"`
+	SortOrder int    `json:"sort_order"`
+}
+
+// AdminCourseManageResponse — ringkasan admin: kelas + konten + tautan paket & tryout.
+type AdminCourseManageResponse struct {
+	Course           CourseResponse             `json:"course"`
+	Contents         []CourseContentResponse    `json:"contents"`
+	ContentsByType   map[string]int             `json:"contents_by_type"`
+	LinkedPackages   []AdminCourseLinkedPackage `json:"linked_packages"`
+	LinkedTryouts    []AdminCourseLinkedTryout  `json:"linked_tryouts"`
+	RelatedEndpoints RelatedCourseAdminEndpoints `json:"related_endpoints"`
+}
+
+// RelatedCourseAdminEndpoints dokumentasi URL relatif base /api/v1/admin untuk FE.
+type RelatedCourseAdminEndpoints struct {
+	ListContents    string `json:"list_contents"`
+	CreateContent   string `json:"create_content"`
+	UpdateContent   string `json:"update_content"`
+	DeleteContent   string `json:"delete_content"`
+	ListEnrollments string `json:"list_enrollments"`
+	TryoutQuestions string `json:"tryout_questions"` // GET/POST /api/v1/admin/tryouts/{tryoutId}/questions
+	PackageManage   string `json:"package_manage_note"`
+}
+
+// AdminCourseLinkedPackagesPutRequest body PUT .../linked-packages
+type AdminCourseLinkedPackagesPutRequest struct {
+	PackageIDs []string `json:"package_ids"`
+}
+
+// AdminCourseLinkedTryoutsPutRequest body PUT .../linked-tryouts
+type AdminCourseLinkedTryoutsPutRequest struct {
+	TryoutIDs []string `json:"tryout_ids"`
+}
+
 type PaymentCreateRequest struct {
 	UserID string `json:"user_id"`
 	Amount int    `json:"amount"`
