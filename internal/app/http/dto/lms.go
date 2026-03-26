@@ -2,9 +2,10 @@ package dto
 
 // RoleItem for public GET /roles
 type RoleItem struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	UserRoleCode string `json:"user_role_code"` // nilai yang dipakai di JWT/users.role setelah pilih slug ini
 }
 
 // SchoolItem for public GET /schools

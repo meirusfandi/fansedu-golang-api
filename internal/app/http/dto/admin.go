@@ -189,19 +189,21 @@ type MonthlyReportResponse struct {
 
 // --- Role ---
 type RoleRequest struct {
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description *string `json:"description,omitempty"`
-	IconURL     *string `json:"icon_url,omitempty"`
+	Name          string  `json:"name"`
+	Slug          string  `json:"slug"`
+	UserRoleCode  *string `json:"user_role_code,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	IconURL       *string `json:"icon_url,omitempty"`
 }
 type RoleResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description *string `json:"description,omitempty"`
-	IconURL     *string `json:"icon_url,omitempty"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Slug          string  `json:"slug"`
+	UserRoleCode  string  `json:"user_role_code"`
+	Description   *string `json:"description,omitempty"`
+	IconURL       *string `json:"icon_url,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 // --- School ---

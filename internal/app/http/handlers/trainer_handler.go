@@ -388,7 +388,7 @@ func TrainerCreateStudent(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"user": userToMap(u),
+			"user": userAuthMap(r.Context(), deps.RoleRepo, u),
 		})
 	}
 }

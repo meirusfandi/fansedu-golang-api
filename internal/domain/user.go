@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	UserRoleAdmin        = "admin"
@@ -12,6 +15,30 @@ const (
 	UserRoleGuru         = "guru"
 	UserRoleTrainer      = "trainer" // nanti dibuat oleh admin
 )
+
+// IsStudentRoleCode reports whether code is the student enum (JWT / users.role).
+func IsStudentRoleCode(code string) bool {
+	return strings.TrimSpace(code) == UserRoleStudent
+}
+
+// IsTeachingStaffRoleCode: guru, instructor (enum legacy), atau trainer — akses portal pengajar.
+func IsTeachingStaffRoleCode(code string) bool {
+	switch strings.TrimSpace(code) {
+	case UserRoleGuru, UserRoleTrainer, "instructor":
+		return true
+	default:
+		return false
+	}
+}
+
+// DisplayRoleForAPI maps stored user_role ke label yang dipakai response JSON (guru → instructor).
+func DisplayRoleForAPI(code string) string {
+	c := strings.TrimSpace(code)
+	if c == UserRoleGuru {
+		return "instructor"
+	}
+	return c
+}
 
 type User struct {
 	ID              string

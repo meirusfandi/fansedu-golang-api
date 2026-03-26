@@ -28,6 +28,8 @@ Aplikasi memuat env dari file:
 
 Detail key Redis & alur cache-aside: **`docs/GEO_REDIS_BACKEND.md`**.
 
+**Packages (landing + admin):** contoh curl `GET /api/v1/packages` dan CRUD admin — **`docs/curl-landing-packages.md`**.
+
 ### Docker Compose (Redis + API satu stack)
 
 Tanpa Redis terpisah di VPS lain: gunakan `docker-compose.yml` — service `redis` dan `api` dalam satu jaringan internal. **Keduanya memakai file `.env` yang sama** (`env_file: .env`); isi `REDIS_URL` (dan opsional `REDIS_PASSWORD` + URL dengan password) di file itu — lihat `.env.docker.example`.

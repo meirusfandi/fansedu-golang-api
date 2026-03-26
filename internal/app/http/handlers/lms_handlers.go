@@ -29,7 +29,7 @@ func ListRoles(deps *Deps) http.HandlerFunc {
 		}
 		out := make([]dto.RoleItem, len(list))
 		for i := range list {
-			out[i] = dto.RoleItem{ID: list[i].ID, Name: list[i].Name, Slug: list[i].Slug}
+			out[i] = dto.RoleItem{ID: list[i].ID, Name: list[i].Name, Slug: list[i].Slug, UserRoleCode: list[i].UserRoleCode}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
@@ -163,7 +163,7 @@ func SchoolCreateByUser(deps *Deps) http.HandlerFunc {
 }
 
 func canCreateSchoolRole(role string) bool {
-	return role == domain.UserRoleStudent || role == domain.UserRoleGuru || role == "instructor"
+	return domain.IsStudentRoleCode(role) || domain.IsTeachingStaffRoleCode(role)
 }
 
 // AuthChangePassword changes password for authenticated user. POST /api/v1/auth/change-password
@@ -841,18 +841,8 @@ func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
-		role := u.Role
-		if role == "guru" {
-			role = "instructor"
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
-			ID:              u.ID,
-			Name:            u.Name,
-			Email:           u.Email,
-			Role:            role,
-			MustSetPassword: u.MustSetPassword,
-		})
+		_ = json.NewEncoder(w).Encode(authUserResponse(r.Context(), deps.RoleRepo, u))
 	}
 }
 

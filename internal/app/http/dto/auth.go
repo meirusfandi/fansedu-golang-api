@@ -4,7 +4,7 @@ type RegisterRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Role     string `json:"role"` // optional: "student"|"siswa" atau "guru", default "student"
+	Role     string `json:"role"` // optional: slug dari GET /api/v1/roles; kosong = default siswa/student dari tabel roles
 }
 
 type LoginRequest struct {
@@ -23,7 +23,9 @@ type AuthUserResponse struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
 	Email           string `json:"email"`
-	Role            string `json:"role"`
+	Role            string `json:"role"`                // tampilan API (guru → instructor)
+	RoleSlug        string `json:"role_slug,omitempty"` // slug publik dari tabel roles
+	RoleCode        string `json:"role_code,omitempty"` // nilai users.role / klaim JWT (enum)
 	MustSetPassword bool   `json:"mustSetPassword"`
 }
 

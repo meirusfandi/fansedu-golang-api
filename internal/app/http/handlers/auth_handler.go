@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -23,12 +24,28 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "validation_error", "name, email, password required")
 			return
 		}
-		role := strings.TrimSpace(strings.ToLower(req.Role))
-		if role != "" && !isValidRegisterRole(role) {
-			writeError(w, http.StatusBadRequest, "validation_error", "role must be student, instructor, or guru")
+		if deps.RoleRepo == nil {
+			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "roles store unavailable")
 			return
 		}
-		u, token, err := deps.AuthService.Register(r.Context(), req.Name, req.Email, req.Password, role)
+		ctx := r.Context()
+		var roleCode string
+		slug := strings.TrimSpace(req.Role)
+		var err error
+		if slug == "" {
+			roleCode, err = defaultUserRoleCode(ctx, deps.RoleRepo)
+		} else {
+			roleCode, err = resolveUserRoleCodeForUserTable(ctx, deps.RoleRepo, slug)
+		}
+		if err != nil {
+			if errors.Is(err, errUnknownRoleSlug) {
+				writeError(w, http.StatusBadRequest, "validation_error", "role must be a slug from GET /api/v1/roles")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+		u, token, err := deps.AuthService.Register(ctx, req.Name, req.Email, req.Password, roleCode)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return
@@ -40,7 +57,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		resp := dto.AuthResponse{
-			User:            userToMap(u),
+			User:            userAuthMap(r.Context(), deps.RoleRepo, u),
 			Token:           token,
 			MustSetPassword: u.MustSetPassword,
 		}
@@ -84,7 +101,7 @@ func AuthRegisterWithInvite(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		resp := dto.AuthResponse{
-			User:            userToMap(u),
+			User:            userAuthMap(r.Context(), deps.RoleRepo, u),
 			Token:           token,
 			MustSetPassword: u.MustSetPassword,
 		}
@@ -117,7 +134,7 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		resp := dto.AuthResponse{
-			User:            userToMap(u),
+			User:            userAuthMap(r.Context(), deps.RoleRepo, u),
 			Token:           token,
 			MustSetPassword: u.MustSetPassword,
 		}
@@ -148,18 +165,8 @@ func AuthMe(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "not_found", "user not found")
 			return
 		}
-		role := u.Role
-		if role == "guru" {
-			role = "instructor"
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.AuthUserResponse{
-			ID:              u.ID,
-			Name:            u.Name,
-			Email:           u.Email,
-			Role:            role,
-			MustSetPassword: u.MustSetPassword,
-		})
+		_ = json.NewEncoder(w).Encode(authUserResponse(r.Context(), deps.RoleRepo, u))
 	}
 }
 
@@ -341,29 +348,6 @@ func AuthResendVerification(deps *Deps) http.HandlerFunc {
 			"message": "verification_link_sent",
 		})
 	}
-}
-
-func userToMap(u domain.User) map[string]interface{} {
-	role := u.Role
-	if role == "guru" {
-		role = "instructor"
-	}
-	m := map[string]interface{}{
-		"id":              u.ID,
-		"name":            u.Name,
-		"email":           u.Email,
-		"role":            role,
-		"mustSetPassword": u.MustSetPassword,
-	}
-	if u.AvatarURL != nil {
-		m["avatar_url"] = *u.AvatarURL
-	}
-	return m
-}
-
-// isValidRegisterRole: student, instructor, atau guru.
-func isValidRegisterRole(role string) bool {
-	return role == domain.UserRoleStudent || role == "siswa" || role == domain.UserRoleGuru || role == "instructor"
 }
 
 func isAdminRoleForBypass(role string) bool {

@@ -93,8 +93,8 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		}
 		return existing, token, nil
 	}
-	role = normalizeRegisterRole(role)
-	if role != domain.UserRoleStudent && role != domain.UserRoleGuru && role != "instructor" {
+	role = strings.TrimSpace(role)
+	if role == "" {
 		role = domain.UserRoleStudent
 	}
 	hash, err := GeneratePasswordHashWithCost(password, s.bcryptCost)
@@ -165,20 +165,6 @@ func (s *authService) RegisterWithInvite(ctx context.Context, token, email, name
 	return u, jwtToken, nil
 }
 
-func normalizeRegisterRole(r string) string {
-	r = strings.TrimSpace(strings.ToLower(r))
-	if r == "" || r == "siswa" {
-		return domain.UserRoleStudent
-	}
-	if r == domain.UserRoleGuru || r == "instructor" {
-		if r == "instructor" {
-			return "instructor"
-		}
-		return domain.UserRoleGuru
-	}
-	return r
-}
-
 func (s *authService) Login(ctx context.Context, email, password string) (domain.User, string, error) {
 	u, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
@@ -196,6 +182,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (domain
 }
 
 func (s *authService) signJWT(userID, role string) (string, error) {
+	role = strings.TrimSpace(role)
 	claims := jwt.MapClaims{
 		"sub": userID,
 		"role": role,

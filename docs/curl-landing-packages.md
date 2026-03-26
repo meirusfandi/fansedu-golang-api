@@ -1,120 +1,117 @@
-# cURL — Landing & Packages
+# cURL — Packages (landing publik & admin)
 
-Base URL sama dengan `VITE_API_URL` di frontend. Copy-paste perintah berikut (set `BASE` sekali di awal).
-
----
-
-## Setup
-
-```bash
-BASE="http://localhost:8080/api/v1"
-TOKEN=""   # isi setelah login untuk endpoint yang butuh auth
-```
+Contoh siap pakai; sesuaikan `BASE_URL` dan token JWT admin.
 
 ---
 
-## Landing — Packages (Program yang Sedang Dibuka)
+## Publik (landing) — tanpa auth
 
-**GET /packages** — Daftar paket untuk section landing. Tanpa auth. Response snake_case.
-
-```bash
-curl -s "$BASE/packages"
-```
-
-Dengan format JSON rapi (perlu `jq`):
+Daftar paket program landing (JSON: `id`, `name`, `slug`, harga, `linked_courses`, dll.).
 
 ```bash
-curl -s "$BASE/packages" | jq .
+curl -sS -X GET "${BASE_URL:-http://localhost:8080}/api/v1/packages" \
+  -H "Accept: application/json"
 ```
 
-Contoh response (array; kosong `[]` jika belum ada data):
+---
 
-```json
-[
-  {
-    "id": "uuid",
-    "name": "string",
-    "slug": "string",
-    "short_description": "string | null",
-    "price_display": "string | null",
-    "price_early_bird": "string | null",
-    "price_normal": "string | null",
-    "cta_label": "Daftar",
-    "wa_message_template": "string | null",
-    "cta_url": "string | null",
+## Admin — butuh JWT + permission `landing.manage`
+
+Ganti `YOUR_ADMIN_JWT` dengan token dari `POST /api/v1/auth/login` (user admin/super_admin yang punya izin landing).
+
+```bash
+AUTH="Authorization: Bearer YOUR_ADMIN_JWT"
+BASE="${BASE_URL:-http://localhost:8080}/api/v1/admin/landing"
+```
+
+### List paket
+
+```bash
+curl -sS -X GET "$BASE/packages" \
+  -H "Accept: application/json" \
+  -H "$AUTH"
+```
+
+### Buat paket (minimal + `linked_course_ids` opsional)
+
+```bash
+curl -sS -X POST "$BASE/packages" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "$AUTH" \
+  -d '{
+    "name": "Paket Bundle A+B",
+    "slug": "paket-bundle-a-b",
+    "short_description": "Akses 2 kelas sekaligus",
+    "price_early_bird": 499000,
+    "price_normal": 799000,
     "is_open": true,
-    "is_bundle": false,
-    "bundle_subtitle": "string | null",
-    "durasi": "string | null",
-    "materi": ["Item 1", "Item 2"],
-    "fasilitas": ["Fasilitas 1"],
-    "bonus": ["Bonus 1"]
-  }
-]
+    "is_bundle": true,
+    "durasi": "8 Minggu",
+    "materi": ["Modul algoritma", "Latihan OSN"],
+    "fasilitas": ["Live class", "Rekaman"],
+    "bonus": [],
+    "linked_course_ids": ["UUID-KELAS-1", "UUID-KELAS-2"]
+  }'
+```
+
+### Update paket (ganti `PACKAGE_UUID`)
+
+```bash
+curl -sS -X PUT "$BASE/packages/PACKAGE_UUID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "$AUTH" \
+  -d '{
+    "name": "Paket Bundle A+B (updated)",
+    "slug": "paket-bundle-a-b",
+    "price_early_bird": 449000,
+    "price_normal": 749000,
+    "linked_course_ids": ["UUID-KELAS-1", "UUID-KELAS-2"]
+  }'
+```
+
+**Catatan:** `linked_course_ids` hanya diproses jika dikirim di body (update); untuk hanya mengubah field lain, omit key itu.
+
+### Hapus paket
+
+```bash
+curl -sS -X DELETE "$BASE/packages/PACKAGE_UUID" \
+  -H "Accept: application/json" \
+  -H "$AUTH"
 ```
 
 ---
 
-## Endpoint LMS lain (ringkas)
+## Ringkasan path
 
-```bash
-# Katalog program (pagination)
-curl -s "$BASE/programs?page=1&limit=12"
-curl -s "$BASE/programs?page=1&limit=12&search=react"
+| Tujuan        | Method | Path                                      |
+|---------------|--------|-------------------------------------------|
+| Publik        | GET    | `/api/v1/packages`                        |
+| Admin list    | GET    | `/api/v1/admin/landing/packages`          |
+| Admin create  | POST   | `/api/v1/admin/landing/packages`          |
+| Admin update  | PUT    | `/api/v1/admin/landing/packages/{id}`     |
+| Admin delete  | DELETE | `/api/v1/admin/landing/packages/{id}`     |
 
-# Detail program by slug
-curl -s "$BASE/programs/<SLUG>"
+**Header auth:** `Authorization: Bearer <jwt>`.
 
-# Checkout (guest)
-curl -s -X POST "$BASE/checkout/initiate" \
-  -H "Content-Type: application/json" \
-  -d '{"programSlug":"<SLUG>","name":"Nama","email":"email@example.com"}'
-
-curl -s -X POST "$BASE/checkout/payment-session" \
-  -H "Content-Type: application/json" \
-  -d '{"checkoutId":"<ORDER_ID>","paymentMethod":"bank_transfer"}'
-
-# Auth
-curl -s -X POST "$BASE/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"rahasia123"}'
-
-curl -s "$BASE/auth/me" -H "Authorization: Bearer $TOKEN"
-
-# Student (butuh Bearer)
-curl -s "$BASE/student/courses"      -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/student/transactions" -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/student/profile"      -H "Authorization: Bearer $TOKEN"
-
-# Instructor (butuh Bearer)
-curl -s "$BASE/instructor/courses"   -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/students"  -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/earnings"  -H "Authorization: Bearer $TOKEN"
-```
+**Alternatif tautan kelas dari sisi course:** `PUT /api/v1/admin/courses/{courseId}/linked-packages` dengan body `{"package_ids":["..."]}` (permission `courses.manage`).
 
 ---
 
-## Satu blok lengkap (Landing + Packages + Login + Profil)
+## Setup cepat + `jq` (opsional)
 
 ```bash
-BASE="http://localhost:8080/api/v1"
+BASE_URL="http://localhost:8080"
+curl -sS "${BASE_URL}/api/v1/packages" | jq .
+```
 
-# 1. Landing — packages
-curl -s "$BASE/packages" | jq .
-
-# 2. Katalog program
-curl -s "$BASE/programs?page=1&limit=12" | jq .
-
-# 3. Login & simpan token
-RES=$(curl -s -X POST "$BASE/auth/login" \
+```bash
+RES=$(curl -sS -X POST "${BASE_URL}/api/v1/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"budi@example.com","password":"rahasia123"}')
-echo "$RES" | jq .
+  -d '{"email":"admin@example.com","password":"..."}')
 TOKEN=$(echo "$RES" | jq -r '.token')
-
-# 4. Profil & kursus saya
-curl -s "$BASE/auth/me" -H "Authorization: Bearer $TOKEN" | jq .
-curl -s "$BASE/student/courses" -H "Authorization: Bearer $TOKEN" | jq .
+AUTH="Authorization: Bearer $TOKEN"
+BASE="${BASE_URL}/api/v1/admin/landing"
+curl -sS -X GET "$BASE/packages" -H "Accept: application/json" -H "$AUTH" | jq .
 ```
-
-`jq` opsional; tanpa `jq` hapus `| jq .` atau `| jq -r '.token'`.

@@ -77,6 +77,9 @@ func AdminCreateRole(deps *Deps) http.HandlerFunc {
 		}
 		slug := ensureSlug(req.Slug, req.Name)
 		e := domain.Role{Name: req.Name, Slug: slug, Description: req.Description, IconURL: req.IconURL}
+		if req.UserRoleCode != nil {
+			e.UserRoleCode = strings.TrimSpace(*req.UserRoleCode)
+		}
 		created, err := deps.RoleRepo.Create(r.Context(), e)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -112,6 +115,9 @@ func AdminUpdateRole(deps *Deps) http.HandlerFunc {
 		if req.IconURL != nil {
 			e.IconURL = req.IconURL
 		}
+		if req.UserRoleCode != nil {
+			e.UserRoleCode = strings.TrimSpace(*req.UserRoleCode)
+		}
 		if err := deps.RoleRepo.Update(r.Context(), e); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -124,7 +130,7 @@ func AdminDeleteRole(deps *Deps) http.HandlerFunc {
 }
 func roleToResp(e domain.Role) dto.RoleResponse {
 	return dto.RoleResponse{
-		ID: e.ID, Name: e.Name, Slug: e.Slug,
+		ID: e.ID, Name: e.Name, Slug: e.Slug, UserRoleCode: e.UserRoleCode,
 		Description: e.Description, IconURL: e.IconURL,
 		CreatedAt: e.CreatedAt.Format(time.RFC3339), UpdatedAt: e.UpdatedAt.Format(time.RFC3339),
 	}

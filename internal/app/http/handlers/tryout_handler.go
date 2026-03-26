@@ -74,7 +74,7 @@ func StudentTryoutRegister(deps *Deps) http.HandlerFunc {
 		}
 
 		// Subject guard (student only)
-		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, err := deps.UserRepo.FindByID(r.Context(), userID)
 				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
@@ -132,7 +132,7 @@ func StudentTryoutStart(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, err := deps.UserRepo.FindByID(r.Context(), userID)
 				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
@@ -412,7 +412,7 @@ func TryoutGetByID(deps *Deps) http.HandlerFunc {
 		}
 		// Siswa hanya boleh melihat tryout yang sesuai bidang-nya (atau tryout umum subject_id = nil)
 		if userID, ok := middleware.GetUserID(r.Context()); ok && userID != "" {
-			if role, _ := middleware.GetRole(r.Context()); role == "student" {
+			if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 				if t.SubjectID != nil && *t.SubjectID != "" {
 					u, err := deps.UserRepo.FindByID(r.Context(), userID)
 					if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
@@ -446,7 +446,7 @@ func StudentTryoutGetByID(deps *Deps) http.HandlerFunc {
 			http.Error(w, "tryout not found", http.StatusNotFound)
 			return
 		}
-		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, err := deps.UserRepo.FindByID(r.Context(), userID)
 				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
@@ -478,7 +478,7 @@ func TryoutRegister(deps *Deps) http.HandlerFunc {
 			http.Error(w, "tryout not found", http.StatusNotFound)
 			return
 		}
-		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, err := deps.UserRepo.FindByID(r.Context(), userID)
 				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
@@ -606,7 +606,7 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 			http.Error(w, "tryout not found", http.StatusNotFound)
 			return
 		}
-		if role, _ := middleware.GetRole(r.Context()); role == "student" {
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, err := deps.UserRepo.FindByID(r.Context(), userID)
 				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {

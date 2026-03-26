@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -40,8 +41,8 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
-			userID, _ := claims["sub"].(string)
-			role, _ := claims["role"].(string)
+			userID := jwtStringClaim(claims, "sub")
+			role := jwtStringClaim(claims, "role")
 			ctx := context.WithValue(r.Context(), ctxKeyUserID{}, userID)
 			ctx = context.WithValue(ctx, ctxKeyRole{}, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -63,6 +64,7 @@ func AdminOnly() func(http.Handler) http.Handler {
 }
 
 func isAdminRole(role string) bool {
+	role = strings.TrimSpace(role)
 	switch role {
 	case domain.UserRoleAdmin,
 		domain.UserRoleSuperAdmin,
@@ -174,12 +176,12 @@ func AdminAuditLog(logger AdminAuditLogger) func(http.Handler) http.Handler {
 	}
 }
 
-// TrainerOnly restricts access to users with role "guru" or "instructor".
+// TrainerOnly restricts access to teaching staff (guru, instructor enum, trainer).
 func TrainerOnly() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
-			if role != "guru" && role != "instructor" {
+			if !domain.IsTeachingStaffRoleCode(role) {
 				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 				return
 			}
@@ -225,12 +227,27 @@ func OptionalAuth(jwtSecret []byte) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			userID, _ := claims["sub"].(string)
-			role, _ := claims["role"].(string)
+			userID := jwtStringClaim(claims, "sub")
+			role := jwtStringClaim(claims, "role")
 			ctx := context.WithValue(r.Context(), ctxKeyUserID{}, userID)
 			ctx = context.WithValue(ctx, ctxKeyRole{}, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
+	}
+}
+
+func jwtStringClaim(claims jwt.MapClaims, key string) string {
+	v, ok := claims[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return strings.TrimSpace(x)
+	case float64:
+		return strings.TrimSpace(fmt.Sprintf("%.0f", x))
+	default:
+		return strings.TrimSpace(fmt.Sprint(x))
 	}
 }
 

@@ -513,7 +513,16 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 			user, err = deps.UserRepo.FindByEmail(r.Context(), email)
 			if err != nil {
 				// Auto-create user baru
-				role := resolveRole(order.RoleHint, &req.RoleHint)
+				rh := strings.TrimSpace(req.RoleHint)
+				var reqHint *string
+				if rh != "" {
+					reqHint = &rh
+				}
+				role, rerr := resolveCheckoutUserRoleCode(r.Context(), deps.RoleRepo, reqHint, order.RoleHint)
+				if rerr != nil {
+					writeError(w, http.StatusInternalServerError, "internal_error", rerr.Error())
+					return
+				}
 				now := time.Now()
 				user, err = deps.UserRepo.Create(r.Context(), domain.User{
 					Email:           email,
@@ -545,7 +554,7 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 		token := generateBootstrapToken(deps.JWTSecret, user.ID, user.Role)
 
 		// Auto-enroll user ke course dari order items jika belum
-		if user.Role == domain.UserRoleStudent {
+		if domain.IsStudentRoleCode(user.Role) {
 			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), user.ID)
 		}
 
@@ -557,38 +566,15 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.CompletePurchaseAuthResponse{
 			Token:           token,
-			User:            userToMap(user),
+			User:            userAuthMap(r.Context(), deps.RoleRepo, user),
 			MustSetPassword: user.MustSetPassword,
 			NextAction:      nextAction,
 		})
 	}
 }
 
-// resolveRole menentukan role berdasarkan roleHint dari order dan request
-func resolveRole(orderHint, reqHint *string) string {
-	if reqHint != nil && isValidRoleHint(*reqHint) {
-		return normalizeRoleHint(*reqHint)
-	}
-	if orderHint != nil && isValidRoleHint(*orderHint) {
-		return normalizeRoleHint(*orderHint)
-	}
-	return domain.UserRoleStudent
-}
-
-func isValidRoleHint(hint string) bool {
-	h := strings.ToLower(strings.TrimSpace(hint))
-	return h == "student" || h == "instructor" || h == "guru" || h == "siswa"
-}
-
-func normalizeRoleHint(hint string) string {
-	h := strings.ToLower(strings.TrimSpace(hint))
-	if h == "instructor" || h == "guru" {
-		return domain.UserRoleGuru
-	}
-	return domain.UserRoleStudent
-}
-
 func generateBootstrapToken(jwtSecret []byte, userID, role string) string {
+	role = strings.TrimSpace(role)
 	claims := jwt.MapClaims{
 		"sub":  userID,
 		"role": role,
