@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -58,7 +60,25 @@ func SchoolToProfile(s domain.School) *dto.SchoolProfile {
 	return p
 }
 
-// BuildUserProfileResponse builds full profile JSON (auth/me, student profile, trainer profile).
+// UserProfileGet returns user + sekolah terhubung; dipakai GET /auth/me, /student/profile, /trainer/profile, /guru/profile.
+func UserProfileGet(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r.Context())
+		if !ok || userID == "" {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			return
+		}
+		u, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "user not found")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u, school))
+	}
+}
+
+// BuildUserProfileResponse builds full profile JSON (auth/me, student profile, trainer/guru profile).
 func BuildUserProfileResponse(ctx context.Context, deps *Deps, u domain.User, school *domain.School) dto.UserProfileResponse {
 	out := dto.UserProfileResponse{
 		ID:              u.ID,

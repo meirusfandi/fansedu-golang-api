@@ -210,16 +210,16 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			})
 		})
 
-		r.Route("/instructor", func(r chi.Router) {
+		r.Route("/guru", func(r chi.Router) {
 			r.Use(middleware.Auth(deps.JWTSecret))
 			r.Use(passwordGuard)
 			r.Use(middleware.TrainerOnly())
 			r.Get("/profile", handlers.TrainerProfileGet(deps))
 			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
-			r.Put("/profile/password", handlers.InstructorProfilePassword(deps))
-			r.Get("/courses", handlers.InstructorCoursesList(deps))
-			r.Get("/students", handlers.InstructorStudentsList(deps))
-			r.Get("/earnings", handlers.InstructorEarningsList(deps))
+			r.Put("/profile/password", handlers.GuruProfilePassword(deps))
+			r.Get("/courses", handlers.GuruCoursesList(deps))
+			r.Get("/students", handlers.GuruStudentsList(deps))
+			r.Get("/earnings", handlers.GuruEarningsList(deps))
 			r.Route("/tryouts", func(r chi.Router) {
 				r.Get("/", handlers.TrainerTryoutList(deps))
 				r.Get("/{tryoutId}/analysis", handlers.TrainerTryoutAnalysis(deps))

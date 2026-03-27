@@ -18,7 +18,7 @@ type Order struct {
 	UnitPrice        int    // harga per item setelah promo (tanpa unique code)
 	Subtotal         int    // UnitPrice * Quantity (tanpa unique code)
 	UniqueCode       int    // kode unik nominal transfer, 1x per order
-	IsCollective     bool   // pembelian kolektif (guru/instructor)
+	IsCollective     bool   // pembelian kolektif (akun guru)
 	StudentsJSON     []byte // JSON metadata siswa kolektif
 	PromoCode        *string
 	Discount         int    // potongan (rupiah)
@@ -30,7 +30,7 @@ type Order struct {
 	PaymentProofAt     *time.Time
 	SenderAccountNo    *string
 	SenderName         *string
-	RoleHint           *string // student|instructor for auto-create user
+	RoleHint           *string // student|guru (instructor legacy) for auto-create user
 	BuyerEmail         *string // email pembeli untuk guest checkout
 	PackageID          *string // paket landing jika checkout bundle / multi-kelas
 	CreatedAt          time.Time

@@ -16,7 +16,7 @@ type ProgramListItem struct {
 	Thumbnail        string           `json:"thumbnail"`
 	Price            int              `json:"price"`
 	PriceDisplay     string           `json:"priceDisplay"`
-	Instructor       ProgramInstructor `json:"instructor"`
+	Guru             ProgramGuru `json:"guru"`
 	Category         string           `json:"category"`
 	Level            string           `json:"level"`
 	Duration         string           `json:"duration"`
@@ -24,7 +24,7 @@ type ProgramListItem struct {
 	ReviewCount      int              `json:"reviewCount"`
 }
 
-type ProgramInstructor struct {
+type ProgramGuru struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Avatar string `json:"avatar"`
@@ -39,7 +39,7 @@ type ProgramDetailResponse struct {
 	Thumbnail        string            `json:"thumbnail"`
 	Price            int               `json:"price"`
 	PriceDisplay     string            `json:"priceDisplay"`
-	Instructor       ProgramInstructor `json:"instructor"`
+	Guru             ProgramGuru `json:"guru"`
 	Category         string            `json:"category"`
 	Level            string            `json:"level"`
 	Duration         string            `json:"duration"`
@@ -124,27 +124,27 @@ type StudentTransactionProgram struct {
 	Title string `json:"title"`
 }
 
-// --- Instructor ---
-type InstructorStudentsResponse struct {
-	Data []InstructorStudentItem `json:"data"`
+// --- Guru (dashboard LMS) ---
+type GuruStudentsResponse struct {
+	Data []GuruStudentItem `json:"data"`
 }
 
-type InstructorStudentItem struct {
-	UserID         string `json:"userId"`
-	Name           string `json:"name"`
-	Email          string `json:"email"`
-	ProgramTitle   string `json:"programTitle"`
-	ProgressPercent int   `json:"progressPercent"`
+type GuruStudentItem struct {
+	UserID          string `json:"userId"`
+	Name            string `json:"name"`
+	Email           string `json:"email"`
+	ProgramTitle    string `json:"programTitle"`
+	ProgressPercent int    `json:"progressPercent"`
 }
 
-type InstructorEarningsResponse struct {
-	Data []InstructorEarningItem `json:"data"`
+type GuruEarningsResponse struct {
+	Data []GuruEarningItem `json:"data"`
 }
 
-type InstructorEarningItem struct {
-	Period     string `json:"period"`
-	Revenue    int64  `json:"revenue"`
-	NewStudents int   `json:"newStudents"`
+type GuruEarningItem struct {
+	Period      string `json:"period"`
+	Revenue     int64  `json:"revenue"`
+	NewStudents int    `json:"newStudents"`
 }
 
 // --- Checkout (spec alignment) ---

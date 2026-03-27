@@ -12,24 +12,10 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
-// TrainerProfileGet returns guru profile: name, email, school.
-// Data sekolah yang terhubung dengan akun guru; jika user punya school_id dan sekolah ada, objek school diisi.
+// TrainerProfileGet returns profile (sama bentuknya dengan /student/profile dan /auth/me).
 // GET /api/v1/trainer/profile
 func TrainerProfileGet(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := middleware.GetUserID(r.Context())
-		if !ok {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
-			return
-		}
-		u, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "not_found", "user not found")
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u, school))
-	}
+	return UserProfileGet(deps)
 }
 
 // TrainerProfileUpdate updates guru profile (name, school_id). PUT /api/v1/trainer/profile
@@ -68,9 +54,9 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// InstructorProfilePassword changes password for instructor.
-// PUT /api/v1/instructor/profile/password
-func InstructorProfilePassword(deps *Deps) http.HandlerFunc {
+// GuruProfilePassword changes password for guru/teaching staff.
+// PUT /api/v1/guru/profile/password
+func GuruProfilePassword(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok || userID == "" {

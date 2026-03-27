@@ -111,7 +111,7 @@ func SchoolGetPublic(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// SchoolCreateByUser creates school by authenticated student/guru/instructor.
+// SchoolCreateByUser creates school by authenticated student/guru (legacy DB role instructor tetap diizinkan).
 // POST /api/v1/schools
 func SchoolCreateByUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -800,9 +800,9 @@ func StudentPaymentsList(deps *Deps) http.HandlerFunc {
 	return PaymentListMine(deps)
 }
 
-// StudentProfileGet returns current student profile (same shape as GET /auth/me). GET /api/v1/student/profile
+// StudentProfileGet returns current student profile (sama bentuk JSON dengan GET /guru/profile). GET /api/v1/student/profile
 func StudentProfileGet(deps *Deps) http.HandlerFunc {
-	return AuthMe(deps)
+	return UserProfileGet(deps)
 }
 
 // StudentProfileUpdate updates student profile (same fields as trainer profile). PUT /api/v1/student/profile
@@ -1006,29 +1006,29 @@ func StudentTransactionsList(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// InstructorCoursesList returns courses taught by the current instructor. GET /api/v1/instructor/courses
-func InstructorCoursesList(deps *Deps) http.HandlerFunc {
+// GuruCoursesList returns courses taught by the current guru. GET /api/v1/guru/courses
+func GuruCoursesList(deps *Deps) http.HandlerFunc {
 	return TrainerCoursesList(deps)
 }
 
-// InstructorStudentsList returns students enrolled in the instructor's courses. GET /api/v1/instructor/students
-func InstructorStudentsList(deps *Deps) http.HandlerFunc {
+// GuruStudentsList returns students enrolled in the guru's courses. GET /api/v1/guru/students
+func GuruStudentsList(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
-		instructor, err := deps.UserRepo.FindByID(r.Context(), userID)
+		guruUser, err := deps.UserRepo.FindByID(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
 
-		// Untuk role guru/instructor: siswa ditentukan dari sekolah + subject yang sama.
-		if instructor.SchoolID == nil || *instructor.SchoolID == "" || instructor.SubjectID == nil || *instructor.SubjectID == "" {
+		// Untuk akun guru: siswa ditentukan dari sekolah + subject yang sama.
+		if guruUser.SchoolID == nil || *guruUser.SchoolID == "" || guruUser.SubjectID == nil || *guruUser.SubjectID == "" {
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: []dto.InstructorStudentItem{}})
+			_ = json.NewEncoder(w).Encode(dto.GuruStudentsResponse{Data: []dto.GuruStudentItem{}})
 			return
 		}
 
@@ -1039,11 +1039,11 @@ func InstructorStudentsList(deps *Deps) http.HandlerFunc {
 		}
 
 		schoolName := ""
-		if school, err := deps.SchoolRepo.GetByID(r.Context(), *instructor.SchoolID); err == nil {
+		if school, err := deps.SchoolRepo.GetByID(r.Context(), *guruUser.SchoolID); err == nil {
 			schoolName = school.Name
 		}
 		subjectName := ""
-		if subject, err := deps.SubjectRepo.GetByID(r.Context(), *instructor.SubjectID); err == nil {
+		if subject, err := deps.SubjectRepo.GetByID(r.Context(), *guruUser.SubjectID); err == nil {
 			subjectName = subject.Name
 		}
 		groupLabel := subjectName
@@ -1054,15 +1054,15 @@ func InstructorStudentsList(deps *Deps) http.HandlerFunc {
 			groupLabel = "Siswa se-sekolah & se-subject"
 		}
 
-		data := make([]dto.InstructorStudentItem, 0)
+		data := make([]dto.GuruStudentItem, 0)
 		for _, s := range allStudents {
 			if s.SchoolID == nil || s.SubjectID == nil {
 				continue
 			}
-			if *s.SchoolID != *instructor.SchoolID || *s.SubjectID != *instructor.SubjectID {
+			if *s.SchoolID != *guruUser.SchoolID || *s.SubjectID != *guruUser.SubjectID {
 				continue
 			}
-			data = append(data, dto.InstructorStudentItem{
+			data = append(data, dto.GuruStudentItem{
 				UserID:          s.ID,
 				Name:            s.Name,
 				Email:           s.Email,
@@ -1072,7 +1072,7 @@ func InstructorStudentsList(deps *Deps) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.InstructorStudentsResponse{Data: data})
+		_ = json.NewEncoder(w).Encode(dto.GuruStudentsResponse{Data: data})
 	}
 }
 
@@ -1089,15 +1089,15 @@ func enrollmentProgressPercent(status string) int {
 	}
 }
 
-// InstructorEarningsList returns earnings summary per period. GET /api/v1/instructor/earnings (stub)
-func InstructorEarningsList(deps *Deps) http.HandlerFunc {
+// GuruEarningsList returns earnings summary per period. GET /api/v1/guru/earnings (stub)
+func GuruEarningsList(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := middleware.GetUserID(r.Context()); !ok {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(dto.InstructorEarningsResponse{Data: []dto.InstructorEarningItem{}})
+		_ = json.NewEncoder(w).Encode(dto.GuruEarningsResponse{Data: []dto.GuruEarningItem{}})
 	}
 }
 

@@ -47,7 +47,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		}
 		if err != nil {
 			if errors.Is(err, errUnknownRoleSlug) {
-				writeError(w, http.StatusBadRequest, "validation_error", "unknown role: use a value from table roles or student/guru/instructor/trainer")
+				writeError(w, http.StatusBadRequest, "validation_error", "unknown role: use a value from table roles or student/guru/trainer (instructor accepted as alias for guru)")
 				return
 			}
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
@@ -162,20 +162,7 @@ func AuthLogout(_ *Deps) http.HandlerFunc {
 
 // AuthMe returns current user from JWT. GET /api/v1/auth/me
 func AuthMe(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := middleware.GetUserID(r.Context())
-		if !ok || userID == "" {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "not logged in")
-			return
-		}
-		u, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "not_found", "user not found")
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(BuildUserProfileResponse(r.Context(), deps, u, school))
-	}
+	return UserProfileGet(deps)
 }
 
 func AuthForgotPassword(_ *Deps) http.HandlerFunc {

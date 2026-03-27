@@ -12,7 +12,7 @@ type UserRepo interface {
 	FindByID(ctx context.Context, id string) (domain.User, error)
 	// FindByIDProfile: sama seperti FindByID tanpa membaca password_hash (lebih ringan untuk /auth/me & profil).
 	FindByIDProfile(ctx context.Context, id string) (domain.User, error)
-	// FindByIDProfileWithSchool: satu round-trip user + sekolah (trainer/instructor profile).
+	// FindByIDProfileWithSchool: satu round-trip user + sekolah (trainer/guru profile).
 	FindByIDProfileWithSchool(ctx context.Context, id string) (domain.User, *domain.School, error)
 	// MustSetPasswordByID: query minimal untuk PasswordSetupGuard.
 	MustSetPasswordByID(ctx context.Context, id string) (bool, error)

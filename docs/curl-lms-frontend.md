@@ -24,7 +24,7 @@ TOKEN=""
 
 ### POST /auth/register
 
-**Request body:** `name`, `email`, `password`, `role` (optional: `"student"` | `"instructor"`)
+**Request body:** `name`, `email`, `password`, `role` (optional: `"student"` | `"guru"`; alias `instructor` → disimpan sebagai guru pada fallback)
 
 ```bash
 # Daftar sebagai siswa (default)
@@ -32,16 +32,16 @@ curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
   -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123"}'
 
-# Daftar sebagai instructor
+# Daftar sebagai guru
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Instruktur","email":"instruktur@example.com","password":"rahasia123","role":"instructor"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
 ```
 
 **Response 201:**
 ```json
 {
-  "user": { "id": "uuid", "name": "string", "email": "string", "role": "student" | "instructor" },
+  "user": { "id": "uuid", "name": "string", "email": "string", "role": "student" | "guru" },
   "token": "eyJhbGc..."
 }
 ```
@@ -59,7 +59,7 @@ curl -s -X POST "$BASE/auth/login" \
 **Response 200:**
 ```json
 {
-  "user": { "id": "uuid", "name": "string", "email": "string", "role": "student" | "instructor" },
+  "user": { "id": "uuid", "name": "string", "email": "string", "role": "student" | "guru" },
   "token": "eyJhbGc..."
 }
 ```
@@ -86,7 +86,7 @@ curl -s "$BASE/auth/me" \
   "id": "uuid",
   "name": "string",
   "email": "string",
-  "role": "student" | "instructor"
+  "role": "student" | "guru"
 }
 ```
 
@@ -134,7 +134,7 @@ curl -s "$BASE/programs?page=1&limit=12&category=matematika"
       "thumbnail": "string",
       "price": 249000,
       "priceDisplay": "Rp249.000",
-      "instructor": { "id": "uuid", "name": "string", "avatar": "string" },
+      "guru": { "id": "uuid", "name": "string", "avatar": "string" },
       "category": "string",
       "level": "beginner",
       "duration": "string",
@@ -170,7 +170,7 @@ curl -s "$BASE/programs/react-dasar"
   "thumbnail": "string",
   "price": 249000,
   "priceDisplay": "Rp249.000",
-  "instructor": { "id": "uuid", "name": "string", "avatar": "string" },
+  "guru": { "id": "uuid", "name": "string", "avatar": "string" },
   "category": "string",
   "level": "beginner",
   "duration": "string",
@@ -410,27 +410,27 @@ curl -s "$BASE/student/certificates" -H "Authorization: Bearer $TOKEN"
 
 ---
 
-## 5. Instructor Dashboard
+## 5. Guru Dashboard
 
-Semua endpoint di bawah **butuh auth**. Role: **instructor** atau **guru**.
+Semua endpoint di bawah **butuh auth**. Role: **guru** (atau legacy **instructor** di DB).
 
-### GET /instructor/courses
+### GET /guru/courses
 
 Daftar program yang diajar.
 
 ```bash
-curl -s "$BASE/instructor/courses" \
+curl -s "$BASE/guru/courses" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
-### GET /instructor/students
+### GET /guru/students
 
 Daftar siswa (enrollment) per program yang diajar.
 
 ```bash
-curl -s "$BASE/instructor/students" \
+curl -s "$BASE/guru/students" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -451,12 +451,12 @@ curl -s "$BASE/instructor/students" \
 
 ---
 
-### GET /instructor/earnings
+### GET /guru/earnings
 
 Ringkasan pendapatan per periode (saat ini stub, bisa kembangkan nanti).
 
 ```bash
-curl -s "$BASE/instructor/earnings" \
+curl -s "$BASE/guru/earnings" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

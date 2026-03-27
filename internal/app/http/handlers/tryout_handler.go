@@ -33,8 +33,7 @@ func TryoutListOpen(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// TryoutList supports query param: GET /api/v1/tryouts?status=open
-// Currently we only support status=open (public).
+// TryoutList: GET /api/v1/tryouts?status=open — daftar tryout berstatus open dengan closes_at belum lewat.
 func TryoutList(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := r.URL.Query().Get("status")
@@ -372,7 +371,7 @@ func StudentTryoutList(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// StudentTryoutListOpen returns only currently open tryouts (by time window) for the student's subject. For dashboard widget. Requires Auth.
+// StudentTryoutListOpen: tryout status open untuk bidang siswa; closes_at belum lewat. Requires Auth.
 func StudentTryoutListOpen(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, _ := middleware.GetUserID(r.Context())

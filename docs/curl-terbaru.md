@@ -52,7 +52,7 @@ curl -s -X POST "$BASE/auth/register" \
 
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Instruktur","email":"instruktur@example.com","password":"rahasia123","role":"instructor"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
 
 # Login (simpan token ke $TOKEN)
 curl -s -X POST "$BASE/auth/login" \
@@ -159,12 +159,12 @@ curl -s "$BASE/student/certificates"    -H "Authorization: Bearer $TOKEN"
 
 ---
 
-## Instructor (Bearer required)
+## Guru (Bearer required)
 
 ```bash
-curl -s "$BASE/instructor/courses"   -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/students"  -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/earnings"  -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/courses"   -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/students"  -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/earnings"  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -258,9 +258,9 @@ Tanpa `jq`: hapus `| jq .` dan `| jq -r '.token'`.
 | `/student/courses` | GET | Bearer |
 | `/student/transactions` | GET | Bearer |
 | `/student/certificates` | GET | Bearer |
-| `/instructor/courses` | GET | Bearer |
-| `/instructor/students` | GET | Bearer |
-| `/instructor/earnings` | GET | Bearer |
+| `/guru/courses` | GET | Bearer |
+| `/guru/students` | GET | Bearer |
+| `/guru/earnings` | GET | Bearer |
 | `/admin/tryouts/:tryoutId/analysis` | GET | Bearer (admin) |
 | `/admin/tryouts/:tryoutId/students` | GET | Bearer (admin) |
 | `/admin/tryouts/:tryoutId/attempts/:attemptId/ai-analysis` | GET | Bearer (admin) |

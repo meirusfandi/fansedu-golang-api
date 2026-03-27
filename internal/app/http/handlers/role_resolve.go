@@ -27,7 +27,7 @@ func registerFallbackUserRoleCode(input string) (string, bool) {
 	case "guru", "pengajar", "pembimbing":
 		return domain.UserRoleGuru, true
 	case "instructor":
-		return "instructor", true
+		return domain.UserRoleGuru, true
 	case "trainer":
 		return domain.UserRoleTrainer, true
 	default:

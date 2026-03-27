@@ -147,7 +147,7 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			_ = cache.LeaderboardZAdd(r.Context(), deps.Redis, a.TryoutSessionID, userID, *a.Score)
 		}
 
-		// Progress notification -> notify all trainers (guru/instructor) linked to this student.
+		// Progress notification -> notify all trainers/guru linked to this student.
 		// We trigger it when an attempt is successfully submitted.
 		if a.Status == domain.AttemptStatusSubmitted && a.SubmittedAt != nil {
 			student, _ := deps.UserRepo.FindByID(r.Context(), userID)

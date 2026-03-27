@@ -12,7 +12,7 @@ Scalable REST API for an LMS with **frictionless checkout**: users can purchase 
 | Auth        | JWT                    |
 | Payment     | Midtrans / Stripe      |
 | Database    | PostgreSQL             |
-| Roles       | student, instructor, admin |
+| Roles       | student, guru (API label; legacy `instructor` enum), trainer, admin |
 
 ---
 
@@ -46,7 +46,7 @@ Scalable REST API for an LMS with **frictionless checkout**: users can purchase 
 | name             | VARCHAR    |                                 |
 | email            | VARCHAR    | UNIQUE                          |
 | password_hash    | VARCHAR    | **Nullable** (auto-created at checkout) |
-| role             | ENUM       | student, instructor, admin      |
+| role             | ENUM       | student, guru, instructor (legacy), trainer, admin |
 | email_verified_at| TIMESTAMPTZ| Set when magic-link used       |
 | created_at       | TIMESTAMPTZ|                                 |
 | updated_at       | TIMESTAMPTZ|                                 |

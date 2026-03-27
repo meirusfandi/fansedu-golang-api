@@ -31,11 +31,11 @@ func IsTeachingStaffRoleCode(code string) bool {
 	}
 }
 
-// DisplayRoleForAPI maps stored user_role ke label yang dipakai response JSON (guru → instructor).
+// DisplayRoleForAPI maps stored user_role ke label response JSON; guru dan legacy enum instructor ditampilkan sebagai "guru".
 func DisplayRoleForAPI(code string) string {
 	c := strings.TrimSpace(code)
-	if c == UserRoleGuru {
-		return "instructor"
+	if c == UserRoleGuru || c == "instructor" {
+		return UserRoleGuru
 	}
 	return c
 }

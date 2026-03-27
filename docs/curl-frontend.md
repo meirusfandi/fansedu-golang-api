@@ -78,10 +78,10 @@ curl -s -X POST "$BASE/auth/logout" \
 # Data user saat ini (LMS: untuk header & guard)
 curl -s "$BASE/auth/me" -H "Authorization: Bearer $TOKEN"
 
-# Register — instructor (alias guru untuk LMS)
+# Register — guru (LMS)
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Instruktur","email":"instruktur@example.com","password":"rahasia123","role":"instructor"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
 
 # Ganti kata sandi
 curl -s -X POST "$BASE/auth/change-password" \
@@ -175,12 +175,12 @@ curl -s -X POST "$BASE/trainer/courses" \
 
 ---
 
-## Instructor (LMS — role guru atau instructor)
+## Guru (LMS — role `guru`; `instructor` tetap diterima sebagai alias saat fallback)
 
 ```bash
-curl -s "$BASE/instructor/courses" -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/students" -H "Authorization: Bearer $TOKEN"
-curl -s "$BASE/instructor/earnings" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/courses" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/students" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/guru/earnings" -H "Authorization: Bearer $TOKEN"
 ```
 
 ---

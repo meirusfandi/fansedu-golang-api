@@ -72,11 +72,13 @@ func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 	return list, rows.Err()
 }
 
+// ListOpen: status open dan belum lewat closes_at (masih dalam periode pendaftaran/penyelenggaraan).
 func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
-		FROM tryout_sessions WHERE status = 'open' AND opens_at <= $1 AND closes_at >= $1
-		ORDER BY opens_at
+		FROM tryout_sessions
+		WHERE status = 'open' AND closes_at >= $1
+		ORDER BY opens_at NULLS LAST, created_at DESC
 	`, now)
 	if err != nil {
 		return nil, err
@@ -95,13 +97,14 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 	return list, rows.Err()
 }
 
+// ListOpenForStudent: status open, closes_at belum lewat, + filter bidang siswa.
 func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error) {
 	query := `
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, created_by, created_at, updated_at
 		FROM tryout_sessions
-		WHERE status = 'open' AND opens_at <= $1 AND closes_at >= $1
+		WHERE status = 'open' AND closes_at >= $1
 		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
-		ORDER BY opens_at
+		ORDER BY opens_at NULLS LAST, created_at DESC
 	`
 	var subj interface{}
 	if subjectID != nil && *subjectID != "" {

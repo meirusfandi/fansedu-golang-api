@@ -85,13 +85,13 @@ func ProgramsList(deps *Deps) http.HandlerFunc {
 			if c.Thumbnail != nil {
 				thumb = *c.Thumbnail
 			}
-			instructor := dto.ProgramInstructor{ID: "", Name: "Instructor", Avatar: ""}
+			guru := dto.ProgramGuru{ID: "", Name: "Guru", Avatar: ""}
 			if c.CreatedBy != nil && *c.CreatedBy != "" {
 				if u, uErr := deps.UserRepo.FindByID(r.Context(), *c.CreatedBy); uErr == nil {
-					instructor.ID = u.ID
-					instructor.Name = u.Name
+					guru.ID = u.ID
+					guru.Name = u.Name
 					if u.AvatarURL != nil {
-						instructor.Avatar = *u.AvatarURL
+						guru.Avatar = *u.AvatarURL
 					}
 				}
 			}
@@ -109,7 +109,7 @@ func ProgramsList(deps *Deps) http.HandlerFunc {
 				Thumbnail:        thumb,
 				Price:            c.Price,
 				PriceDisplay:     formatRupiah(c.Price),
-				Instructor:       instructor,
+				Guru:             guru,
 				Category:         cat,
 				Level:            "beginner",
 				Duration:         "-",
@@ -176,7 +176,7 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 						Thumbnail:        "",
 						Price:            priceRupiah,
 						PriceDisplay:     priceDisplay,
-						Instructor:       dto.ProgramInstructor{},
+						Guru:             dto.ProgramGuru{},
 						Category:         "",
 						Level:            "beginner",
 						Duration:         dur,
@@ -208,13 +208,13 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 		if c.Thumbnail != nil {
 			thumb = *c.Thumbnail
 		}
-		instructor := dto.ProgramInstructor{ID: "", Name: "Instructor", Avatar: ""}
+		guru := dto.ProgramGuru{ID: "", Name: "Guru", Avatar: ""}
 		if c.CreatedBy != nil && *c.CreatedBy != "" {
 			if u, uErr := deps.UserRepo.FindByID(r.Context(), *c.CreatedBy); uErr == nil {
-				instructor.ID = u.ID
-				instructor.Name = u.Name
+				guru.ID = u.ID
+				guru.Name = u.Name
 				if u.AvatarURL != nil {
-					instructor.Avatar = *u.AvatarURL
+					guru.Avatar = *u.AvatarURL
 				}
 			}
 		}
@@ -244,7 +244,7 @@ func ProgramBySlug(deps *Deps) http.HandlerFunc {
 			Thumbnail:        thumb,
 			Price:            c.Price,
 			PriceDisplay:     formatRupiah(c.Price),
-			Instructor:       instructor,
+			Guru:             guru,
 			Category:         cat,
 			Level:            "beginner",
 			Duration:         "-",

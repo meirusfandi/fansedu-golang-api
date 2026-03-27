@@ -180,13 +180,13 @@ func AdminAuditLog(logger AdminAuditLogger) func(http.Handler) http.Handler {
 	}
 }
 
-// TrainerOnly restricts access to teaching staff (guru, instructor enum, trainer).
+// TrainerOnly restricts access to teaching staff (guru, legacy instructor enum, trainer).
 func TrainerOnly() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := GetRole(r.Context())
 			if !domain.IsTeachingStaffRoleCode(role) {
-				WriteJSONError(w, http.StatusForbidden, "forbidden", "Trainer or instructor access required")
+				WriteJSONError(w, http.StatusForbidden, "forbidden", "Trainer or guru access required")
 				return
 			}
 			next.ServeHTTP(w, r)
