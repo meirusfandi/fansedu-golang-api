@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
@@ -257,12 +259,33 @@ func AdminListTryouts(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// AdminGetTryout returns one tryout (admin). GET /api/v1/admin/tryouts/{tryoutId}
+func AdminGetTryout(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "tryoutId")
+		t, err := deps.TryoutService.GetByID(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "tryout not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tryoutToDTO(t))
+	}
+}
+
 func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.TryoutCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
+		}
+		if req.SubjectID != nil && strings.TrimSpace(*req.SubjectID) == "" {
+			req.SubjectID = nil
 		}
 		t := domain.TryoutSession{
 			Title:           req.Title,
@@ -277,8 +300,9 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			MaxParticipants: req.MaxParticipants,
 			Status:          req.Status,
 		}
-		if t.Status == "" {
-			t.Status = domain.TryoutStatusOpen
+		if err := validateTryoutForCreate(&t); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
 		}
 		created, err := deps.AdminService.CreateTryout(r.Context(), t)
 		if err != nil {
@@ -287,6 +311,11 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 		}
 		// Auto-daftarkan semua siswa ke tryout yang baru dibuat
 		_ = deps.TryoutRegistrationRepo.EnsureAllStudentsForTryout(r.Context(), created.ID)
+		created, err = deps.TryoutService.GetByID(r.Context(), created.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(tryoutToDTO(created))
@@ -296,30 +325,51 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 func AdminUpdateTryout(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "tryoutId")
-		var req dto.TryoutCreateRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		t := domain.TryoutSession{
-			ID:               id,
-			Title:            req.Title,
-			ShortTitle:       req.ShortTitle,
-			Description:      req.Description,
-			DurationMinutes:  req.DurationMinutes,
-			QuestionsCount:   req.QuestionsCount,
-			Level:            req.Level,
-			SubjectID:        req.SubjectID,
-			OpensAt:          req.OpensAt,
-			ClosesAt:         req.ClosesAt,
-			MaxParticipants:  req.MaxParticipants,
-			Status:           req.Status,
-		}
-		if err := deps.AdminService.UpdateTryout(r.Context(), t); err != nil {
+		existing, err := deps.TryoutService.GetByID(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "tryout not found", http.StatusNotFound)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		orig := existing
+		if err := mergeTryoutSessionFromJSON(body, &existing); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		restoreTryoutFieldsIfEmptyPatch(&existing, orig)
+		if err := validateTryoutAfterAdminUpdate(&existing); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+		if err := deps.AdminService.UpdateTryout(r.Context(), existing); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		updated, err := deps.TryoutService.GetByID(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "tryout not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		payload, err := json.Marshal(tryoutToDTO(updated))
+		if err != nil {
+			http.Error(w, "failed to encode response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payload)
 	}
 }
 

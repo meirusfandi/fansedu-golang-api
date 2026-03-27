@@ -330,6 +330,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 				r.With(middleware.RequirePermission("tryouts.manage")).Get("/", handlers.AdminListTryouts(deps))
 				r.With(middleware.RequirePermission("tryouts.manage")).Post("/", handlers.AdminCreateTryout(deps))
 				r.Route("/{tryoutId}", func(r chi.Router) {
+					r.With(middleware.RequirePermission("tryouts.manage")).Get("/", handlers.AdminGetTryout(deps))
 					r.With(middleware.RequirePermission("tryouts.manage")).Put("/", handlers.AdminUpdateTryout(deps))
 					r.With(middleware.RequirePermission("tryouts.manage")).Delete("/", handlers.AdminDeleteTryout(deps))
 					r.With(middleware.RequirePermission("tryouts.manage")).Get("/analysis", handlers.AdminGetTryoutAnalysis(deps))
