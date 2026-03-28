@@ -13,6 +13,12 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
+// registerRequiresPhoneOrWhatsapp: siswa & guru (termasuk enum legacy instructor) wajib punya kontak.
+func registerRequiresPhoneOrWhatsapp(roleCode string) bool {
+	c := strings.TrimSpace(strings.ToLower(roleCode))
+	return c == domain.UserRoleStudent || c == domain.UserRoleGuru || c == "instructor"
+}
+
 func AuthRegister(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.RegisterRequest
@@ -53,7 +59,20 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return
 		}
-		u, token, err := deps.AuthService.Register(ctx, req.Name, req.Email, req.Password, roleCode)
+		phoneTrim := strings.TrimSpace(req.Phone)
+		waTrim := strings.TrimSpace(req.Whatsapp)
+		if registerRequiresPhoneOrWhatsapp(roleCode) && phoneTrim == "" && waTrim == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "phone or whatsapp is required for student and guru registration")
+			return
+		}
+		var phonePtr, waPtr *string
+		if phoneTrim != "" {
+			phonePtr = &phoneTrim
+		}
+		if waTrim != "" {
+			waPtr = &waTrim
+		}
+		u, token, err := deps.AuthService.Register(ctx, req.Name, req.Email, req.Password, roleCode, phonePtr, waPtr)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			return

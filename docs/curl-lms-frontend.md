@@ -24,18 +24,18 @@ TOKEN=""
 
 ### POST /auth/register
 
-**Request body:** `name`, `email`, `password`, `role` (optional: `"student"` | `"guru"`; alias `instructor` → disimpan sebagai guru pada fallback)
+**Request body:** `name`, `email`, `password`, `role` (optional: `"student"` | `"guru"`; alias `instructor` → disimpan sebagai guru pada fallback), **`phone` dan/atau `whatsapp`** (wajib salah satu untuk siswa & guru).
 
 ```bash
 # Daftar sebagai siswa (default)
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123"}'
+  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123","phone":"081234567890"}'
 
 # Daftar sebagai guru
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru","whatsapp":"6281234567890"}'
 ```
 
 **Response 201:**

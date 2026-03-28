@@ -26,13 +26,13 @@ func (r *userRepo) Create(ctx context.Context, u domain.User) (domain.User, erro
 		passHash = nil
 	}
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO users (id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password)
-		VALUES ($1::uuid, $2, $3, $4, $5::user_role, $6, $7::uuid, $8::uuid, $9, $10, $11)
+		INSERT INTO users (id, email, password_hash, name, role, avatar_url, school_id, subject_id, email_verified, email_verified_at, must_set_password, phone, whatsapp)
+		VALUES ($1::uuid, $2, $3, $4, $5::user_role, $6, $7::uuid, $8::uuid, $9, $10, $11, $12, $13)
 		RETURNING id, email, password_hash, name, role, avatar_url, school_id, subject_id,
 		          email_verified, email_verified_at, must_set_password,
 		          phone, whatsapp, class_level, city, province, gender, birth_date, bio, parent_name, parent_phone, instagram,
 		          created_at, updated_at
-	`, id, u.Email, passHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.EmailVerified, u.EmailVerifiedAt, u.MustSetPassword)
+	`, id, u.Email, passHash, u.Name, u.Role, u.AvatarURL, u.SchoolID, u.SubjectID, u.EmailVerified, u.EmailVerifiedAt, u.MustSetPassword, u.Phone, u.Whatsapp)
 	var out domain.User
 	var avatarURL, schoolID, subjectID, pass *string
 	var emailVerifiedAt *time.Time

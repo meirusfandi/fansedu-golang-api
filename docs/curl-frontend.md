@@ -56,15 +56,15 @@ Setelah webhook sukses, enrollment course dibuat otomatis; user bisa akses cours
 ## Auth
 
 ```bash
-# Register — siswa (default)
+# Register — siswa (default); wajib phone atau whatsapp
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123"}'
+  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123","phone":"081234567890"}'
 
 # Register — guru
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru","whatsapp":"6281234567890"}'
 
 # Login (simpan .token dari response untuk $TOKEN)
 curl -s -X POST "$BASE/auth/login" \
@@ -81,7 +81,7 @@ curl -s "$BASE/auth/me" -H "Authorization: Bearer $TOKEN"
 # Register — guru (LMS)
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru","phone":"081234567890"}'
 
 # Ganti kata sandi
 curl -s -X POST "$BASE/auth/change-password" \
@@ -264,8 +264,8 @@ Response berisi:
 
 | Aksi Frontend        | Method | URL                    | Body / Query                    |
 |----------------------|--------|------------------------|----------------------------------|
-| Register siswa       | POST   | `/api/v1/auth/register` | `{ name, email, password }`     |
-| Register guru        | POST   | `/api/v1/auth/register` | `{ name, email, password, role: "guru" }` |
+| Register siswa       | POST   | `/api/v1/auth/register` | `{ name, email, password, phone \| whatsapp }`     |
+| Register guru        | POST   | `/api/v1/auth/register` | `{ name, email, password, role: "guru", phone \| whatsapp }` |
 | Login                | POST   | `/api/v1/auth/login`   | `{ email, password }`           |
 | Logout               | POST   | `/api/v1/auth/logout`  | — Header: `Authorization: Bearer <token>` |
 | Get profil guru      | GET    | `/api/v1/trainer/profile` | — Header: Bearer                |

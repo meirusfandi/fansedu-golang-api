@@ -45,14 +45,14 @@ curl -s "$BASE/programs/<SLUG_COURSE>"
 ## Auth
 
 ```bash
-# Register
+# Register (siswa/guru: wajib phone atau whatsapp)
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123"}'
+  -d '{"name":"Budi Siswa","email":"budi@example.com","password":"rahasia123","phone":"081234567890"}'
 
 curl -s -X POST "$BASE/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru"}'
+  -d '{"name":"Pak Guru","email":"guru@example.com","password":"rahasia123","role":"guru","whatsapp":"6281234567890"}'
 
 # Login (simpan token ke $TOKEN)
 curl -s -X POST "$BASE/auth/login" \

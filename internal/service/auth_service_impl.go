@@ -65,7 +65,22 @@ func NewAuthService(userRepo interface {
 	}
 }
 
-func (s *authService) Register(ctx context.Context, name, email, password, role string) (domain.User, string, error) {
+func applyRegisterPhoneWhatsapp(u *domain.User, phone, whatsapp *string) {
+	if phone != nil {
+		p := strings.TrimSpace(*phone)
+		if p != "" {
+			u.Phone = &p
+		}
+	}
+	if whatsapp != nil {
+		w := strings.TrimSpace(*whatsapp)
+		if w != "" {
+			u.Whatsapp = &w
+		}
+	}
+}
+
+func (s *authService) Register(ctx context.Context, name, email, password, role string, phone, whatsapp *string) (domain.User, string, error) {
 	existing, err := s.userRepo.FindByEmail(ctx, email)
 	if err == nil {
 		// Email sudah terdaftar: perlakukan sebagai update password (reset/first setup),
@@ -78,6 +93,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		if strings.TrimSpace(name) != "" {
 			existing.Name = name
 		}
+		applyRegisterPhoneWhatsapp(&existing, phone, whatsapp)
 		now := time.Now()
 		existing.EmailVerified = true
 		if existing.EmailVerifiedAt == nil {
@@ -110,6 +126,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		EmailVerified:   true,
 		EmailVerifiedAt: &now,
 	}
+	applyRegisterPhoneWhatsapp(&u, phone, whatsapp)
 	u, err = s.userRepo.Create(ctx, u)
 	if err != nil {
 		return domain.User{}, "", err

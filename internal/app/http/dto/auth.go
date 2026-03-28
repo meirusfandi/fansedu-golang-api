@@ -1,10 +1,12 @@
 package dto
 
 type RegisterRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"` // optional: slug atau user_role_code yang ada di tabel roles; kosong = default dari tabel roles
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Role      string `json:"role"` // optional: slug atau user_role_code yang ada di tabel roles; kosong = default dari tabel roles
+	Phone     string `json:"phone,omitempty"`
+	Whatsapp  string `json:"whatsapp,omitempty"`
 }
 
 type LoginRequest struct {
