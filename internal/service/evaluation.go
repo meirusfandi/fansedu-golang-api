@@ -25,22 +25,10 @@ type AttemptEvaluation struct {
 	Recommendation   string                `json:"recommendation"`
 }
 
-// ComputeQuestionScore mengembalikan score yang didapat untuk satu soal (logika sama dengan attempt submit)
+// ComputeQuestionScore mengembalikan score yang didapat untuk satu soal (selaras dengan penilaian submit tryout).
 func ComputeQuestionScore(q domain.Question, ans *domain.AttemptAnswer) float64 {
-	if ans == nil {
-		return 0
-	}
-	switch q.Type {
-	case domain.QuestionTypeShort:
-		if ans.AnswerText != nil && *ans.AnswerText != "" {
-			return q.MaxScore * 0.5
-		}
-	case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
-		if ans.SelectedOption != nil && *ans.SelectedOption != "" {
-			return q.MaxScore
-		}
-	}
-	return 0
+	s, _ := gradeQuestion(q, ans)
+	return s
 }
 
 // EvaluateAttemptAnswers membangun detail penilaian dan rekomendasi dari questions + answers (rule-based).
@@ -57,15 +45,23 @@ func EvaluateAttemptAnswers(questions []domain.Question, answers []domain.Attemp
 		if hasAns {
 			ansPtr = &ans
 		}
-		got := ComputeQuestionScore(q, ansPtr)
+		got, ic := gradeQuestion(q, ansPtr)
 		status := "unanswered"
 		if hasAns {
-			if got >= q.MaxScore {
-				status = "correct"
-			} else if got > 0 {
-				status = "partial"
+			if ic != nil {
+				if *ic {
+					status = "correct"
+				} else {
+					status = "wrong"
+				}
 			} else {
-				status = "wrong"
+				if got >= q.MaxScore && q.MaxScore > 0 {
+					status = "correct"
+				} else if got > 0 {
+					status = "partial"
+				} else {
+					status = "wrong"
+				}
 			}
 		}
 		breakdown = append(breakdown, QuestionScoreDetail{

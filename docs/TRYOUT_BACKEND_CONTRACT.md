@@ -28,6 +28,26 @@ Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `
 | POST | `/api/v1/student/tryouts/:tryoutId/register` | Idempoten (`200` / `201`). Setelah sukses, status & leaderboard konsisten untuk user terdaftar. |
 | POST | `/api/v1/student/tryouts/:tryoutId/start` | Ditolak di server jika belum daftar, sebelum `opensAt`, setelah `closesAt`, atau sudah submit (satu attempt per user per tryout). |
 
+## Submit tryout (siswa)
+
+`POST /api/v1/attempts/{attemptId}/submit` — setelah sukses, body mencakup:
+
+- `review[]` — per soal: `questionId`, `isCorrect` (`true` / `false` / dihilangkan jika belum dinilai otomatis), `scoreGot`, `maxScore`, `moduleKey`, `moduleLabel`, opsional `moduleId`, `moduleTitle`, `bidang`, `tags`.
+- `moduleAnalysis[]` — agregat: `moduleKey`, `moduleLabel`, `questionCount`, `correctCount`, `wrongCount`, `unscoredCount`.
+
+Penilaian otomatis:
+
+- **PG / benar–salah:** bandingkan `selectedOption` dengan `correct_option` di soal (diset lewat admin). Tanpa `correct_option`, skor mengikuti aturan lama (ada pilihan = penuh) dan `isCorrect` tidak dikirim (belum dinilai).
+- **Isian singkat:** jika `correct_text` diisi, dibandingkan case-insensitive; jika kosong, skor parsial 50% dan `isCorrect` tidak dikirim.
+
+Soal (GET lembar ujian, tanpa kunci):
+
+- Field opsional untuk pengelompokan modul di FE: `moduleId`, `moduleTitle`, `bidang`, `tags` — tidak menyertakan `correctOption` / `correctText`.
+
+Admin (penyusunan soal):
+
+- `POST|PUT .../admin/tryouts/{tryoutId}/questions` — boleh mengirim `moduleId`, `moduleTitle`, `bidang`, `tags`, `correctOption`, `correctText`.
+
 ## Leaderboard (publik / Bearer)
 
 | Method | Path | Catatan |

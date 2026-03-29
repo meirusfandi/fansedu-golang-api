@@ -38,6 +38,7 @@ type AttemptRepo interface {
 type AttemptAnswerRepo interface {
 	Upsert(ctx context.Context, a domain.AttemptAnswer) error
 	ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+	SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
 }
 
 type FeedbackRepo interface {
@@ -99,20 +100,24 @@ func (s *attemptService) ListByUser(ctx context.Context, userID string) ([]domai
 	return s.attemptRepo.ListByUserID(ctx, userID)
 }
 
-func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (domain.Attempt, *domain.AttemptFeedback, error) {
+func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (domain.Attempt, *domain.AttemptFeedback, *TryoutSubmitAnalysis, error) {
 	a, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
-		return domain.Attempt{}, nil, ErrAttemptNotFound
+		return domain.Attempt{}, nil, nil, ErrAttemptNotFound
 	}
 	if a.UserID != userID {
-		return domain.Attempt{}, nil, ErrNotYourAttempt
+		return domain.Attempt{}, nil, nil, ErrNotYourAttempt
 	}
 	if a.Status == domain.AttemptStatusSubmitted {
-		return a, nil, ErrAlreadySubmitted
+		return a, nil, nil, ErrAlreadySubmitted
 	}
 	answers, _ := s.answerRepo.ListByAttemptID(ctx, attemptID)
 	questions, _ := s.questionRepo.ListByTryoutSessionID(ctx, a.TryoutSessionID)
-	score, maxScore := computeScore(questions, answers)
+	score, maxScore, outcomes, modAggs := GradeTryoutAttempt(questions, answers)
+	for _, o := range outcomes {
+		_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
+	}
+	analysis := &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs}
 	percentile := float64(0)
 	// TODO: compute percentile from all attempts for this tryout
 	now := time.Now()
@@ -126,7 +131,7 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 		a.TimeSecondsSpent = &sec
 	}
 	if err := s.attemptRepo.Update(ctx, a); err != nil {
-		return domain.Attempt{}, nil, err
+		return domain.Attempt{}, nil, nil, err
 	}
 	// Generate feedback berdasarkan jawaban (AI atau fallback), lalu simpan ke attempt_feedback
 	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
@@ -156,37 +161,22 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	}
 	fb, err = s.feedbackRepo.Create(ctx, fb)
 	if err != nil {
-		return a, nil, nil
+		return a, nil, analysis, nil
 	}
-	return a, &fb, nil
+	return a, &fb, analysis, nil
 }
 
-func computeScore(questions []domain.Question, answers []domain.AttemptAnswer) (float64, float64) {
-	answerMap := make(map[string]domain.AttemptAnswer)
-	for _, a := range answers {
-		answerMap[a.QuestionID] = a
+func (s *attemptService) TryoutAnalysisForAttempt(ctx context.Context, attemptID, tryoutSessionID string) (*TryoutSubmitAnalysis, error) {
+	answers, err := s.answerRepo.ListByAttemptID(ctx, attemptID)
+	if err != nil {
+		return nil, err
 	}
-	var score, maxScore float64
-	for _, q := range questions {
-		maxScore += q.MaxScore
-		ans, ok := answerMap[q.ID]
-		if !ok {
-			continue
-		}
-		var got float64
-		switch q.Type {
-		case domain.QuestionTypeShort:
-			if ans.AnswerText != nil && *ans.AnswerText != "" {
-				got = q.MaxScore * 0.5
-			}
-		case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
-			if ans.SelectedOption != nil && *ans.SelectedOption != "" {
-				got = q.MaxScore
-			}
-		}
-		score += got
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutSessionID)
+	if err != nil {
+		return nil, err
 	}
-	return score, maxScore
+	_, _, outcomes, modAggs := GradeTryoutAttempt(questions, answers)
+	return &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs}, nil
 }
 
 func formatScore(f float64) string { return fmt.Sprintf("%.2f", f) }

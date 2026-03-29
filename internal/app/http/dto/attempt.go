@@ -13,6 +13,10 @@ type AttemptResponse struct {
 	MaxScore         *float64   `json:"maxScore,omitempty"`
 	Percentile       *float64   `json:"percentile,omitempty"`
 	TimeSecondsSpent *int       `json:"timeSecondsSpent,omitempty"`
+	// Hanya terisi jika status submitted — untuk refresh halaman / muat ulang detail attempt.
+	Review         []AttemptReviewRow  `json:"review,omitempty"`
+	ModuleAnalysis []ModuleAnalysisRow `json:"moduleAnalysis,omitempty"`
+	ModuleSummary  []ModuleAnalysisRow `json:"moduleSummary,omitempty"` // alias isi sama dengan moduleAnalysis (kompatibilitas FE)
 }
 
 type AnswerPutRequest struct {
@@ -22,10 +26,38 @@ type AnswerPutRequest struct {
 }
 
 type SubmitResponse struct {
-	AttemptID  string            `json:"attemptId"`
-	Score      float64           `json:"score"`
-	Percentile float64           `json:"percentile"`
-	Feedback   *FeedbackResponse `json:"feedback,omitempty"`
+	AttemptID       string                 `json:"attemptId"`
+	Score           float64                `json:"score"`
+	MaxScore        float64                `json:"maxScore"`
+	Percentile      float64                `json:"percentile"`
+	Feedback        *FeedbackResponse      `json:"feedback,omitempty"`
+	Review          []AttemptReviewRow     `json:"review,omitempty"`
+	ModuleAnalysis  []ModuleAnalysisRow    `json:"moduleAnalysis,omitempty"`
+	ModuleSummary   []ModuleAnalysisRow    `json:"moduleSummary,omitempty"` // alias isi sama (kompatibilitas FE)
+}
+
+// AttemptReviewRow pembahasan per soal setelah submit (isCorrect null = belum dinilai otomatis).
+type AttemptReviewRow struct {
+	QuestionID   string   `json:"questionId"`
+	IsCorrect    *bool    `json:"isCorrect"` // tanpa omitempty agar null eksplisit di JSON
+	ScoreGot     float64  `json:"scoreGot"`
+	MaxScore     float64  `json:"maxScore"`
+	ModuleKey    string   `json:"moduleKey,omitempty"`
+	ModuleLabel  string   `json:"moduleLabel,omitempty"`
+	ModuleID     *string  `json:"moduleId,omitempty"`
+	ModuleTitle  *string  `json:"moduleTitle,omitempty"`
+	Bidang       *string  `json:"bidang,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+}
+
+// ModuleAnalysisRow agregat benar/salah per modul/topik.
+type ModuleAnalysisRow struct {
+	ModuleKey      string `json:"moduleKey"`
+	ModuleLabel    string `json:"moduleLabel"`
+	QuestionCount  int    `json:"questionCount"`
+	CorrectCount   int    `json:"correctCount"`
+	WrongCount     int    `json:"wrongCount"`
+	UnscoredCount  int    `json:"unscoredCount"`
 }
 
 type FeedbackResponse struct {
@@ -46,4 +78,10 @@ type QuestionResponse struct {
 	ImageURLs       []string    `json:"imageUrls,omitempty"`
 	Options         interface{} `json:"options,omitempty"`
 	MaxScore        float64     `json:"maxScore"`
+	ModuleID        *string     `json:"moduleId,omitempty"`
+	ModuleTitle     *string     `json:"moduleTitle,omitempty"`
+	Bidang          *string     `json:"bidang,omitempty"`
+	Tags            []string    `json:"tags,omitempty"`
+	CorrectOption   *string     `json:"correctOption,omitempty"` // hanya admin / penyusun soal
+	CorrectText     *string     `json:"correctText,omitempty"`   // hanya admin
 }

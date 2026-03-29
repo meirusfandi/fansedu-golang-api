@@ -64,16 +64,28 @@ type QuestionCreateRequest struct {
 	ImageURLs       []string    `json:"imageUrls,omitempty"`
 	Options         interface{} `json:"options,omitempty"`
 	MaxScore        float64     `json:"maxScore"`
+	ModuleID        *string     `json:"moduleId,omitempty"`
+	ModuleTitle     *string     `json:"moduleTitle,omitempty"`
+	Bidang          *string     `json:"bidang,omitempty"`
+	Tags            []string    `json:"tags,omitempty"`
+	CorrectOption   *string     `json:"correctOption,omitempty"`
+	CorrectText     *string     `json:"correctText,omitempty"`
 }
 
 type QuestionUpdateRequest struct {
-	SortOrder *int           `json:"sortOrder,omitempty"`
-	Type      *string        `json:"type,omitempty"`
-	Body      *string        `json:"body,omitempty"`
-	ImageURL  *string        `json:"imageUrl,omitempty"`
-	ImageURLs *[]string      `json:"imageUrls,omitempty"`
-	Options   *interface{}   `json:"options,omitempty"`
-	MaxScore  *float64       `json:"maxScore,omitempty"`
+	SortOrder     *int           `json:"sortOrder,omitempty"`
+	Type          *string        `json:"type,omitempty"`
+	Body          *string        `json:"body,omitempty"`
+	ImageURL      *string        `json:"imageUrl,omitempty"`
+	ImageURLs     *[]string      `json:"imageUrls,omitempty"`
+	Options       *interface{}   `json:"options,omitempty"`
+	MaxScore      *float64       `json:"maxScore,omitempty"`
+	ModuleID      *string        `json:"moduleId,omitempty"`
+	ModuleTitle   *string        `json:"moduleTitle,omitempty"`
+	Bidang        *string        `json:"bidang,omitempty"`
+	Tags          *[]string      `json:"tags,omitempty"`
+	CorrectOption *string        `json:"correctOption,omitempty"`
+	CorrectText   *string        `json:"correctText,omitempty"`
 }
 
 type CourseCreateRequest struct {

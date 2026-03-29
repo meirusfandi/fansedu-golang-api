@@ -52,8 +52,19 @@ func AttemptGetByID(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
+		resp := attemptToDTO(a)
+		if a.Status == domain.AttemptStatusSubmitted {
+			if analysis, aerr := deps.AttemptService.TryoutAnalysisForAttempt(r.Context(), a.ID, a.TryoutSessionID); aerr == nil && analysis != nil {
+				rev, mod := tryoutAnalysisToDTO(analysis)
+				resp.Review = rev
+				resp.ModuleAnalysis = mod
+				if len(mod) > 0 {
+					resp.ModuleSummary = append([]dto.ModuleAnalysisRow(nil), mod...)
+				}
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(attemptToDTO(a))
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -181,7 +192,7 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
-		a, fb, err := deps.AttemptService.Submit(r.Context(), attemptID, userID)
+		a, fb, analysis, err := deps.AttemptService.Submit(r.Context(), attemptID, userID)
 		if err != nil {
 			if err == service.ErrAttemptNotFound || err == service.ErrNotYourAttempt {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
@@ -227,23 +238,35 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		score, percentile := 0.0, 0.0
+		score, percentile, maxScore := 0.0, 0.0, 0.0
 		if a.Score != nil {
 			score = *a.Score
 		}
 		if a.Percentile != nil {
 			percentile = *a.Percentile
 		}
+		if a.MaxScore != nil {
+			maxScore = *a.MaxScore
+		}
 		resp := dto.SubmitResponse{
 			AttemptID:  a.ID,
 			Score:      score,
+			MaxScore:   maxScore,
 			Percentile: percentile,
 		}
 		if fb != nil {
 			resp.Feedback = &dto.FeedbackResponse{
-				Summary:           fb.Summary,
-				Recap:             fb.Recap,
+				Summary:            fb.Summary,
+				Recap:              fb.Recap,
 				RecommendationText: fb.RecommendationText,
+			}
+		}
+		if analysis != nil {
+			rev, mod := tryoutAnalysisToDTO(analysis)
+			resp.Review = rev
+			resp.ModuleAnalysis = mod
+			if len(mod) > 0 {
+				resp.ModuleSummary = append([]dto.ModuleAnalysisRow(nil), mod...)
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -266,7 +289,48 @@ func attemptToDTO(a domain.Attempt) dto.AttemptResponse {
 	}
 }
 
+func tryoutAnalysisToDTO(analysis *service.TryoutSubmitAnalysis) (review []dto.AttemptReviewRow, modules []dto.ModuleAnalysisRow) {
+	if analysis == nil {
+		return nil, nil
+	}
+	for _, o := range analysis.Review {
+		review = append(review, dto.AttemptReviewRow{
+			QuestionID:  o.QuestionID,
+			IsCorrect:   o.IsCorrect,
+			ScoreGot:    o.ScoreGot,
+			MaxScore:    o.MaxScore,
+			ModuleKey:   o.ModuleKey,
+			ModuleLabel: o.ModuleLabel,
+			ModuleID:    o.ModuleID,
+			ModuleTitle: o.ModuleTitle,
+			Bidang:      o.Bidang,
+			Tags:        o.Tags,
+		})
+	}
+	for _, m := range analysis.Modules {
+		modules = append(modules, dto.ModuleAnalysisRow{
+			ModuleKey:     m.ModuleKey,
+			ModuleLabel:   m.ModuleLabel,
+			QuestionCount: m.QuestionCount,
+			CorrectCount:  m.CorrectCount,
+			WrongCount:    m.WrongCount,
+			UnscoredCount: m.UnscoredCount,
+		})
+	}
+	return review, modules
+}
+
+// questionToDTO soal untuk siswa / ujian (tanpa kunci jawaban).
 func questionToDTO(q domain.Question) dto.QuestionResponse {
+	return questionToDTOWithSecrets(q, false)
+}
+
+// questionToAdminDTO soal untuk admin (termasuk kunci PG / isian jika ada).
+func questionToAdminDTO(q domain.Question) dto.QuestionResponse {
+	return questionToDTOWithSecrets(q, true)
+}
+
+func questionToDTOWithSecrets(q domain.Question, includeKeys bool) dto.QuestionResponse {
 	var opts interface{}
 	if len(q.Options) > 0 {
 		_ = json.Unmarshal(q.Options, &opts)
@@ -275,15 +339,28 @@ func questionToDTO(q domain.Question) dto.QuestionResponse {
 	if len(q.ImageURLs) > 0 {
 		_ = json.Unmarshal(q.ImageURLs, &imageURLs)
 	}
-	return dto.QuestionResponse{
-		ID:               q.ID,
-		TryoutSessionID:  q.TryoutSessionID,
-		SortOrder:        q.SortOrder,
-		Type:             q.Type,
-		Body:             q.Body,
-		ImageURL:         q.ImageURL,
-		ImageURLs:        imageURLs,
-		Options:          opts,
-		MaxScore:         q.MaxScore,
+	var tags []string
+	if len(q.Tags) > 0 {
+		_ = json.Unmarshal(q.Tags, &tags)
 	}
+	r := dto.QuestionResponse{
+		ID:              q.ID,
+		TryoutSessionID: q.TryoutSessionID,
+		SortOrder:       q.SortOrder,
+		Type:            q.Type,
+		Body:            q.Body,
+		ImageURL:        q.ImageURL,
+		ImageURLs:       imageURLs,
+		Options:         opts,
+		MaxScore:        q.MaxScore,
+		ModuleID:        q.ModuleID,
+		ModuleTitle:     q.ModuleTitle,
+		Bidang:          q.Bidang,
+		Tags:            tags,
+	}
+	if includeKeys {
+		r.CorrectOption = q.CorrectOption
+		r.CorrectText = q.CorrectText
+	}
+	return r
 }

@@ -392,7 +392,7 @@ func AdminListQuestions(deps *Deps) http.HandlerFunc {
 		}
 		out := make([]dto.QuestionResponse, len(list))
 		for i := range list {
-			out[i] = questionToDTO(list[i])
+			out[i] = questionToAdminDTO(list[i])
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
@@ -413,7 +413,7 @@ func AdminGetQuestion(deps *Deps) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(questionToDTO(q))
+		_ = json.NewEncoder(w).Encode(questionToAdminDTO(q))
 	}
 }
 
@@ -430,15 +430,25 @@ func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 		if len(req.ImageURLs) > 0 {
 			imageURLs, _ = json.Marshal(req.ImageURLs)
 		}
+		tagsJSON := []byte("[]")
+		if len(req.Tags) > 0 {
+			tagsJSON, _ = json.Marshal(req.Tags)
+		}
 		q := domain.Question{
 			TryoutSessionID: tryoutID,
-			SortOrder:        req.SortOrder,
-			Type:             req.Type,
-			Body:             req.Body,
-			ImageURL:         req.ImageURL,
-			ImageURLs:        imageURLs,
-			Options:          opts,
-			MaxScore:         req.MaxScore,
+			SortOrder:       req.SortOrder,
+			Type:            req.Type,
+			Body:            req.Body,
+			ImageURL:        req.ImageURL,
+			ImageURLs:       imageURLs,
+			Options:         opts,
+			MaxScore:        req.MaxScore,
+			ModuleID:        req.ModuleID,
+			ModuleTitle:     req.ModuleTitle,
+			Bidang:          req.Bidang,
+			Tags:            tagsJSON,
+			CorrectOption:   req.CorrectOption,
+			CorrectText:     req.CorrectText,
 		}
 		if q.MaxScore == 0 {
 			q.MaxScore = 1
@@ -450,7 +460,7 @@ func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(questionToDTO(created))
+		_ = json.NewEncoder(w).Encode(questionToAdminDTO(created))
 	}
 }
 
@@ -495,13 +505,32 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 		if req.MaxScore != nil {
 			q.MaxScore = *req.MaxScore
 		}
+		if req.ModuleID != nil {
+			q.ModuleID = req.ModuleID
+		}
+		if req.ModuleTitle != nil {
+			q.ModuleTitle = req.ModuleTitle
+		}
+		if req.Bidang != nil {
+			q.Bidang = req.Bidang
+		}
+		if req.Tags != nil {
+			tagsJSON, _ := json.Marshal(*req.Tags)
+			q.Tags = tagsJSON
+		}
+		if req.CorrectOption != nil {
+			q.CorrectOption = req.CorrectOption
+		}
+		if req.CorrectText != nil {
+			q.CorrectText = req.CorrectText
+		}
 		if err := deps.AdminService.UpdateQuestion(r.Context(), q); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(questionToDTO(q))
+		_ = json.NewEncoder(w).Encode(questionToAdminDTO(q))
 	}
 }
 
