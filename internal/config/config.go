@@ -39,6 +39,13 @@ type Config struct {
 	SchoolListCacheSeconds int
 	// PackagesListCacheSeconds TTL cache GET /packages (default 12 jam).
 	PackagesListCacheSeconds int
+
+	// SMTP (Brevo / lain): jika Password terisi, API memakai pengiriman sungguhan; jika kosong, mailer log-only di main.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string // kosong = sama dengan SMTPFrom (umum untuk Brevo)
+	SMTPPassword string // BREVO_SMTP_KEY atau SMTP_PASSWORD
+	SMTPFrom     string // alamat From (harus sender yang sah di Brevo)
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -88,6 +95,17 @@ func Load() Config {
 		}
 	}
 
+	smtpPort := 587
+	if v := getenv("SMTP_PORT", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			smtpPort = n
+		}
+	}
+	smtpPassword := getenv("BREVO_SMTP_KEY", "")
+	if smtpPassword == "" {
+		smtpPassword = getenv("SMTP_PASSWORD", "")
+	}
+
 	cfg := Config{
 		Env:                    env,
 		Port:                   getenv("PORT", "8080"),
@@ -103,6 +121,11 @@ func Load() Config {
 		LeaderboardCacheTTLSeconds: lbTTL,
 		SchoolListCacheSeconds:     schoolCache,
 		PackagesListCacheSeconds:   packagesCache,
+		SMTPHost:                   getenv("SMTP_HOST", "smtp-relay.brevo.com"),
+		SMTPPort:                   smtpPort,
+		SMTPUser:                   getenv("SMTP_USER", ""),
+		SMTPPassword:               smtpPassword,
+		SMTPFrom:                   getenv("SMTP_FROM", "admin@fansedu.web.id"),
 	}
 
 	if cfg.Env == EnvProduction {

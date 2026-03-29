@@ -29,7 +29,7 @@ type SubmitResponse struct {
 	AttemptID       string                 `json:"attemptId"`
 	Score           float64                `json:"score"`
 	MaxScore        float64                `json:"maxScore"`
-	Percentile      float64                `json:"percentile"`
+	Percentile      *float64               `json:"percentile,omitempty"` // dihilangkan jika belum / tidak bisa dihitung (bukan 0 palsu)
 	Feedback        *FeedbackResponse      `json:"feedback,omitempty"`
 	Review          []AttemptReviewRow     `json:"review,omitempty"`
 	ModuleAnalysis  []ModuleAnalysisRow    `json:"moduleAnalysis,omitempty"`

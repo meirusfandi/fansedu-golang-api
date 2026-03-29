@@ -238,21 +238,18 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		score, percentile, maxScore := 0.0, 0.0, 0.0
+		score, maxScore := 0.0, 0.0
 		if a.Score != nil {
 			score = *a.Score
-		}
-		if a.Percentile != nil {
-			percentile = *a.Percentile
 		}
 		if a.MaxScore != nil {
 			maxScore = *a.MaxScore
 		}
 		resp := dto.SubmitResponse{
-			AttemptID:  a.ID,
-			Score:      score,
-			MaxScore:   maxScore,
-			Percentile: percentile,
+			AttemptID:   a.ID,
+			Score:       score,
+			MaxScore:    maxScore,
+			Percentile:  a.Percentile,
 		}
 		if fb != nil {
 			resp.Feedback = &dto.FeedbackResponse{

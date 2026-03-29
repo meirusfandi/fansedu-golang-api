@@ -60,7 +60,7 @@ func EvaluateAttemptAnswers(questions []domain.Question, answers []domain.Attemp
 				} else if got > 0 {
 					status = "partial"
 				} else {
-					status = "wrong"
+					status = "unscored"
 				}
 			}
 		}
@@ -76,7 +76,7 @@ func EvaluateAttemptAnswers(questions []domain.Question, answers []domain.Attemp
 		switch status {
 		case "correct":
 			t.correct++
-		case "partial":
+		case "partial", "unscored":
 			t.partial++
 		case "wrong", "unanswered":
 			t.wrong++

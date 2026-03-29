@@ -32,6 +32,7 @@ type AttemptRepo interface {
 	GetByID(ctx context.Context, id string) (domain.Attempt, error)
 	GetByUserAndTryout(ctx context.Context, userID, tryoutSessionID string) (domain.Attempt, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
+	ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 	Update(ctx context.Context, a domain.Attempt) error
 }
 
@@ -118,14 +119,24 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 		_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
 	}
 	analysis := &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs}
-	percentile := float64(0)
-	// TODO: compute percentile from all attempts for this tryout
+	// Persentil: hanya jika ada ≥2 skor (peserta lain + attempt ini); jika tidak, NULL (bukan 0 palsu).
+	var percentile *float64
+	if others, perr := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, a.TryoutSessionID); perr == nil {
+		scores := make([]float64, 0, len(others)+1)
+		for _, o := range others {
+			if o.Score != nil {
+				scores = append(scores, *o.Score)
+			}
+		}
+		scores = append(scores, score)
+		percentile = percentileRankPercent(scores, score)
+	}
 	now := time.Now()
 	a.SubmittedAt = &now
 	a.Status = domain.AttemptStatusSubmitted
 	a.Score = &score
 	a.MaxScore = &maxScore
-	a.Percentile = &percentile
+	a.Percentile = percentile
 	// Waktu pengerjaan (detik) untuk leaderboard
 	if sec := int(now.Sub(a.StartedAt).Seconds()); sec >= 0 {
 		a.TimeSecondsSpent = &sec

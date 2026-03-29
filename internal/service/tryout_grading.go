@@ -185,9 +185,9 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 			}
 			return 0, boolPtr(false)
 		}
-		// Tanpa kunci: perilaku lama (ada pilihan = dapat penuh), tidak tahu benar/salah.
+		// Tanpa kunci PG/TF: tidak memakai skor parsial — tidak ada jawaban otomatis; skor 0 sampai admin set kunci.
 		if ans.SelectedOption != nil && strings.TrimSpace(*ans.SelectedOption) != "" {
-			return q.MaxScore, nil
+			return 0, nil
 		}
 		return 0, boolPtr(false)
 
@@ -202,18 +202,19 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 			}
 			return 0, boolPtr(false)
 		}
+		// Isian tanpa kunci: tidak ada setengah poin; belum dinilai otomatis.
 		if ans.AnswerText != nil && strings.TrimSpace(*ans.AnswerText) != "" {
-			return q.MaxScore * 0.5, nil
+			return 0, nil
 		}
 		return 0, boolPtr(false)
 
 	default:
 		if ans.SelectedOption != nil && strings.TrimSpace(*ans.SelectedOption) != "" {
-			return q.MaxScore, nil
+			return 0, nil
 		}
 		if ans.AnswerText != nil && strings.TrimSpace(*ans.AnswerText) != "" {
-			return q.MaxScore * 0.5, nil
+			return 0, nil
 		}
-		return 0, nil
+		return 0, boolPtr(false)
 	}
 }

@@ -32,13 +32,14 @@ Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `
 
 `POST /api/v1/attempts/{attemptId}/submit` — setelah sukses, body mencakup:
 
-- `review[]` — per soal: `questionId`, `isCorrect` (`true` / `false` / dihilangkan jika belum dinilai otomatis), `scoreGot`, `maxScore`, `moduleKey`, `moduleLabel`, opsional `moduleId`, `moduleTitle`, `bidang`, `tags`.
-- `moduleAnalysis[]` — agregat: `moduleKey`, `moduleLabel`, `questionCount`, `correctCount`, `wrongCount`, `unscoredCount`.
+- `review[]` — per soal: `questionId`, `isCorrect` (`true` / `false` / `null` jika belum dinilai otomatis), `scoreGot`, `maxScore`, `moduleKey`, `moduleLabel`, opsional `moduleId`, `moduleTitle`, `bidang`, `tags`.
+- `moduleAnalysis[]` — agregat: `moduleKey`, `moduleLabel`, `questionCount`, `correctCount`, `wrongCount`, `unscoredCount` (selaras dengan `isCorrect` / skor per soal).
+- `percentile` pada submit / attempt: **dihilangkan (omit)** jika belum bisa dihitung (mis. peserta submit &lt; 2). Bukan placeholder `0` saat skor final sudah ada. Jika ada ≥2 skor pada tryout yang sama, diisi 0–100 (rank persentil dalam kelompok peserta).
 
-Penilaian otomatis:
+Penilaian otomatis (tryout: biner, tanpa setengah poin):
 
-- **PG / benar–salah:** bandingkan `selectedOption` dengan `correct_option` di soal (diset lewat admin). Tanpa `correct_option`, skor mengikuti aturan lama (ada pilihan = penuh) dan `isCorrect` tidak dikirim (belum dinilai).
-- **Isian singkat:** jika `correct_text` diisi, dibandingkan case-insensitive; jika kosong, skor parsial 50% dan `isCorrect` tidak dikirim.
+- **PG / benar–salah:** dengan `correct_option`: benar → `scoreGot = maxScore`, `isCorrect: true`; salah / kosong → `scoreGot = 0`, `isCorrect: false`. Tanpa `correct_option`: `scoreGot = 0`, `isCorrect: null` (belum dinilai otomatis) meski siswa memilih opsi.
+- **Isian singkat:** dengan `correct_text`: sama biner (0 atau penuh, `isCorrect` true/false). Tanpa `correct_text`: `scoreGot = 0`, `isCorrect: null` (tidak ada skor parsial 50%).
 
 Soal (GET lembar ujian, tanpa kunci):
 

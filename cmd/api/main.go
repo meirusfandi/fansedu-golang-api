@@ -174,6 +174,27 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 	courseAdminLinkRepo := repo.NewCourseAdminLinkRepo(pool)
 	mailer := mail.NewLogMailer()
+	if cfg.SMTPPassword != "" {
+		smtpUser := cfg.SMTPUser
+		if smtpUser == "" {
+			smtpUser = cfg.SMTPFrom
+		}
+		m, err := mail.NewSMTPMailer(mail.SMTPConfig{
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			User:     smtpUser,
+			Password: cfg.SMTPPassword,
+			From:     cfg.SMTPFrom,
+		})
+		if err != nil {
+			log.Printf("warning: smtp mailer: %v — using log mailer", err)
+		} else {
+			mailer = m
+			log.Printf("mail: SMTP enabled host=%s port=%d from=%s", cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom)
+		}
+	} else if cfg.IsProduction() {
+		log.Printf("warning: BREVO_SMTP_KEY/SMTP_PASSWORD not set — transactional email hanya di-log (LogMailer)")
+	}
 	if appURL == "" {
 		appURL = "http://localhost:5173"
 	}
