@@ -35,13 +35,13 @@ func profileApplyErr(status int, code, msg string) error {
 	return &profileApplyError{status: status, code: code, msg: msg}
 }
 
-func writeErrorFromProfileApply(w http.ResponseWriter, err error) {
+func writeErrorFromProfileApply(w http.ResponseWriter, r *http.Request, err error) {
 	var pe *profileApplyError
 	if errors.As(err, &pe) {
 		writeError(w, pe.status, pe.code, pe.msg)
 		return
 	}
-	writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+	writeInternalError(w, r, err)
 }
 
 // SchoolToProfile maps domain.School to SchoolProfile (camelCase JSON).

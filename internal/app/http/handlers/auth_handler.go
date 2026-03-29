@@ -56,7 +56,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusBadRequest, "validation_error", "unknown role: use a value from table roles or student/guru/trainer (instructor accepted as alias for guru)")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		phoneTrim := strings.TrimSpace(req.Phone)
@@ -74,7 +74,7 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		}
 		u, token, err := deps.AuthService.Register(ctx, req.Name, req.Email, req.Password, roleCode, phonePtr, waPtr)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -119,7 +119,7 @@ func AuthRegisterWithInvite(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusBadRequest, "invite_used", "Link registrasi sudah digunakan")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -152,7 +152,7 @@ func AuthLogin(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -235,7 +235,7 @@ func AuthAdminPasswordBypass(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if err := deps.AuthService.SetPassword(r.Context(), u.ID, req.NewPassword); err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -266,7 +266,7 @@ func AuthRunMigrateBypass(deps *Deps) http.HandlerFunc {
 		}
 		applied, err := db.Migrate(r.Context(), deps.DB)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -293,7 +293,7 @@ func AdminGeneratePasswordHash(_ *Deps) http.HandlerFunc {
 		}
 		hash, err := service.GeneratePasswordHash(req.Password)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -350,7 +350,7 @@ func AuthResendVerification(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -394,7 +394,7 @@ func AuthSetPassword(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := deps.AuthService.SetPassword(r.Context(), userID, req.NewPassword); err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 

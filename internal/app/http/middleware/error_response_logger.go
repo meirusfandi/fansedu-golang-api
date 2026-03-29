@@ -162,14 +162,23 @@ func shouldSkipErrorLogPath(path string) bool {
 }
 
 func parseErrorJSON(body []byte) (code string, message string) {
-	var v struct {
+	var nested struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &nested); err == nil && nested.Error.Code != "" {
+		return strings.TrimSpace(nested.Error.Code), strings.TrimSpace(nested.Error.Message)
+	}
+	var flat struct {
 		Error   string `json:"error"`
 		Message string `json:"message"`
 	}
-	if err := json.Unmarshal(body, &v); err != nil {
+	if err := json.Unmarshal(body, &flat); err != nil {
 		return "", strings.TrimSpace(string(body))
 	}
-	return strings.TrimSpace(v.Error), strings.TrimSpace(v.Message)
+	return strings.TrimSpace(flat.Error), strings.TrimSpace(flat.Message)
 }
 
 func inferApplicationErrorType(httpStatus int, errorCode string) string {

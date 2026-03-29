@@ -2,6 +2,15 @@ package dto
 
 import "time"
 
+// GuruTryoutPaperResponse — GET /api/v1/guru/tryouts/:id/paper (dan trainer setara).
+type GuruTryoutPaperResponse struct {
+	Title            string              `json:"title"`
+	DurationMinutes  int                 `json:"durationMinutes"`
+	OpensAt          time.Time           `json:"opensAt"`
+	ClosesAt         time.Time           `json:"closesAt"`
+	Questions        []QuestionResponse  `json:"questions"`
+}
+
 type TryoutResponse struct {
 	ID               string    `json:"id"`
 	Title            string    `json:"title"`

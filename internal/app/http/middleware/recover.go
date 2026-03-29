@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/jsonerror"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -69,9 +70,7 @@ func Recover(inserter ApplicationErrorLogInserter) func(http.Handler) http.Handl
 						}()
 					}
 					if strings.HasPrefix(r.URL.Path, "/api/") {
-						w.Header().Set("Content-Type", "application/json; charset=utf-8")
-						w.WriteHeader(http.StatusInternalServerError)
-						_, _ = w.Write([]byte(`{"error":"internal_error","message":"Internal server error"}`))
+						jsonerror.Write(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan pada server.")
 					} else {
 						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					}

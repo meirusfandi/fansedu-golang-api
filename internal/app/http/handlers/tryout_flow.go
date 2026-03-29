@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -28,37 +27,38 @@ func canStartTryoutExam(t domain.TryoutSession, now time.Time) bool {
 
 func tryoutStartBlockReason(t domain.TryoutSession, now time.Time) (code, message string) {
 	if t.Status != domain.TryoutStatusOpen {
-		return "tryout_not_open", "tryout tidak dibuka untuk pengerjaan"
+		return "TRYOUT_NOT_OPEN", "Tryout tidak dibuka untuk pengerjaan."
 	}
 	u := now.UTC()
 	if u.Before(t.OpensAt.UTC()) {
-		return "before_opens_at", "waktu mulai tryout belum dimulai"
+		return "BEFORE_OPENS_AT", "Waktu mulai tryout belum dimulai."
 	}
 	if u.After(t.ClosesAt.UTC()) {
-		return "after_closes_at", "batas waktu tryout sudah berakhir"
+		return "AFTER_CLOSES_AT", "Batas waktu tryout sudah berakhir."
 	}
-	return "forbidden", "tidak dapat memulai ujian"
+	return "FORBIDDEN", "Tidak dapat memulai ujian."
 }
 
 // startTryoutExamForUser: wajib terdaftar; resume in_progress selalu boleh; attempt baru hanya dalam jendela waktu.
-func startTryoutExamForUser(w http.ResponseWriter, ctx context.Context, deps *Deps, tryoutID, userID string) (domain.Attempt, bool) {
+func startTryoutExamForUser(w http.ResponseWriter, r *http.Request, deps *Deps, tryoutID, userID string) (domain.Attempt, bool) {
+	ctx := r.Context()
 	reg, err := deps.TryoutRegistrationRepo.IsRegistered(ctx, userID, tryoutID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		writeInternalError(w, r, err)
 		return domain.Attempt{}, false
 	}
 	if !reg {
-		writeError(w, http.StatusForbidden, "not_registered", "daftar tryout terlebih dahulu agar bisa mulai ujian")
+		writeError(w, http.StatusForbidden, "NOT_REGISTERED", "Daftar tryout terlebih dahulu agar bisa mulai ujian.")
 		return domain.Attempt{}, false
 	}
 	t, err := deps.TryoutService.GetByID(ctx, tryoutID)
 	if err != nil {
-		http.Error(w, "tryout not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
 		return domain.Attempt{}, false
 	}
 	attempts, err := deps.AttemptService.ListByUser(ctx, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		writeInternalError(w, r, err)
 		return domain.Attempt{}, false
 	}
 	var latest *domain.Attempt
@@ -74,7 +74,7 @@ func startTryoutExamForUser(w http.ResponseWriter, ctx context.Context, deps *De
 			return *latest, true
 		}
 		if latest.Status == domain.AttemptStatusSubmitted {
-			writeError(w, http.StatusConflict, "already_submitted", "tryout sudah diselesaikan")
+			writeError(w, http.StatusConflict, "ALREADY_SUBMITTED", "Tryout sudah diselesaikan.")
 			return domain.Attempt{}, false
 		}
 	}
@@ -86,10 +86,10 @@ func startTryoutExamForUser(w http.ResponseWriter, ctx context.Context, deps *De
 	attempt, err := deps.AttemptService.Start(ctx, userID, tryoutID)
 	if err != nil {
 		if err == service.ErrAlreadySubmitted {
-			writeError(w, http.StatusConflict, "already_submitted", "tryout sudah diselesaikan")
+			writeError(w, http.StatusConflict, "ALREADY_SUBMITTED", "Tryout sudah diselesaikan.")
 			return domain.Attempt{}, false
 		}
-		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		writeInternalError(w, r, err)
 		return domain.Attempt{}, false
 	}
 	return attempt, true

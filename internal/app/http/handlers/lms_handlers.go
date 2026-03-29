@@ -24,7 +24,7 @@ func ListRoles(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		list, err := deps.RoleRepo.List(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.RoleItem, len(list))
@@ -824,11 +824,11 @@ func StudentProfileUpdate(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if err := ApplyUserProfileUpdate(r.Context(), deps, &u, &req); err != nil {
-			writeErrorFromProfileApply(w, err)
+			writeErrorFromProfileApply(w, r, err)
 			return
 		}
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
-			writeErrorFromUserRepoUpdate(w, err)
+			writeErrorFromUserRepoUpdate(w, r, err)
 			return
 		}
 		u2, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
@@ -1119,7 +1119,7 @@ func PackagesListLanding(deps *Deps) http.HandlerFunc {
 			var err error
 			list, err = deps.LandingPackageRepo.List(r.Context())
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+				writeInternalError(w, r, err)
 				return
 			}
 		}

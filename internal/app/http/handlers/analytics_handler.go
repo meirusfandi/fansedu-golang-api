@@ -140,7 +140,7 @@ func AdminAnalyticsSummary(deps *Deps) http.HandlerFunc {
 		}
 		s, err := deps.AnalyticsRepo.GetSummary(r.Context())
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -159,7 +159,7 @@ func AdminAnalyticsVisitors(deps *Deps) http.HandlerFunc {
 		limit := parseQueryInt(r, "limit", 20)
 		items, total, err := deps.AnalyticsRepo.ListVisitors(r.Context(), page, limit)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

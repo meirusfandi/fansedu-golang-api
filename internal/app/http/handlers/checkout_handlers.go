@@ -175,7 +175,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusBadRequest, "package_no_classes", "paket belum dihubungkan ke kelas")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		if result == nil {
@@ -253,7 +253,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 						writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
 						return
 					}
-					writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+					writeInternalError(w, r, err)
 					return
 				}
 			}
@@ -331,7 +331,7 @@ func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusBadRequest, "bad_request", "order is not pending")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		amount := 0
@@ -356,16 +356,16 @@ func PaymentWebhook(deps *Deps) http.HandlerFunc {
 			OrderID string `json:"orderId"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
 		if body.OrderID == "" {
-			http.Error(w, "orderId required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "orderId wajib diisi.")
 			return
 		}
 		// TODO: verify gateway signature (Midtrans/Stripe) using header or body
 		if err := deps.CheckoutService.HandlePaymentWebhook(r.Context(), body.OrderID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -374,6 +374,12 @@ func PaymentWebhook(deps *Deps) http.HandlerFunc {
 
 // UploadDir untuk bukti pembayaran (relatif dari working directory).
 const paymentProofUploadDir = "uploads/payment-proofs"
+
+const maxPaymentProofBytes = 5 << 20 // 5 MiB
+
+var allowedPaymentProofContentTypes = map[string]struct{}{
+	"image/jpeg": {}, "image/png": {}, "image/webp": {}, "application/pdf": {},
+}
 
 // CheckoutPaymentProof menerima upload bukti transfer. POST /api/v1/checkout/orders/:orderId/payment-proof
 // FormData: proof (file), amount, senderAccountNo, senderName
@@ -405,15 +411,36 @@ func CheckoutPaymentProof(deps *Deps) http.HandlerFunc {
 		if safeName == "" {
 			safeName = "proof"
 		}
+		if fh == nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Berkas bukti pembayaran tidak valid.")
+			return
+		}
+		if fh.Size > maxPaymentProofBytes {
+			writeError(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "Ukuran file bukti pembayaran melebihi batas.")
+			return
+		}
+		ct := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
+		if ct != "" {
+			if _, ok := allowedPaymentProofContentTypes[ct]; !ok {
+				writeError(w, http.StatusBadRequest, "INVALID_FILE_TYPE", "Tipe file tidak diizinkan. Gunakan JPG, PNG, WebP, atau PDF.")
+				return
+			}
+		} else {
+			ext := strings.ToLower(filepath.Ext(safeName))
+			if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".pdf" {
+				writeError(w, http.StatusBadRequest, "INVALID_FILE_TYPE", "Ekstensi file tidak diizinkan. Gunakan .jpg, .png, .webp, atau .pdf.")
+				return
+			}
+		}
 		dir := filepath.Join(paymentProofUploadDir, orderID)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			writeError(w, http.StatusInternalServerError, "server_error", "failed to create upload dir")
+			writeInternalError(w, r, err)
 			return
 		}
 		dstPath := filepath.Join(dir, safeName)
 		dst, err := os.Create(dstPath)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "server_error", "failed to save file")
+			writeInternalError(w, r, err)
 			return
 		}
 		_, _ = io.Copy(dst, file)
@@ -426,10 +453,10 @@ func CheckoutPaymentProof(deps *Deps) http.HandlerFunc {
 				return
 			}
 			if err == service.ErrOrderNotPending {
-				writeError(w, http.StatusBadRequest, "bad_request", "order sudah dibayar atau tidak pending")
+				writeError(w, http.StatusBadRequest, "ORDER_NOT_PENDING", "Order sudah dibayar atau tidak dalam status menunggu.")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -492,7 +519,7 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 				}
 				role, rerr := resolveCheckoutUserRoleCode(r.Context(), deps.RoleRepo, reqHint, order.RoleHint)
 				if rerr != nil {
-					writeError(w, http.StatusInternalServerError, "internal_error", rerr.Error())
+					writeInternalError(w, r, rerr)
 					return
 				}
 				now := time.Now()
@@ -506,7 +533,7 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 					MustSetPassword: true,
 				})
 				if err != nil {
-					writeError(w, http.StatusInternalServerError, "internal_error", "gagal membuat user: "+err.Error())
+					writeInternalError(w, r, err)
 					return
 				}
 				isNewUser = true
@@ -517,7 +544,7 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 		if !isNewUser && user.PasswordHash == "" {
 			user.MustSetPassword = true
 			if err := deps.UserRepo.Update(r.Context(), user); err != nil {
-				writeErrorFromUserRepoUpdate(w, err)
+				writeErrorFromUserRepoUpdate(w, r, err)
 				return
 			}
 		}

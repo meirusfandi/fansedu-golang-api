@@ -1,27 +1,23 @@
 package middleware
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/jsonerror"
 )
 
-// WriteJSONError mengirim {"error","message"} agar konsisten dengan handler (FE bisa parse selalu).
+// WriteJSONError sends { "error": { "code", "message" } } with stable uppercase codes.
 func WriteJSONError(w http.ResponseWriter, status int, code, message string) {
 	msg := strings.TrimSpace(message)
 	if msg == "" {
 		msg = http.StatusText(status)
 	}
 	if msg == "" {
-		msg = "Request failed"
+		msg = "Permintaan tidak dapat diproses."
 	}
 	if strings.TrimSpace(code) == "" {
-		code = "error"
+		code = "ERROR"
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(struct {
-		Error   string `json:"error"`
-		Message string `json:"message"`
-	}{Error: code, Message: msg})
+	jsonerror.Write(w, status, code, msg)
 }

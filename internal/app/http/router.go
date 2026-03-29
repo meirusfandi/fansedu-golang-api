@@ -64,9 +64,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 					next.ServeHTTP(w, req)
 					return
 				}
-				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(`{"error":"Service unavailable: database not configured. Set DATABASE_URL in .env or .env.dev."}`))
+				_, _ = w.Write([]byte(`{"error":{"code":"SERVICE_UNAVAILABLE","message":"Layanan sementara tidak tersedia."}}`))
 			})
 		})
 		r.Get("/health", handlers.Health())
@@ -205,6 +205,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Put("/students/{studentId}", handlers.TrainerStudentUpdate(deps))
 			r.Route("/tryouts", func(r chi.Router) {
 				r.Get("/", handlers.TrainerTryoutList(deps))
+				r.Get("/{tryoutId}/paper", handlers.TrainerGuruTryoutPaperGet(deps))
+				r.Put("/{tryoutId}/paper", handlers.TrainerGuruTryoutPaperPut(deps))
 				r.Get("/{tryoutId}/analysis", handlers.TrainerTryoutAnalysis(deps))
 				r.Get("/{tryoutId}/students", handlers.TrainerTryoutStudents(deps))
 				r.Get("/{tryoutId}/attempts/{attemptId}/ai-analysis", handlers.TrainerAttemptAIAnalysis(deps))
@@ -223,6 +225,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/earnings", handlers.GuruEarningsList(deps))
 			r.Route("/tryouts", func(r chi.Router) {
 				r.Get("/", handlers.TrainerTryoutList(deps))
+				r.Get("/{tryoutId}/paper", handlers.TrainerGuruTryoutPaperGet(deps))
+				r.Put("/{tryoutId}/paper", handlers.TrainerGuruTryoutPaperPut(deps))
 				r.Get("/{tryoutId}/analysis", handlers.TrainerTryoutAnalysis(deps))
 				r.Get("/{tryoutId}/students", handlers.TrainerTryoutStudents(deps))
 				r.Get("/{tryoutId}/attempts/{attemptId}/ai-analysis", handlers.TrainerAttemptAIAnalysis(deps))

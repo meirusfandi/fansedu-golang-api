@@ -18,12 +18,12 @@ func AttemptListByUser(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		list, err := deps.AttemptService.ListByUser(r.Context(), userID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.AttemptResponse, len(list))
@@ -40,16 +40,16 @@ func AttemptGetByID(deps *Deps) http.HandlerFunc {
 		attemptID := chi.URLParam(r, "attemptId")
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		a, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
 		if err != nil {
 			if err == service.ErrAttemptNotFound || err == service.ErrNotYourAttempt {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -62,17 +62,17 @@ func AttemptGetQuestions(deps *Deps) http.HandlerFunc {
 		attemptID := chi.URLParam(r, "attemptId")
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		attempt, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
 			return
 		}
 		questions, err := deps.QuestionRepo.ListByTryoutSessionID(r.Context(), attempt.TryoutSessionID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.QuestionResponse, len(questions))
@@ -92,39 +92,39 @@ func StudentTryoutAttemptPaper(deps *Deps) http.HandlerFunc {
 		attemptID := chi.URLParam(r, "attemptId")
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" || tryoutID == "" || attemptID == "" {
-			writeError(w, http.StatusBadRequest, "bad_request", "tryoutId, attemptId, and authentication required")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "tryoutId, attemptId, dan autentikasi wajib.")
 			return
 		}
 		attempt, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
 		if err != nil {
 			if err == service.ErrAttemptNotFound || err == service.ErrNotYourAttempt {
-				writeError(w, http.StatusNotFound, "not_found", "attempt not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		if attempt.TryoutSessionID != tryoutID {
-			writeError(w, http.StatusNotFound, "not_found", "attempt does not belong to this tryout")
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak sesuai tryout ini.")
 			return
 		}
 		t, err := deps.TryoutService.GetByID(r.Context(), tryoutID)
 		if err != nil {
-			writeError(w, http.StatusNotFound, "not_found", "tryout not found")
+			writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
 			return
 		}
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
 			if t.SubjectID != nil && *t.SubjectID != "" {
 				u, uerr := deps.UserRepo.FindByID(r.Context(), userID)
 				if uerr != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "not_found", "tryout not found")
+					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
 					return
 				}
 			}
 		}
 		questions, err := deps.QuestionRepo.ListByTryoutSessionID(r.Context(), tryoutID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.QuestionResponse, len(questions))
@@ -142,17 +142,17 @@ func AttemptPutAnswer(deps *Deps) http.HandlerFunc {
 		questionID := chi.URLParam(r, "questionId")
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		_, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
 			return
 		}
 		var req dto.AnswerPutRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
 		aa := domain.AttemptAnswer{
@@ -166,7 +166,7 @@ func AttemptPutAnswer(deps *Deps) http.HandlerFunc {
 			aa.IsMarked = *req.IsMarked
 		}
 		if err := deps.AttemptAnswerRepo.Upsert(r.Context(), aa); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -178,20 +178,20 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 		attemptID := chi.URLParam(r, "attemptId")
 		userID, _ := middleware.GetUserID(r.Context())
 		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		a, fb, err := deps.AttemptService.Submit(r.Context(), attemptID, userID)
 		if err != nil {
 			if err == service.ErrAttemptNotFound || err == service.ErrNotYourAttempt {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
 				return
 			}
 			if err == service.ErrAlreadySubmitted {
-				http.Error(w, "already submitted", http.StatusConflict)
+				writeError(w, http.StatusConflict, "ALREADY_SUBMITTED", "Attempt sudah dikirim.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 

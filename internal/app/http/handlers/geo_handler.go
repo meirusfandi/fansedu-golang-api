@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/jsonerror"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -13,12 +14,12 @@ import (
 func GeoProvinces(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.GeoService == nil {
-			http.Error(w, `{"error":"geo_unavailable"}`, http.StatusServiceUnavailable)
+			jsonerror.Write(w, http.StatusServiceUnavailable, "GEO_UNAVAILABLE", "Data wilayah tidak tersedia sementara.")
 			return
 		}
 		body, err := deps.GeoService.ProvincesJSON(r.Context())
 		if err != nil {
-			http.Error(w, `{"error":"upstream_failed"}`, http.StatusBadGateway)
+			jsonerror.Write(w, http.StatusBadGateway, "GEO_UPSTREAM_ERROR", "Gagal memuat data wilayah.")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -31,17 +32,17 @@ func GeoProvinces(deps *Deps) http.HandlerFunc {
 func GeoRegencies(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps == nil || deps.GeoService == nil {
-			http.Error(w, `{"error":"geo_unavailable"}`, http.StatusServiceUnavailable)
+			jsonerror.Write(w, http.StatusServiceUnavailable, "GEO_UNAVAILABLE", "Data wilayah tidak tersedia sementara.")
 			return
 		}
 		provinceID := chi.URLParam(r, "provinceId")
 		body, err := deps.GeoService.RegenciesJSON(r.Context(), provinceID)
 		if err != nil {
 			if errors.Is(err, service.ErrGeoNotFound) {
-				http.Error(w, `{"error":"not_found"}`, http.StatusNotFound)
+				jsonerror.Write(w, http.StatusNotFound, "NOT_FOUND", "Provinsi tidak ditemukan.")
 				return
 			}
-			http.Error(w, `{"error":"upstream_failed"}`, http.StatusBadGateway)
+			jsonerror.Write(w, http.StatusBadGateway, "GEO_UPSTREAM_ERROR", "Gagal memuat data wilayah.")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")

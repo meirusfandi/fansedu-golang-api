@@ -23,7 +23,7 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		var req dto.TrainerProfileUpdateRequest
@@ -37,16 +37,16 @@ func TrainerProfileUpdate(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if err := ApplyUserProfileUpdate(r.Context(), deps, &u, &req); err != nil {
-			writeErrorFromProfileApply(w, err)
+			writeErrorFromProfileApply(w, r, err)
 			return
 		}
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
-			writeErrorFromUserRepoUpdate(w, err)
+			writeErrorFromUserRepoUpdate(w, r, err)
 			return
 		}
 		u2, school, err := deps.UserRepo.FindByIDProfileWithSchool(r.Context(), userID)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -60,7 +60,7 @@ func GuruProfilePassword(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok || userID == "" {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "not authenticated")
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 
@@ -91,7 +91,7 @@ func GuruProfilePassword(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusUnauthorized, "invalid_current_password", "current password is incorrect")
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			writeInternalError(w, r, err)
 			return
 		}
 
@@ -105,13 +105,13 @@ func TrainerStatus(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		includeStudents := r.URL.Query().Get("students") != ""
 		paidSlots, registeredCount, students, err := deps.TrainerService.Status(r.Context(), userID, includeStudents)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		resp := dto.TrainerStatusResponse{
@@ -134,20 +134,20 @@ func TrainerPay(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		var req dto.TrainerPayRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Permintaan tidak valid.")
 			return
 		}
 		if req.Quantity <= 0 {
-			http.Error(w, "quantity must be positive", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Jumlah harus positif.")
 			return
 		}
 		if err := deps.TrainerService.Pay(r.Context(), userID, req.Quantity); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -160,29 +160,29 @@ func TrainerCreateStudent(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		var req dto.TrainerCreateStudentRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Permintaan tidak valid.")
 			return
 		}
 		if req.Email == "" || req.Password == "" || req.Name == "" {
-			http.Error(w, "name, email, password required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Nama, email, dan password wajib diisi.")
 			return
 		}
 		u, err := deps.TrainerService.CreateStudent(r.Context(), userID, req.Name, req.Email, req.Password)
 		if err != nil {
 			if err == service.ErrNoSlotsAvailable {
-				http.Error(w, "no paid slots available to register more students", http.StatusForbidden)
+				writeError(w, http.StatusForbidden, "NO_SLOTS_AVAILABLE", "Tidak ada slot berbayar untuk menambah siswa.")
 				return
 			}
 			if err == service.ErrEmailExists {
-				http.Error(w, "email already registered", http.StatusConflict)
+				writeError(w, http.StatusConflict, "EMAIL_EXISTS", "Email sudah terdaftar.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -199,12 +199,12 @@ func TrainerStudentsList(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok || userID == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.TrainerStudentItem, 0, len(students))
@@ -227,17 +227,17 @@ func TrainerStudentGet(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok || userID == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		studentID := chi.URLParam(r, "studentId")
 		if studentID == "" {
-			http.Error(w, "studentId required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "studentId wajib diisi.")
 			return
 		}
 		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		for _, u := range students {
@@ -252,7 +252,7 @@ func TrainerStudentGet(deps *Deps) http.HandlerFunc {
 				return
 			}
 		}
-		http.Error(w, "student not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Siswa tidak ditemukan.")
 	}
 }
 
@@ -262,24 +262,24 @@ func TrainerStudentUpdate(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := middleware.GetUserID(r.Context())
 		if !ok || userID == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
 			return
 		}
 		studentID := chi.URLParam(r, "studentId")
 		if studentID == "" {
-			http.Error(w, "studentId required", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "studentId wajib diisi.")
 			return
 		}
 		var req dto.TrainerStudentUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Permintaan tidak valid.")
 			return
 		}
 
 		// Ensure student belongs to this trainer by checking in the list.
 		_, _, students, err := deps.TrainerService.Status(r.Context(), userID, true)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		found := false
@@ -290,13 +290,13 @@ func TrainerStudentUpdate(deps *Deps) http.HandlerFunc {
 			}
 		}
 		if !found {
-			http.Error(w, "student not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Siswa tidak ditemukan.")
 			return
 		}
 
 		u, err := deps.UserRepo.FindByID(r.Context(), studentID)
 		if err != nil {
-			http.Error(w, "student not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Siswa tidak ditemukan.")
 			return
 		}
 
@@ -306,14 +306,14 @@ func TrainerStudentUpdate(deps *Deps) http.HandlerFunc {
 		if req.Email != "" {
 			existing, err := deps.UserRepo.FindByEmail(r.Context(), req.Email)
 			if err == nil && existing.ID != u.ID {
-				http.Error(w, "email already in use", http.StatusConflict)
+				writeError(w, http.StatusConflict, "EMAIL_EXISTS", "Email sudah digunakan.")
 				return
 			}
 			u.Email = req.Email
 		}
 
 		if err := deps.UserRepo.Update(r.Context(), u); err != nil {
-			writeErrorFromUserRepoUpdate(w, err)
+			writeErrorFromUserRepoUpdate(w, r, err)
 			return
 		}
 
@@ -333,7 +333,7 @@ func TrainerTryoutList(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		list, err := deps.AdminService.ListTryouts(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		out := make([]dto.TryoutResponse, len(list))
@@ -353,10 +353,10 @@ func TrainerTryoutAnalysis(deps *Deps) http.HandlerFunc {
 		analysis, err := deps.AdminService.GetTryoutAnalysis(r.Context(), tryoutID)
 		if err != nil {
 			if err == service.ErrNotFound {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -372,10 +372,10 @@ func TrainerTryoutStudents(deps *Deps) http.HandlerFunc {
 		list, err := deps.AdminService.ListTryoutStudents(r.Context(), tryoutID)
 		if err != nil {
 			if err == service.ErrNotFound {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -392,10 +392,10 @@ func TrainerAttemptAIAnalysis(deps *Deps) http.HandlerFunc {
 		analysis, err := deps.AdminService.GetAttemptAIAnalysis(r.Context(), tryoutID, attemptID)
 		if err != nil {
 			if err == service.ErrNotFound {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeInternalError(w, r, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

@@ -290,9 +290,7 @@ func PasswordSetupGuard(userFinder func(ctx context.Context, id string) (bool, e
 			}
 
 			if mustSetPassword {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write([]byte(`{"error":"password_setup_required","message":"Silakan atur password terlebih dahulu."}`))
+				WriteJSONError(w, http.StatusForbidden, "PASSWORD_SETUP_REQUIRED", "Silakan atur password terlebih dahulu.")
 				return
 			}
 
