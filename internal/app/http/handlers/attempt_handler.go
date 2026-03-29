@@ -292,16 +292,24 @@ func tryoutAnalysisToDTO(analysis *service.TryoutSubmitAnalysis) (review []dto.A
 	}
 	for _, o := range analysis.Review {
 		review = append(review, dto.AttemptReviewRow{
-			QuestionID:  o.QuestionID,
-			IsCorrect:   o.IsCorrect,
-			ScoreGot:    o.ScoreGot,
-			MaxScore:    o.MaxScore,
-			ModuleKey:   o.ModuleKey,
-			ModuleLabel: o.ModuleLabel,
-			ModuleID:    o.ModuleID,
-			ModuleTitle: o.ModuleTitle,
-			Bidang:      o.Bidang,
-			Tags:        o.Tags,
+			QuestionID:       o.QuestionID,
+			SortOrder:        o.SortOrder,
+			QuestionType:     o.QuestionType,
+			QuestionBody:     o.QuestionBody,
+			AnswerText:       o.AnswerText,
+			SelectedOption:   o.SelectedOption,
+			CorrectOption:    o.CorrectOption,
+			CorrectText:      o.CorrectText,
+			IsCorrect:        o.IsCorrect,
+			ScoreGot:         o.ScoreGot,
+			MaxScore:         o.MaxScore,
+			AnalysisSummary:  o.AnalysisSummary,
+			ModuleKey:        o.ModuleKey,
+			ModuleLabel:      o.ModuleLabel,
+			ModuleID:         o.ModuleID,
+			ModuleTitle:      o.ModuleTitle,
+			Bidang:           o.Bidang,
+			Tags:             o.Tags,
 		})
 	}
 	for _, m := range analysis.Modules {

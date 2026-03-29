@@ -15,18 +15,26 @@ type TryoutSubmitAnalysis struct {
 	Modules []ModuleAnalysisAgg
 }
 
-// QuestionReviewOutcome satu baris review setelah submit (untuk FE analisis modul).
+// QuestionReviewOutcome satu baris review setelah submit (untuk FE analisis modul + jawaban siswa).
 type QuestionReviewOutcome struct {
-	QuestionID   string
-	ScoreGot     float64
-	MaxScore     float64
-	IsCorrect    *bool
-	ModuleKey    string
-	ModuleLabel  string
-	ModuleID     *string
-	ModuleTitle  *string
-	Bidang       *string
-	Tags         []string
+	QuestionID     string
+	SortOrder      int
+	QuestionType   string
+	QuestionBody   string
+	AnswerText     *string
+	SelectedOption *string
+	CorrectOption  *string
+	CorrectText    *string
+	ScoreGot       float64
+	MaxScore       float64
+	IsCorrect      *bool
+	ModuleKey      string
+	ModuleLabel    string
+	ModuleID       *string
+	ModuleTitle    *string
+	Bidang         *string
+	Tags           []string
+	AnalysisSummary string // teks singkat untuk siswa (benar/salah/belum dinilai/tidak dijawab)
 }
 
 // ModuleAnalysisAgg agregat per modul/topik.
@@ -40,6 +48,19 @@ type ModuleAnalysisAgg struct {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+func reviewAnalysisSummary(hasAnswer bool, isCorrect *bool) string {
+	if !hasAnswer {
+		return "Soal tidak dijawab."
+	}
+	if isCorrect != nil {
+		if *isCorrect {
+			return "Jawaban Anda benar."
+		}
+		return "Jawaban Anda kurang tepat."
+	}
+	return "Jawaban tercatat; penilaian otomatis untuk soal ini belum tersedia."
+}
 
 // GradeTryoutAttempt menghitung skor, benar/salah per soal, dan agregat modul.
 func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAnswer) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg) {
@@ -61,18 +82,41 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 
 		k, lbl := moduleKeyLabel(q)
 		tags := parseTags(q.Tags)
-		outcomes = append(outcomes, QuestionReviewOutcome{
-			QuestionID:  q.ID,
-			ScoreGot:    score,
-			MaxScore:    q.MaxScore,
-			IsCorrect:   isCorrect,
-			ModuleKey:   k,
-			ModuleLabel: lbl,
-			ModuleID:    q.ModuleID,
-			ModuleTitle: q.ModuleTitle,
-			Bidang:      q.Bidang,
-			Tags:        tags,
-		})
+		out := QuestionReviewOutcome{
+			QuestionID:   q.ID,
+			SortOrder:    q.SortOrder,
+			QuestionType: q.Type,
+			QuestionBody: q.Body,
+			ScoreGot:     score,
+			MaxScore:     q.MaxScore,
+			IsCorrect:    isCorrect,
+			ModuleKey:    k,
+			ModuleLabel:  lbl,
+			ModuleID:     q.ModuleID,
+			ModuleTitle:  q.ModuleTitle,
+			Bidang:       q.Bidang,
+			Tags:         tags,
+		}
+		if has {
+			if ans.AnswerText != nil {
+				v := *ans.AnswerText
+				out.AnswerText = &v
+			}
+			if ans.SelectedOption != nil {
+				v := *ans.SelectedOption
+				out.SelectedOption = &v
+			}
+		}
+		if q.CorrectOption != nil && strings.TrimSpace(*q.CorrectOption) != "" {
+			v := strings.TrimSpace(*q.CorrectOption)
+			out.CorrectOption = &v
+		}
+		if q.CorrectText != nil && strings.TrimSpace(*q.CorrectText) != "" {
+			v := strings.TrimSpace(*q.CorrectText)
+			out.CorrectText = &v
+		}
+		out.AnalysisSummary = reviewAnalysisSummary(has, isCorrect)
+		outcomes = append(outcomes, out)
 
 		if modMap[k] == nil {
 			modMap[k] = &ModuleAnalysisAgg{ModuleKey: k, ModuleLabel: lbl}

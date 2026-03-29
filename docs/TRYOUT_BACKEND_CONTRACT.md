@@ -32,7 +32,7 @@ Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `
 
 `POST /api/v1/attempts/{attemptId}/submit` — setelah sukses, body mencakup:
 
-- `review[]` — per soal: `questionId`, `isCorrect` (`true` / `false` / `null` jika belum dinilai otomatis), `scoreGot`, `maxScore`, `moduleKey`, `moduleLabel`, opsional `moduleId`, `moduleTitle`, `bidang`, `tags`.
+- `review[]` — per soal (urut `sortOrder`): `questionId`, `sortOrder`, `questionType`, `questionBody`, jawaban siswa `answerText` / `selectedOption` (opsional), kunci pembahasan `correctOption` / `correctText` (jika diset di bank soal), `isCorrect`, `scoreGot`, `maxScore`, `analysisSummary` (teks singkat untuk siswa), modul (`moduleKey`, `moduleLabel`, `moduleId`, `moduleTitle`, `bidang`, `tags`).
 - `moduleAnalysis[]` — agregat: `moduleKey`, `moduleLabel`, `questionCount`, `correctCount`, `wrongCount`, `unscoredCount` (selaras dengan `isCorrect` / skor per soal).
 - `percentile` pada submit / attempt: **dihilangkan (omit)** jika belum bisa dihitung (mis. peserta submit &lt; 2). Bukan placeholder `0` saat skor final sudah ada. Jika ada ≥2 skor pada tryout yang sama, diisi 0–100 (rank persentil dalam kelompok peserta).
 

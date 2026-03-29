@@ -38,16 +38,24 @@ type SubmitResponse struct {
 
 // AttemptReviewRow pembahasan per soal setelah submit (isCorrect null = belum dinilai otomatis).
 type AttemptReviewRow struct {
-	QuestionID   string   `json:"questionId"`
-	IsCorrect    *bool    `json:"isCorrect"` // tanpa omitempty agar null eksplisit di JSON
-	ScoreGot     float64  `json:"scoreGot"`
-	MaxScore     float64  `json:"maxScore"`
-	ModuleKey    string   `json:"moduleKey,omitempty"`
-	ModuleLabel  string   `json:"moduleLabel,omitempty"`
-	ModuleID     *string  `json:"moduleId,omitempty"`
-	ModuleTitle  *string  `json:"moduleTitle,omitempty"`
-	Bidang       *string  `json:"bidang,omitempty"`
-	Tags         []string `json:"tags,omitempty"`
+	QuestionID      string   `json:"questionId"`
+	SortOrder       int      `json:"sortOrder"`
+	QuestionType    string   `json:"questionType"`
+	QuestionBody    string   `json:"questionBody"`
+	AnswerText      *string  `json:"answerText,omitempty"`
+	SelectedOption  *string  `json:"selectedOption,omitempty"`
+	CorrectOption   *string  `json:"correctOption,omitempty"`
+	CorrectText     *string  `json:"correctText,omitempty"`
+	IsCorrect       *bool    `json:"isCorrect"` // tanpa omitempty agar null eksplisit di JSON
+	ScoreGot        float64  `json:"scoreGot"`
+	MaxScore        float64  `json:"maxScore"`
+	AnalysisSummary string   `json:"analysisSummary"`
+	ModuleKey       string   `json:"moduleKey,omitempty"`
+	ModuleLabel     string   `json:"moduleLabel,omitempty"`
+	ModuleID        *string  `json:"moduleId,omitempty"`
+	ModuleTitle     *string  `json:"moduleTitle,omitempty"`
+	Bidang          *string  `json:"bidang,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
 }
 
 // ModuleAnalysisRow agregat benar/salah per modul/topik.
