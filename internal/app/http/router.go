@@ -150,6 +150,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/tryouts/open", handlers.StudentTryoutListOpen(deps))
 			r.Get("/tryouts/{tryoutId}/status", handlers.StudentTryoutStatus(deps))
 			r.Get("/tryouts/history", handlers.StudentTryoutHistory(deps))
+			r.Get("/tryouts/{tryoutId}/attempts/{attemptId}/paper", handlers.StudentTryoutAttemptPaper(deps))
 			r.Get("/tryouts/{tryoutId}", handlers.StudentTryoutGetByID(deps))
 			r.Get("/next-actions", handlers.StudentNextActions(deps))
 			r.Post("/tryouts/{tryoutId}/register", handlers.StudentTryoutRegister(deps))

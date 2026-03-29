@@ -118,6 +118,16 @@ type StudentTryoutStatusResponse struct {
 	CanRetake    bool    `json:"canRetake"`
 	AttemptCount int     `json:"attemptCount"`
 	LastAttemptID *string `json:"lastAttemptId"`
+	// Waktu & status tryout (untuk tombol daftar / mulai di frontend)
+	OpensAt      string `json:"opensAt"`
+	ClosesAt     string `json:"closesAt"`
+	TryoutStatus string `json:"tryoutStatus"`
+	// CanRegister: belum terdaftar dan masih bisa daftar (tryout open, belum lewat closesAt).
+	CanRegister bool `json:"canRegister"`
+	// CanStartExam: sudah terdaftar dan boleh buka ujian (resume in_progress atau jendela waktu OK).
+	CanStartExam bool `json:"canStartExam"`
+	// StartDisabledReason: kode saat CanStartExam false, mis. not_registered, before_opens_at, already_submitted.
+	StartDisabledReason string `json:"startDisabledReason,omitempty"`
 }
 
 type StudentTryoutHistoryItem struct {

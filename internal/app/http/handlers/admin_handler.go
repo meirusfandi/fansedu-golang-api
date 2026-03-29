@@ -309,8 +309,6 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// Auto-daftarkan semua siswa ke tryout yang baru dibuat
-		_ = deps.TryoutRegistrationRepo.EnsureAllStudentsForTryout(r.Context(), created.ID)
 		created, err = deps.TryoutService.GetByID(r.Context(), created.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

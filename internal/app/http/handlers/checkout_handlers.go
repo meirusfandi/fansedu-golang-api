@@ -525,11 +525,6 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 		// Generate JWT token (bootstrap token untuk complete-purchase-auth)
 		token := generateBootstrapToken(deps.JWTSecret, user.ID, user.Role)
 
-		// Auto-enroll user ke course dari order items jika belum
-		if domain.IsStudentRoleCode(user.Role) {
-			_ = deps.TryoutRegistrationRepo.EnsureStudentForAllOpenTryouts(r.Context(), user.ID)
-		}
-
 		nextAction := ""
 		if user.MustSetPassword {
 			nextAction = "SET_PASSWORD"

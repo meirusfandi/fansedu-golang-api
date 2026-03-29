@@ -14,7 +14,6 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
-	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
 func TryoutListOpen(deps *Deps) http.HandlerFunc {
@@ -83,6 +82,11 @@ func StudentTryoutRegister(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		if !canRegisterForTryout(t, time.Now()) {
+			writeError(w, http.StatusForbidden, "registration_closed", "pendaftaran tryout tidak tersedia")
+			return
+		}
+
 		already, err := deps.TryoutRegistrationRepo.IsRegistered(r.Context(), userID, tryoutID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
@@ -141,29 +145,9 @@ func StudentTryoutStart(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		attempt, err := deps.AttemptService.Start(r.Context(), userID, tryoutID)
-		if err != nil {
-			if err == service.ErrAlreadySubmitted {
-				// If already started/submitted, return the latest existing attempt.
-				attempts, _ := deps.AttemptService.ListByUser(r.Context(), userID)
-				found := domain.Attempt{}
-				ok := false
-				for _, a := range attempts {
-					if a.TryoutSessionID == tryoutID {
-						found = a
-						ok = true
-						break
-					}
-				}
-				if !ok {
-					writeError(w, http.StatusConflict, "already_submitted", "attempt already submitted")
-					return
-				}
-				attempt = found
-			} else {
-				writeError(w, http.StatusInternalServerError, "server_error", err.Error())
-				return
-			}
+		attempt, ok := startTryoutExamForUser(w, r.Context(), deps, tryoutID, userID)
+		if !ok {
+			return
 		}
 
 		base := os.Getenv("EXAM_BASE_URL")
@@ -193,13 +177,29 @@ func StudentTryoutStatus(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		isRegistered, err := deps.TryoutRegistrationRepo.IsRegistered(r.Context(), userID, tryoutID)
+		ctx := r.Context()
+		t, err := deps.TryoutService.GetByID(ctx, tryoutID)
+		if err != nil {
+			http.Error(w, "tryout not found", http.StatusNotFound)
+			return
+		}
+		if role, _ := middleware.GetRole(ctx); domain.IsStudentRoleCode(role) {
+			if t.SubjectID != nil && *t.SubjectID != "" {
+				u, uerr := deps.UserRepo.FindByID(ctx, userID)
+				if uerr != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+					http.Error(w, "tryout not found", http.StatusNotFound)
+					return
+				}
+			}
+		}
+
+		isRegistered, err := deps.TryoutRegistrationRepo.IsRegistered(ctx, userID, tryoutID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
 
-		attempts, err := deps.AttemptService.ListByUser(r.Context(), userID)
+		attempts, err := deps.AttemptService.ListByUser(ctx, userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
@@ -209,27 +209,65 @@ func StudentTryoutStatus(deps *Deps) http.HandlerFunc {
 		hasAttempted := false
 		var lastAttemptID *string
 		var lastAttemptTime time.Time
+		var latestForTryout *domain.Attempt
 		for _, a := range attempts {
 			if a.TryoutSessionID != tryoutID {
 				continue
 			}
+			if latestForTryout == nil {
+				a2 := a
+				latestForTryout = &a2
+			}
 			count++
 			hasAttempted = true
 			if lastAttemptID == nil || a.StartedAt.After(lastAttemptTime) {
-				t := a.StartedAt
-				lastAttemptTime = t
+				t0 := a.StartedAt
+				lastAttemptTime = t0
 				id := a.ID
 				lastAttemptID = &id
 			}
 		}
 
 		canRetake := hasAttempted
+		now := time.Now()
+		canRegister := !isRegistered && canRegisterForTryout(t, now)
+		canStartExam := false
+		startReason := ""
+		if !isRegistered {
+			startReason = "not_registered"
+		} else if latestForTryout != nil {
+			switch latestForTryout.Status {
+			case domain.AttemptStatusInProgress:
+				canStartExam = true
+			case domain.AttemptStatusSubmitted:
+				startReason = "already_submitted"
+			default:
+				if canStartTryoutExam(t, now) {
+					canStartExam = true
+				} else {
+					startReason, _ = tryoutStartBlockReason(t, now)
+				}
+			}
+		} else {
+			if canStartTryoutExam(t, now) {
+				canStartExam = true
+			} else {
+				startReason, _ = tryoutStartBlockReason(t, now)
+			}
+		}
+
 		resp := dto.StudentTryoutStatusResponse{
-			IsRegistered: isRegistered,
-			HasAttempted: hasAttempted,
-			CanRetake:    canRetake,
-			AttemptCount: count,
-			LastAttemptID: lastAttemptID,
+			IsRegistered:        isRegistered,
+			HasAttempted:        hasAttempted,
+			CanRetake:           canRetake,
+			AttemptCount:        count,
+			LastAttemptID:       lastAttemptID,
+			OpensAt:             t.OpensAt.UTC().Format(time.RFC3339),
+			ClosesAt:            t.ClosesAt.UTC().Format(time.RFC3339),
+			TryoutStatus:        t.Status,
+			CanRegister:         canRegister,
+			CanStartExam:        canStartExam,
+			StartDisabledReason: startReason,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -486,6 +524,10 @@ func TryoutRegister(deps *Deps) http.HandlerFunc {
 				}
 			}
 		}
+		if !canRegisterForTryout(t, time.Now()) {
+			writeError(w, http.StatusForbidden, "registration_closed", "pendaftaran tryout tidak tersedia")
+			return
+		}
 		if err := deps.TryoutService.Register(r.Context(), userID, tryoutID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -540,20 +582,39 @@ func TryoutLeaderboardTop(deps *Deps) http.HandlerFunc {
 				limit = n
 			}
 		}
-		zs, err := cache.LeaderboardTop(r.Context(), deps.Redis, tryoutID, limit)
+		ctx := r.Context()
+		fetch := limit * 15
+		if fetch < 60 {
+			fetch = 60
+		}
+		if fetch > 500 {
+			fetch = 500
+		}
+		zs, err := cache.LeaderboardTop(ctx, deps.Redis, tryoutID, fetch)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		out := make([]dto.LeaderboardTopRow, 0, len(zs))
-		for i, z := range zs {
+		out := make([]dto.LeaderboardTopRow, 0, limit)
+		for _, z := range zs {
+			if len(out) >= limit {
+				break
+			}
 			uid, _ := z.Member.(string)
+			reg, err := deps.TryoutRegistrationRepo.IsRegistered(ctx, uid, tryoutID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if !reg {
+				continue
+			}
 			name := uid
-			if u, err := deps.UserRepo.FindByID(r.Context(), uid); err == nil {
+			if u, err := deps.UserRepo.FindByID(ctx, uid); err == nil {
 				name = u.Name
 			}
 			out = append(out, dto.LeaderboardTopRow{
-				Rank:     i + 1,
+				Rank:     len(out) + 1,
 				UserID:   uid,
 				UserName: name,
 				Score:    z.Score,
@@ -573,11 +634,22 @@ func TryoutLeaderboardMyRank(deps *Deps) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if _, err := deps.TryoutService.GetByID(r.Context(), tryoutID); err != nil {
+		ctx := r.Context()
+		if _, err := deps.TryoutService.GetByID(ctx, tryoutID); err != nil {
 			http.Error(w, "tryout not found", http.StatusNotFound)
 			return
 		}
-		rank0, score, ok, err := cache.LeaderboardUserRankScore(r.Context(), deps.Redis, tryoutID, userID)
+		reg, err := deps.TryoutRegistrationRepo.IsRegistered(ctx, userID, tryoutID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !reg {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_ = json.NewEncoder(w).Encode(dto.LeaderboardRankResponse{InLeaderboard: false})
+			return
+		}
+		rank0, score, ok, err := cache.LeaderboardUserRankScore(ctx, deps.Redis, tryoutID, userID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -614,15 +686,8 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 				}
 			}
 		}
-		// Auto-register ke tryout agar masuk leaderboard bila belum terdaftar
-		_ = deps.TryoutRegistrationRepo.Register(r.Context(), userID, tryoutID)
-		attempt, err := deps.AttemptService.Start(r.Context(), userID, tryoutID)
-		if err != nil {
-			if err == service.ErrAlreadySubmitted {
-				http.Error(w, "already submitted", http.StatusConflict)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		attempt, ok := startTryoutExamForUser(w, r.Context(), deps, tryoutID, userID)
+		if !ok {
 			return
 		}
 		expiresAt := attempt.StartedAt.Add(time.Duration(t.DurationMinutes) * time.Minute)

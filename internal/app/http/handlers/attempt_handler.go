@@ -84,6 +84,58 @@ func AttemptGetQuestions(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// StudentTryoutAttemptPaper returns the question set for an attempt under a tryout (student namespace).
+// GET /api/v1/student/tryouts/{tryoutId}/attempts/{attemptId}/paper — same JSON array as GET /attempts/{attemptId}/questions.
+func StudentTryoutAttemptPaper(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		attemptID := chi.URLParam(r, "attemptId")
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" || tryoutID == "" || attemptID == "" {
+			writeError(w, http.StatusBadRequest, "bad_request", "tryoutId, attemptId, and authentication required")
+			return
+		}
+		attempt, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
+		if err != nil {
+			if err == service.ErrAttemptNotFound || err == service.ErrNotYourAttempt {
+				writeError(w, http.StatusNotFound, "not_found", "attempt not found")
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if attempt.TryoutSessionID != tryoutID {
+			writeError(w, http.StatusNotFound, "not_found", "attempt does not belong to this tryout")
+			return
+		}
+		t, err := deps.TryoutService.GetByID(r.Context(), tryoutID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "tryout not found")
+			return
+		}
+		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
+			if t.SubjectID != nil && *t.SubjectID != "" {
+				u, uerr := deps.UserRepo.FindByID(r.Context(), userID)
+				if uerr != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+					writeError(w, http.StatusNotFound, "not_found", "tryout not found")
+					return
+				}
+			}
+		}
+		questions, err := deps.QuestionRepo.ListByTryoutSessionID(r.Context(), tryoutID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := make([]dto.QuestionResponse, len(questions))
+		for i := range questions {
+			out[i] = questionToDTO(questions[i])
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
 func AttemptPutAnswer(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		attemptID := chi.URLParam(r, "attemptId")
@@ -144,7 +196,9 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 		}
 
 		if a.Score != nil {
-			_ = cache.LeaderboardZAdd(r.Context(), deps.Redis, a.TryoutSessionID, userID, *a.Score)
+			if reg, rerr := deps.TryoutRegistrationRepo.IsRegistered(r.Context(), userID, a.TryoutSessionID); rerr == nil && reg {
+				_ = cache.LeaderboardZAdd(r.Context(), deps.Redis, a.TryoutSessionID, userID, *a.Score)
+			}
 		}
 
 		// Progress notification -> notify all trainers/guru linked to this student.
