@@ -173,7 +173,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	appErrLogRepo := repo.NewApplicationErrorLogRepo(pool)
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
 	courseAdminLinkRepo := repo.NewCourseAdminLinkRepo(pool)
-	mailer := mail.NewLogMailer()
+	var mailer mail.Mailer = mail.NewLogMailer()
 	if cfg.SMTPPassword != "" {
 		smtpUser := cfg.SMTPUser
 		if smtpUser == "" {
