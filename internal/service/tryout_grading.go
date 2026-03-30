@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"unicode"
@@ -9,32 +10,62 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
-// TryoutSubmitAnalysis grading + agregat modul untuk respons HTTP setelah submit.
+// TryoutSubmitAnalysis grading + agregat modul + analisis keseluruhan (setelah submit / GET detail).
 type TryoutSubmitAnalysis struct {
 	Review  []QuestionReviewOutcome
 	Modules []ModuleAnalysisAgg
+	Overall TryoutOverallAnalysis
+}
+
+// TryoutOverallAnalysis ringkasan performa berdasarkan tipe soal + narasi untuk siswa.
+type TryoutOverallAnalysis struct {
+	TotalQuestions  int
+	AnsweredCount   int
+	UnansweredCount int
+	CorrectCount    int // isCorrect == true
+	WrongCount      int // isCorrect == false
+	UnscoredCount   int // isCorrect == nil
+	ScorePercent    float64
+	ScoreGot        float64
+	MaxScore        float64
+	ByQuestionType  []QuestionTypeOverallStat
+	Summary         string // narasi keseluruhan (Bahasa Indonesia)
+}
+
+// QuestionTypeOverallStat agregat per jenis soal (PG, benar-salah, isian).
+type QuestionTypeOverallStat struct {
+	Type         string
+	Label        string
+	Total        int
+	Correct      int
+	Wrong        int
+	Unscored     int
+	ScoreGot     float64
+	MaxScore     float64
 }
 
 // QuestionReviewOutcome satu baris review setelah submit (untuk FE analisis modul + jawaban siswa).
 type QuestionReviewOutcome struct {
-	QuestionID     string
-	SortOrder      int
-	QuestionType   string
-	QuestionBody   string
-	AnswerText     *string
-	SelectedOption *string
-	CorrectOption  *string
-	CorrectText    *string
-	ScoreGot       float64
-	MaxScore       float64
-	IsCorrect      *bool
-	ModuleKey      string
-	ModuleLabel    string
-	ModuleID       *string
-	ModuleTitle    *string
-	Bidang         *string
-	Tags           []string
-	AnalysisSummary string // teks singkat untuk siswa (benar/salah/belum dinilai/tidak dijawab)
+	QuestionID       string
+	SortOrder        int
+	QuestionType     string
+	QuestionTypeLabel string // label manusiawi sesuai tipe
+	QuestionBody     string
+	AnswerText       *string
+	SelectedOption   *string
+	CorrectOption    *string
+	CorrectText      *string
+	ScoreGot         float64
+	MaxScore         float64
+	IsCorrect        *bool
+	ModuleKey        string
+	ModuleLabel      string
+	ModuleID         *string
+	ModuleTitle      *string
+	Bidang           *string
+	Tags             []string
+	AnalysisSummary  string // satu kalimat status
+	AnalysisDetail   string // penjelasan per soal (tipe + jawaban + skor)
 }
 
 // ModuleAnalysisAgg agregat per modul/topik.
@@ -49,6 +80,88 @@ type ModuleAnalysisAgg struct {
 
 func boolPtr(b bool) *bool { return &b }
 
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// resolvedCorrectOption: kolom correct_option, atau opsi yang ditandai benar di JSON options (FE/admin).
+func resolvedCorrectOption(q domain.Question) string {
+	if q.CorrectOption != nil {
+		if s := strings.TrimSpace(*q.CorrectOption); s != "" {
+			return s
+		}
+	}
+	return correctOptionFromOptionsJSON(q.Options)
+}
+
+func resolvedCorrectText(q domain.Question) string {
+	if q.CorrectText != nil {
+		if s := strings.TrimSpace(*q.CorrectText); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// correctOptionFromOptionsJSON mendukung array objek, mis. {"key":"A","correct":true} atau isCorrect / is_correct.
+func correctOptionFromOptionsJSON(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(raw, &arr); err != nil {
+		return ""
+	}
+	for _, o := range arr {
+		truthy := false
+		switch v := o["correct"].(type) {
+		case bool:
+			truthy = v
+		}
+		switch v := o["isCorrect"].(type) {
+		case bool:
+			truthy = truthy || v
+		}
+		switch v := o["is_correct"].(type) {
+		case bool:
+			truthy = truthy || v
+		}
+		switch v := o["isTrue"].(type) {
+		case bool:
+			truthy = truthy || v
+		}
+		if !truthy {
+			continue
+		}
+		for _, k := range []string{"key", "value", "id", "option", "label"} {
+			switch v := o[k].(type) {
+			case string:
+				if s := strings.TrimSpace(v); s != "" {
+					return s
+				}
+			case float64:
+				// JSON number untuk index / kode
+				s := strings.TrimSpace(jsonNumberString(v))
+				if s != "" {
+					return s
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func jsonNumberString(n float64) string {
+	// bilangan bulat tanpa desimal .0
+	if n == float64(int64(n)) {
+		return fmt.Sprintf("%.0f", n)
+	}
+	return fmt.Sprintf("%g", n)
+}
+
 func reviewAnalysisSummary(hasAnswer bool, isCorrect *bool) string {
 	if !hasAnswer {
 		return "Soal tidak dijawab."
@@ -62,8 +175,182 @@ func reviewAnalysisSummary(hasAnswer bool, isCorrect *bool) string {
 	return "Jawaban tercatat; penilaian otomatis untuk soal ini belum tersedia."
 }
 
-// GradeTryoutAttempt menghitung skor, benar/salah per soal, dan agregat modul.
-func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAnswer) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg) {
+func humanQuestionTypeLabel(qType string) string {
+	switch qType {
+	case domain.QuestionTypeMultipleChoice:
+		return "Pilihan ganda"
+	case domain.QuestionTypeTrueFalse:
+		return "Benar / Salah"
+	case domain.QuestionTypeShort:
+		return "Isian singkat"
+	default:
+		if strings.TrimSpace(qType) == "" {
+			return "Soal"
+		}
+		return "Soal (" + qType + ")"
+	}
+}
+
+func buildPerQuestionAnalysis(q domain.Question, hasAns bool, ans *domain.AttemptAnswer, isCorrect *bool, scoreGot, maxScore float64) string {
+	typeLabel := humanQuestionTypeLabel(q.Type)
+	keyOpt := resolvedCorrectOption(q)
+	keyTxt := resolvedCorrectText(q)
+
+	switch q.Type {
+	case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
+		if !hasAns || ans == nil || ans.SelectedOption == nil || strings.TrimSpace(*ans.SelectedOption) == "" {
+			return fmt.Sprintf("%s: tidak ada pilihan yang dikirim. Skor %.0f / %.0f.", typeLabel, scoreGot, maxScore)
+		}
+		sel := strings.TrimSpace(*ans.SelectedOption)
+		if isCorrect != nil && *isCorrect {
+			return fmt.Sprintf("%s: pilihan %q sesuai kunci. Skor %.0f / %.0f.", typeLabel, sel, scoreGot, maxScore)
+		}
+		if isCorrect != nil && !*isCorrect {
+			if keyOpt != "" {
+				return fmt.Sprintf("%s: Anda memilih %q; kunci %q. Skor %.0f / %.0f.", typeLabel, sel, keyOpt, scoreGot, maxScore)
+			}
+			return fmt.Sprintf("%s: pilihan %q dinilai salah atau skor 0. Skor %.0f / %.0f.", typeLabel, sel, scoreGot, maxScore)
+		}
+		return fmt.Sprintf("%s: pilihan %q tercatat; penilaian otomatis belum tersedia (pastikan kunci soal lengkap di bank soal).", typeLabel, sel)
+
+	case domain.QuestionTypeShort:
+		if !hasAns || ans == nil || ans.AnswerText == nil || strings.TrimSpace(*ans.AnswerText) == "" {
+			return fmt.Sprintf("%s: tidak ada jawaban teks. Skor %.0f / %.0f.", typeLabel, scoreGot, maxScore)
+		}
+		userAns := strings.TrimSpace(*ans.AnswerText)
+		if len(userAns) > 160 {
+			userAns = userAns[:157] + "…"
+		}
+		if isCorrect != nil && *isCorrect {
+			return fmt.Sprintf("%s: jawaban teks sesuai kunci. Skor %.0f / %.0f.", typeLabel, scoreGot, maxScore)
+		}
+		if isCorrect != nil && !*isCorrect {
+			if keyTxt != "" {
+				return fmt.Sprintf("%s: jawaban Anda tidak sama dengan kunci referensi. Skor %.0f / %.0f. (Cuplikan jawaban: %q)", typeLabel, scoreGot, maxScore, userAns)
+			}
+			return fmt.Sprintf("%s: jawaban tercatat %q; skor %.0f / %.0f.", typeLabel, userAns, scoreGot, maxScore)
+		}
+		return fmt.Sprintf("%s: jawaban %q tercatat; menunggu penilaian otomatis atau kunci isian.", typeLabel, userAns)
+
+	default:
+		var parts []string
+		if hasAns && ans != nil {
+			if ans.SelectedOption != nil && strings.TrimSpace(*ans.SelectedOption) != "" {
+				parts = append(parts, fmt.Sprintf("pilihan %q", strings.TrimSpace(*ans.SelectedOption)))
+			}
+			if ans.AnswerText != nil && strings.TrimSpace(*ans.AnswerText) != "" {
+				parts = append(parts, "jawaban teks tercatat")
+			}
+		}
+		if len(parts) == 0 {
+			return fmt.Sprintf("%s: tidak dijawab. Skor %.0f / %.0f.", typeLabel, scoreGot, maxScore)
+		}
+		return fmt.Sprintf("%s: %s. Skor %.0f / %.0f.", typeLabel, strings.Join(parts, ", "), scoreGot, maxScore)
+	}
+}
+
+func outcomeHasAnswer(o QuestionReviewOutcome) bool {
+	if o.SelectedOption != nil && strings.TrimSpace(*o.SelectedOption) != "" {
+		return true
+	}
+	if o.AnswerText != nil && strings.TrimSpace(*o.AnswerText) != "" {
+		return true
+	}
+	return false
+}
+
+func buildOverallTryoutAnalysis(outcomes []QuestionReviewOutcome, scoreGot, maxScore float64) TryoutOverallAnalysis {
+	pct := 0.0
+	if maxScore > 0 {
+		pct = scoreGot / maxScore * 100
+	}
+	statMap := make(map[string]*QuestionTypeOverallStat)
+	var answered, correctN, wrongN, unscoredN int
+	for _, o := range outcomes {
+		if outcomeHasAnswer(o) {
+			answered++
+		}
+		if o.IsCorrect != nil {
+			if *o.IsCorrect {
+				correctN++
+			} else {
+				wrongN++
+			}
+		} else {
+			unscoredN++
+		}
+		st := statMap[o.QuestionType]
+		if st == nil {
+			st = &QuestionTypeOverallStat{
+				Type:  o.QuestionType,
+				Label: humanQuestionTypeLabel(o.QuestionType),
+			}
+			statMap[o.QuestionType] = st
+		}
+		st.Total++
+		st.ScoreGot += o.ScoreGot
+		st.MaxScore += o.MaxScore
+		if o.IsCorrect != nil {
+			if *o.IsCorrect {
+				st.Correct++
+			} else {
+				st.Wrong++
+			}
+		} else {
+			st.Unscored++
+		}
+	}
+	byType := make([]QuestionTypeOverallStat, 0, len(statMap))
+	for _, st := range statMap {
+		byType = append(byType, *st)
+	}
+	sort.Slice(byType, func(i, j int) bool {
+		if byType[i].Label == byType[j].Label {
+			return byType[i].Type < byType[j].Type
+		}
+		return byType[i].Label < byType[j].Label
+	})
+	n := len(outcomes)
+	unanswered := n - answered
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Total %d soal. Skor %.2f dari %.2f (%.1f%%). ", n, scoreGot, maxScore, pct))
+	sb.WriteString(fmt.Sprintf("Dinilai otomatis: %d benar, %d salah; %d belum dinilai otomatis; %d tanpa jawaban. ",
+		correctN, wrongN, unscoredN, unanswered))
+	if len(byType) > 0 {
+		sb.WriteString("Per jenis: ")
+		for i, st := range byType {
+			if i > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(fmt.Sprintf("%s: %d soal (benar %d, salah %d, belum dinilai %d; skor %.0f/%.0f).",
+				st.Label, st.Total, st.Correct, st.Wrong, st.Unscored, st.ScoreGot, st.MaxScore))
+		}
+		sb.WriteString(" ")
+	}
+	if pct >= 75 {
+		sb.WriteString("Secara keseluruhan hasil Anda kuat; pertahankan dan perdalam materi yang masih kurang.")
+	} else if pct >= 50 {
+		sb.WriteString("Hasil cukup; fokus ulang pada soal yang salah dan topik yang masih lemah.")
+	} else {
+		sb.WriteString("Masih banyak ruang untuk naik; ulangi konsep dasar dan latihan bertahap per tipe soal.")
+	}
+	return TryoutOverallAnalysis{
+		TotalQuestions:   n,
+		AnsweredCount:    answered,
+		UnansweredCount:  unanswered,
+		CorrectCount:     correctN,
+		WrongCount:       wrongN,
+		UnscoredCount:    unscoredN,
+		ScorePercent:     pct,
+		ScoreGot:         scoreGot,
+		MaxScore:         maxScore,
+		ByQuestionType:   byType,
+		Summary:          sb.String(),
+	}
+}
+
+// GradeTryoutAttempt menghitung skor, benar/salah per soal, agregat modul, dan analisis keseluruhan.
+func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAnswer) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg, overall TryoutOverallAnalysis) {
 	answerMap := make(map[string]domain.AttemptAnswer)
 	for _, a := range answers {
 		answerMap[a.QuestionID] = a
@@ -107,15 +394,11 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 				out.SelectedOption = &v
 			}
 		}
-		if q.CorrectOption != nil && strings.TrimSpace(*q.CorrectOption) != "" {
-			v := strings.TrimSpace(*q.CorrectOption)
-			out.CorrectOption = &v
-		}
-		if q.CorrectText != nil && strings.TrimSpace(*q.CorrectText) != "" {
-			v := strings.TrimSpace(*q.CorrectText)
-			out.CorrectText = &v
-		}
+		out.CorrectOption = strPtr(resolvedCorrectOption(q))
+		out.CorrectText = strPtr(resolvedCorrectText(q))
+		out.QuestionTypeLabel = humanQuestionTypeLabel(q.Type)
 		out.AnalysisSummary = reviewAnalysisSummary(has, isCorrect)
+		out.AnalysisDetail = buildPerQuestionAnalysis(q, has, ansPtr, isCorrect, score, q.MaxScore)
 		outcomes = append(outcomes, out)
 
 		if modMap[k] == nil {
@@ -141,7 +424,8 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 		}
 		return aggs[i].ModuleLabel < aggs[j].ModuleLabel
 	})
-	return totalScore, maxScore, outcomes, aggs
+	overall = buildOverallTryoutAnalysis(outcomes, totalScore, maxScore)
+	return totalScore, maxScore, outcomes, aggs, overall
 }
 
 func parseTags(raw json.RawMessage) []string {
@@ -203,12 +487,12 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 	if ans == nil {
 		switch q.Type {
 		case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
-			if q.CorrectOption != nil && strings.TrimSpace(*q.CorrectOption) != "" {
+			if resolvedCorrectOption(q) != "" {
 				return 0, boolPtr(false)
 			}
 			return 0, nil
 		case domain.QuestionTypeShort:
-			if q.CorrectText != nil && strings.TrimSpace(*q.CorrectText) != "" {
+			if resolvedCorrectText(q) != "" {
 				return 0, boolPtr(false)
 			}
 			return 0, nil
@@ -219,11 +503,12 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 
 	switch q.Type {
 	case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
-		if q.CorrectOption != nil && strings.TrimSpace(*q.CorrectOption) != "" {
+		key := resolvedCorrectOption(q)
+		if key != "" {
 			if ans.SelectedOption == nil || strings.TrimSpace(*ans.SelectedOption) == "" {
 				return 0, boolPtr(false)
 			}
-			ok := strings.EqualFold(strings.TrimSpace(*ans.SelectedOption), strings.TrimSpace(*q.CorrectOption))
+			ok := strings.EqualFold(strings.TrimSpace(*ans.SelectedOption), key)
 			if ok {
 				return q.MaxScore, boolPtr(true)
 			}
@@ -236,11 +521,12 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 		return 0, boolPtr(false)
 
 	case domain.QuestionTypeShort:
-		if q.CorrectText != nil && strings.TrimSpace(*q.CorrectText) != "" {
+		want := resolvedCorrectText(q)
+		if want != "" {
 			if ans.AnswerText == nil || strings.TrimSpace(*ans.AnswerText) == "" {
 				return 0, boolPtr(false)
 			}
-			ok := strings.EqualFold(strings.TrimSpace(*ans.AnswerText), strings.TrimSpace(*q.CorrectText))
+			ok := strings.EqualFold(strings.TrimSpace(*ans.AnswerText), want)
 			if ok {
 				return q.MaxScore, boolPtr(true)
 			}

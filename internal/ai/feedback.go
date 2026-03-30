@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -31,6 +32,8 @@ type FeedbackRequest struct {
 	Answers   []domain.AttemptAnswer
 	Score     float64
 	MaxScore  float64
+	// OverallNarrative analisis agregat per tipe soal (Bahasa Indonesia), dari service setelah grading.
+	OverallNarrative string
 }
 
 type openAIGenerator struct {
@@ -101,7 +104,11 @@ Respon HARUS valid JSON saja, tanpa markdown atau teks lain, dengan format:
 - strength_areas: array 2-4 area/topik yang dikuasai (string)
 - improvement_areas: array 2-4 area yang perlu ditingkatkan (string)
 - recommendation: 1-2 kalimat rekomendasi belajar`
-	userPrompt := fmt.Sprintf("Skor siswa: %.2f dari %.2f (%.1f%%).\n\nDetail soal dan jawaban:\n%s\n\nBeri feedback JSON.", req.Score, req.MaxScore, pct, sb)
+	userPrompt := fmt.Sprintf("Skor siswa: %.2f dari %.2f (%.1f%%).\n\nDetail soal dan jawaban:\n%s\n", req.Score, req.MaxScore, pct, sb)
+	if s := strings.TrimSpace(req.OverallNarrative); s != "" {
+		userPrompt += "\nAnalisis agregat (per jenis soal, dari sistem):\n" + s + "\n"
+	}
+	userPrompt += "\nBeri feedback JSON."
 
 	body, _ := json.Marshal(openAIChatRequest{
 		Model: "gpt-4o-mini",

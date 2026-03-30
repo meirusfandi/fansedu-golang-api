@@ -55,9 +55,10 @@ func AttemptGetByID(deps *Deps) http.HandlerFunc {
 		resp := attemptToDTO(a)
 		if a.Status == domain.AttemptStatusSubmitted {
 			if analysis, aerr := deps.AttemptService.TryoutAnalysisForAttempt(r.Context(), a.ID, a.TryoutSessionID); aerr == nil && analysis != nil {
-				rev, mod := tryoutAnalysisToDTO(analysis)
+				rev, mod, overall := tryoutAnalysisToDTO(analysis)
 				resp.Review = rev
 				resp.ModuleAnalysis = mod
+				resp.OverallAnalysis = overall
 				if len(mod) > 0 {
 					resp.ModuleSummary = append([]dto.ModuleAnalysisRow(nil), mod...)
 				}
@@ -259,9 +260,10 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			}
 		}
 		if analysis != nil {
-			rev, mod := tryoutAnalysisToDTO(analysis)
+			rev, mod, overall := tryoutAnalysisToDTO(analysis)
 			resp.Review = rev
 			resp.ModuleAnalysis = mod
+			resp.OverallAnalysis = overall
 			if len(mod) > 0 {
 				resp.ModuleSummary = append([]dto.ModuleAnalysisRow(nil), mod...)
 			}
@@ -286,30 +288,32 @@ func attemptToDTO(a domain.Attempt) dto.AttemptResponse {
 	}
 }
 
-func tryoutAnalysisToDTO(analysis *service.TryoutSubmitAnalysis) (review []dto.AttemptReviewRow, modules []dto.ModuleAnalysisRow) {
+func tryoutAnalysisToDTO(analysis *service.TryoutSubmitAnalysis) (review []dto.AttemptReviewRow, modules []dto.ModuleAnalysisRow, overall *dto.TryoutOverallAnalysisRow) {
 	if analysis == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	for _, o := range analysis.Review {
 		review = append(review, dto.AttemptReviewRow{
-			QuestionID:       o.QuestionID,
-			SortOrder:        o.SortOrder,
-			QuestionType:     o.QuestionType,
-			QuestionBody:     o.QuestionBody,
-			AnswerText:       o.AnswerText,
-			SelectedOption:   o.SelectedOption,
-			CorrectOption:    o.CorrectOption,
-			CorrectText:      o.CorrectText,
-			IsCorrect:        o.IsCorrect,
-			ScoreGot:         o.ScoreGot,
-			MaxScore:         o.MaxScore,
-			AnalysisSummary:  o.AnalysisSummary,
-			ModuleKey:        o.ModuleKey,
-			ModuleLabel:      o.ModuleLabel,
-			ModuleID:         o.ModuleID,
-			ModuleTitle:      o.ModuleTitle,
-			Bidang:           o.Bidang,
-			Tags:             o.Tags,
+			QuestionID:        o.QuestionID,
+			SortOrder:         o.SortOrder,
+			QuestionType:      o.QuestionType,
+			QuestionTypeLabel: o.QuestionTypeLabel,
+			QuestionBody:      o.QuestionBody,
+			AnswerText:        o.AnswerText,
+			SelectedOption:    o.SelectedOption,
+			CorrectOption:     o.CorrectOption,
+			CorrectText:       o.CorrectText,
+			IsCorrect:         o.IsCorrect,
+			ScoreGot:          o.ScoreGot,
+			MaxScore:          o.MaxScore,
+			AnalysisSummary:   o.AnalysisSummary,
+			AnalysisDetail:    o.AnalysisDetail,
+			ModuleKey:         o.ModuleKey,
+			ModuleLabel:       o.ModuleLabel,
+			ModuleID:          o.ModuleID,
+			ModuleTitle:       o.ModuleTitle,
+			Bidang:            o.Bidang,
+			Tags:              o.Tags,
 		})
 	}
 	for _, m := range analysis.Modules {
@@ -322,7 +326,32 @@ func tryoutAnalysisToDTO(analysis *service.TryoutSubmitAnalysis) (review []dto.A
 			UnscoredCount: m.UnscoredCount,
 		})
 	}
-	return review, modules
+	overall = overallTryoutAnalysisToDTO(analysis.Overall)
+	return review, modules, overall
+}
+
+func overallTryoutAnalysisToDTO(o service.TryoutOverallAnalysis) *dto.TryoutOverallAnalysisRow {
+	by := make([]dto.QuestionTypeStatRow, len(o.ByQuestionType))
+	for i, t := range o.ByQuestionType {
+		by[i] = dto.QuestionTypeStatRow{
+			Type: t.Type, Label: t.Label, Total: t.Total,
+			Correct: t.Correct, Wrong: t.Wrong, Unscored: t.Unscored,
+			ScoreGot: t.ScoreGot, MaxScore: t.MaxScore,
+		}
+	}
+	return &dto.TryoutOverallAnalysisRow{
+		TotalQuestions:  o.TotalQuestions,
+		AnsweredCount:   o.AnsweredCount,
+		UnansweredCount: o.UnansweredCount,
+		CorrectCount:    o.CorrectCount,
+		WrongCount:      o.WrongCount,
+		UnscoredCount:   o.UnscoredCount,
+		ScorePercent:    o.ScorePercent,
+		ScoreGot:        o.ScoreGot,
+		MaxScore:        o.MaxScore,
+		ByQuestionType:  by,
+		Summary:         o.Summary,
+	}
 }
 
 // questionToDTO soal untuk siswa / ujian (tanpa kunci jawaban).

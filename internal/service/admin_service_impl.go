@@ -600,11 +600,13 @@ func (s *adminService) GetAttemptAIAnalysis(ctx context.Context, tryoutID, attem
 	if err == nil && (fb.Summary != nil && *fb.Summary != "" || fb.Recap != nil && *fb.Recap != "") {
 		return feedbackToAIAnalysisResponse(attemptID, fb)
 	}
+	_, _, _, _, overall := GradeTryoutAttempt(questions, answers)
 	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
-		Questions: questions,
-		Answers:   answers,
-		Score:     score,
-		MaxScore:  maxScore,
+		Questions:        questions,
+		Answers:          answers,
+		Score:            score,
+		MaxScore:         maxScore,
+		OverallNarrative: overall.Summary,
 	})
 	if err != nil {
 		return &AttemptAIAnalysisResponse{

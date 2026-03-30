@@ -14,9 +14,10 @@ type AttemptResponse struct {
 	Percentile       *float64   `json:"percentile,omitempty"`
 	TimeSecondsSpent *int       `json:"timeSecondsSpent,omitempty"`
 	// Hanya terisi jika status submitted — untuk refresh halaman / muat ulang detail attempt.
-	Review         []AttemptReviewRow  `json:"review,omitempty"`
-	ModuleAnalysis []ModuleAnalysisRow `json:"moduleAnalysis,omitempty"`
-	ModuleSummary  []ModuleAnalysisRow `json:"moduleSummary,omitempty"` // alias isi sama dengan moduleAnalysis (kompatibilitas FE)
+	Review            []AttemptReviewRow         `json:"review,omitempty"`
+	ModuleAnalysis    []ModuleAnalysisRow        `json:"moduleAnalysis,omitempty"`
+	ModuleSummary     []ModuleAnalysisRow        `json:"moduleSummary,omitempty"` // alias isi sama dengan moduleAnalysis (kompatibilitas FE)
+	OverallAnalysis   *TryoutOverallAnalysisRow  `json:"overallAnalysis,omitempty"`
 }
 
 type AnswerPutRequest struct {
@@ -32,16 +33,45 @@ type SubmitResponse struct {
 	Percentile      *float64               `json:"percentile,omitempty"` // dihilangkan jika belum / tidak bisa dihitung (bukan 0 palsu)
 	Feedback        *FeedbackResponse      `json:"feedback,omitempty"`
 	Review          []AttemptReviewRow     `json:"review,omitempty"`
-	ModuleAnalysis  []ModuleAnalysisRow    `json:"moduleAnalysis,omitempty"`
-	ModuleSummary   []ModuleAnalysisRow    `json:"moduleSummary,omitempty"` // alias isi sama (kompatibilitas FE)
+	ModuleAnalysis    []ModuleAnalysisRow       `json:"moduleAnalysis,omitempty"`
+	ModuleSummary     []ModuleAnalysisRow       `json:"moduleSummary,omitempty"` // alias isi sama (kompatibilitas FE)
+	OverallAnalysis   *TryoutOverallAnalysisRow `json:"overallAnalysis,omitempty"`
+}
+
+// TryoutOverallAnalysisRow analisis keseluruhan setelah grading (per jenis soal + narasi).
+type TryoutOverallAnalysisRow struct {
+	TotalQuestions   int                   `json:"totalQuestions"`
+	AnsweredCount    int                   `json:"answeredCount"`
+	UnansweredCount  int                   `json:"unansweredCount"`
+	CorrectCount     int                   `json:"correctCount"`
+	WrongCount       int                   `json:"wrongCount"`
+	UnscoredCount    int                   `json:"unscoredCount"`
+	ScorePercent     float64               `json:"scorePercent"`
+	ScoreGot         float64               `json:"scoreGot"`
+	MaxScore         float64               `json:"maxScore"`
+	ByQuestionType   []QuestionTypeStatRow `json:"byQuestionType"`
+	Summary          string                `json:"summary"`
+}
+
+// QuestionTypeStatRow ringkasan per tipe soal.
+type QuestionTypeStatRow struct {
+	Type      string  `json:"type"`
+	Label     string  `json:"label"`
+	Total     int     `json:"total"`
+	Correct   int     `json:"correct"`
+	Wrong     int     `json:"wrong"`
+	Unscored  int     `json:"unscored"`
+	ScoreGot  float64 `json:"scoreGot"`
+	MaxScore  float64 `json:"maxScore"`
 }
 
 // AttemptReviewRow pembahasan per soal setelah submit (isCorrect null = belum dinilai otomatis).
 type AttemptReviewRow struct {
-	QuestionID      string   `json:"questionId"`
-	SortOrder       int      `json:"sortOrder"`
-	QuestionType    string   `json:"questionType"`
-	QuestionBody    string   `json:"questionBody"`
+	QuestionID        string   `json:"questionId"`
+	SortOrder         int      `json:"sortOrder"`
+	QuestionType      string   `json:"questionType"`
+	QuestionTypeLabel string   `json:"questionTypeLabel"`
+	QuestionBody      string   `json:"questionBody"`
 	AnswerText      *string  `json:"answerText,omitempty"`
 	SelectedOption  *string  `json:"selectedOption,omitempty"`
 	CorrectOption   *string  `json:"correctOption,omitempty"`
@@ -49,8 +79,9 @@ type AttemptReviewRow struct {
 	IsCorrect       *bool    `json:"isCorrect"` // tanpa omitempty agar null eksplisit di JSON
 	ScoreGot        float64  `json:"scoreGot"`
 	MaxScore        float64  `json:"maxScore"`
-	AnalysisSummary string   `json:"analysisSummary"`
-	ModuleKey       string   `json:"moduleKey,omitempty"`
+	AnalysisSummary  string   `json:"analysisSummary"`
+	AnalysisDetail   string   `json:"analysisDetail"`
+	ModuleKey        string   `json:"moduleKey,omitempty"`
 	ModuleLabel     string   `json:"moduleLabel,omitempty"`
 	ModuleID        *string  `json:"moduleId,omitempty"`
 	ModuleTitle     *string  `json:"moduleTitle,omitempty"`

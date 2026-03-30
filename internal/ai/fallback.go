@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // FallbackFeedbackGenerator feedback rule-based tanpa AI (jika AI tidak tersedia)
@@ -19,6 +20,9 @@ func (g *FallbackFeedbackGenerator) Generate(ctx context.Context, req FeedbackRe
 	}
 	summary := fmt.Sprintf("Tryout selesai. Skor Anda %.2f dari %.2f.", req.Score, req.MaxScore)
 	recap := fmt.Sprintf("Skor: %.2f dari %.2f (%.1f%%). Lanjutkan berlatih untuk hasil lebih baik.", req.Score, req.MaxScore, pct)
+	if s := strings.TrimSpace(req.OverallNarrative); s != "" {
+		recap = fmt.Sprintf("Skor: %.2f dari %.2f (%.1f%%). %s", req.Score, req.MaxScore, pct, s)
+	}
 	strength := []string{}
 	improvement := []string{"Perbanyak latihan soal", "Review materi yang kurang dikuasai"}
 	if pct >= 70 {

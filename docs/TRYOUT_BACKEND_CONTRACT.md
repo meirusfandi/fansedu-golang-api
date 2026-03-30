@@ -15,6 +15,10 @@ Respons error memakai bentuk tunggal:
 
 Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `EXPOSE_INTERNAL_ERRORS=true` hanya di lingkungan dev jika perlu melihat pesan asli pada 5xx.
 
+## CORS (browser / Chrome)
+
+`Access-Control-Allow-Headers` memakai daftar eksplisit yang mencakup **`Authorization`** (wildcard `*` tidak lagi dianggap mencakup header ini pada preflight di browser modern). Origin diatur lewat env **`CORS_ORIGINS`** (koma); jika perlu kredensial cookie, jangan memakai `*` untuk origin — daftar domain frontend secara eksplisit.
+
 ## TryoutResponse
 
 - `opensAt` dan `closesAt` selalu diserialisasi sebagai ISO-8601 (RFC3339) dari `time.Time`.
@@ -32,13 +36,14 @@ Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `
 
 `POST /api/v1/attempts/{attemptId}/submit` — setelah sukses, body mencakup:
 
-- `review[]` — per soal (urut `sortOrder`): `questionId`, `sortOrder`, `questionType`, `questionBody`, jawaban siswa `answerText` / `selectedOption` (opsional), kunci pembahasan `correctOption` / `correctText` (jika diset di bank soal), `isCorrect`, `scoreGot`, `maxScore`, `analysisSummary` (teks singkat untuk siswa), modul (`moduleKey`, `moduleLabel`, `moduleId`, `moduleTitle`, `bidang`, `tags`).
+- `review[]` — per soal (urut `sortOrder`): `questionId`, `sortOrder`, `questionType`, `questionTypeLabel` (mis. "Pilihan ganda"), `questionBody`, jawaban siswa `answerText` / `selectedOption`, kunci `correctOption` / `correctText` (jika ada), `isCorrect`, `scoreGot`, `maxScore`, `analysisSummary` (satu kalimat), `analysisDetail` (narasi per soal sesuai tipe: pilihan vs isian, benar/salah, skor), modul (`moduleKey`, `moduleLabel`, …).
+- `overallAnalysis` — ringkasan tryout: `totalQuestions`, `answeredCount`, `unansweredCount`, `correctCount`, `wrongCount`, `unscoredCount`, `scorePercent`, `scoreGot`, `maxScore`, `byQuestionType[]` (`type`, `label`, `total`, `correct`, `wrong`, `unscored`, `scoreGot`, `maxScore` per jenis soal), `summary` (paragraf Bahasa Indonesia).
 - `moduleAnalysis[]` — agregat: `moduleKey`, `moduleLabel`, `questionCount`, `correctCount`, `wrongCount`, `unscoredCount` (selaras dengan `isCorrect` / skor per soal).
 - `percentile` pada submit / attempt: **dihilangkan (omit)** jika belum bisa dihitung (mis. peserta submit &lt; 2). Bukan placeholder `0` saat skor final sudah ada. Jika ada ≥2 skor pada tryout yang sama, diisi 0–100 (rank persentil dalam kelompok peserta).
 
 Penilaian otomatis (tryout: biner, tanpa setengah poin):
 
-- **PG / benar–salah:** dengan `correct_option`: benar → `scoreGot = maxScore`, `isCorrect: true`; salah / kosong → `scoreGot = 0`, `isCorrect: false`. Tanpa `correct_option`: `scoreGot = 0`, `isCorrect: null` (belum dinilai otomatis) meski siswa memilih opsi.
+- **PG / benar–salah:** kunci diambil dari kolom `correct_option` **atau** dari entri opsi di JSON `options` yang memiliki `correct` / `isCorrect` / `is_correct` / `isTrue` (dan field kunci `key`, `value`, `id`, `option`, atau `label`). Dengan kunci: benar → penuh; salah / kosong → 0 + `isCorrect: false`. Tanpa kunci sama sekali: `scoreGot = 0`, `isCorrect: null`.
 - **Isian singkat:** dengan `correct_text`: sama biner (0 atau penuh, `isCorrect` true/false). Tanpa `correct_text`: `scoreGot = 0`, `isCorrect: null` (tidak ada skor parsial 50%).
 
 Soal (GET lembar ujian, tanpa kunci):

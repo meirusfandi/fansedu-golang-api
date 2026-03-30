@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+// corsAllowedHeaders — daftar eksplisit (bukan "*") karena browser modern (Chrome m97+)
+// tidak lagi menganggap wildcard mencakup Authorization pada preflight.
+const corsAllowedHeaders = "Accept, Accept-Language, Authorization, Content-Type, Origin, X-Requested-With, X-CSRF-Token, Cache-Control"
+
 // CORS returns a middleware that sets CORS headers and handles OPTIONS preflight.
 // Allowed origins: set CORS_ORIGINS env (comma-separated, e.g. "http://localhost:5173,https://app.example.com").
 // Default allows http://localhost:5173 (Vite frontend) and "*".
@@ -33,7 +37,7 @@ func CORS(allowedOrigins string) func(http.Handler) http.Handler {
 				}
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
-			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Allow-Headers", corsAllowedHeaders)
 			w.Header().Set("Access-Control-Max-Age", "86400")
 
 			if r.Method == http.MethodOptions {

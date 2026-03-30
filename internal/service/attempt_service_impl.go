@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
@@ -112,13 +113,19 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	if a.Status == domain.AttemptStatusSubmitted {
 		return a, nil, nil, ErrAlreadySubmitted
 	}
-	answers, _ := s.answerRepo.ListByAttemptID(ctx, attemptID)
-	questions, _ := s.questionRepo.ListByTryoutSessionID(ctx, a.TryoutSessionID)
-	score, maxScore, outcomes, modAggs := GradeTryoutAttempt(questions, answers)
+	answers, err := s.answerRepo.ListByAttemptID(ctx, attemptID)
+	if err != nil {
+		return domain.Attempt{}, nil, nil, fmt.Errorf("submit: load answers: %w", err)
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, a.TryoutSessionID)
+	if err != nil {
+		return domain.Attempt{}, nil, nil, fmt.Errorf("submit: load questions: %w", err)
+	}
+	score, maxScore, outcomes, modAggs, overall := GradeTryoutAttempt(questions, answers)
 	for _, o := range outcomes {
 		_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
 	}
-	analysis := &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs}
+	analysis := &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs, Overall: overall}
 	// Persentil: hanya jika ada ≥2 skor (peserta lain + attempt ini); jika tidak, NULL (bukan 0 palsu).
 	var percentile *float64
 	if others, perr := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, a.TryoutSessionID); perr == nil {
@@ -146,15 +153,20 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	}
 	// Generate feedback berdasarkan jawaban (AI atau fallback), lalu simpan ke attempt_feedback
 	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
-		Questions: questions,
-		Answers:   answers,
-		Score:     score,
-		MaxScore:  maxScore,
+		Questions:        questions,
+		Answers:          answers,
+		Score:            score,
+		MaxScore:         maxScore,
+		OverallNarrative: analysis.Overall.Summary,
 	})
 	if err != nil {
+		recap := "Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + "."
+		if s := strings.TrimSpace(analysis.Overall.Summary); s != "" {
+			recap += " " + s
+		}
 		gen = &ai.GeneratedFeedback{
 			Summary:          "Tryout selesai.",
-			Recap:            "Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + ".",
+			Recap:            recap,
 			StrengthAreas:    []string{},
 			ImprovementAreas: []string{"Lanjutkan berlatih."},
 			Recommendation:   "Lanjutkan berlatih dan perbaiki area yang masih lemah.",
@@ -186,8 +198,8 @@ func (s *attemptService) TryoutAnalysisForAttempt(ctx context.Context, attemptID
 	if err != nil {
 		return nil, err
 	}
-	_, _, outcomes, modAggs := GradeTryoutAttempt(questions, answers)
-	return &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs}, nil
+	_, _, outcomes, modAggs, overall := GradeTryoutAttempt(questions, answers)
+	return &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs, Overall: overall}, nil
 }
 
 func formatScore(f float64) string { return fmt.Sprintf("%.2f", f) }
