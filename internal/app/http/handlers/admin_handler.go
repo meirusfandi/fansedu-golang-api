@@ -422,7 +422,17 @@ func AdminCreateQuestion(deps *Deps) http.HandlerFunc {
 		tryoutID := chi.URLParam(r, "tryoutId")
 		var req dto.QuestionCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body soal tidak valid: "+err.Error())
+			return
+		}
+		req.Type = strings.TrimSpace(req.Type)
+		req.Body = strings.TrimSpace(req.Body)
+		if req.Type == "" || req.Body == "" {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "type dan body wajib diisi.")
+			return
+		}
+		if req.MaxScore < 0 {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "maxScore harus >= 0.")
 			return
 		}
 		opts, _ := json.Marshal(req.Options)
@@ -470,7 +480,11 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 		questionID := chi.URLParam(r, "questionId")
 		var req dto.QuestionUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body soal tidak valid: "+err.Error())
+			return
+		}
+		if req.MaxScore != nil && *req.MaxScore < 0 {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "maxScore harus >= 0.")
 			return
 		}
 		q, err := deps.QuestionRepo.GetByID(r.Context(), questionID)
@@ -486,10 +500,10 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 			q.SortOrder = *req.SortOrder
 		}
 		if req.Type != nil {
-			q.Type = *req.Type
+			q.Type = strings.TrimSpace(*req.Type)
 		}
 		if req.Body != nil {
-			q.Body = *req.Body
+			q.Body = strings.TrimSpace(*req.Body)
 		}
 		if req.ImageURL != nil {
 			q.ImageURL = req.ImageURL
@@ -528,9 +542,14 @@ func AdminUpdateQuestion(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		fresh, gerr := deps.QuestionRepo.GetByID(r.Context(), questionID)
+		if gerr != nil {
+			http.Error(w, "question not found", http.StatusNotFound)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(questionToAdminDTO(q))
+		_ = json.NewEncoder(w).Encode(questionToAdminDTO(fresh))
 	}
 }
 
