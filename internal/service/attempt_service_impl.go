@@ -203,4 +203,3 @@ func (s *attemptService) TryoutAnalysisForAttempt(ctx context.Context, attemptID
 }
 
 func formatScore(f float64) string { return fmt.Sprintf("%.2f", f) }
-func strPtr(s string) *string     { return &s }
