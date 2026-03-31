@@ -128,12 +128,12 @@ go run ./cmd/migrate
 
 **Admin (Bearer + role admin)**
 
-- **Dashboard overview:** `GET /api/v1/admin/overview` — total_students, total_users, active_tryouts, total_courses, total_enrollments, avg_score, total_certificates
+- **Dashboard overview:** `GET /api/v1/admin/overview` — totalStudents, totalUsers, activeTryouts, totalCourses, totalEnrollments, avgScore, totalCertificates
 - **Manajemen user:**  
   - `GET /api/v1/admin/users` — Daftar user (query: `?role=student|admin`)  
   - `GET /api/v1/admin/users/{userId}` — Detail user  
-  - `POST /api/v1/admin/users` — Tambah user (body: email, password, name, role, avatar_url)  
-  - `PUT /api/v1/admin/users/{userId}` — Edit user (body: name, email, role, avatar_url, password opsional)
+  - `POST /api/v1/admin/users` — Tambah user (body: email, password, name, role, avatarUrl)  
+  - `PUT /api/v1/admin/users/{userId}` — Edit user (body: name, email, role, avatarUrl, password opsional)
 - **Manajemen kelas (courses):**  
   - `GET /api/v1/admin/courses` — Daftar kelas  
   - `GET /api/v1/admin/courses/{courseId}` — Detail kelas  
@@ -141,24 +141,24 @@ go run ./cmd/migrate
   - `PUT /api/v1/admin/courses/{courseId}` — Edit kelas  
   - `GET /api/v1/admin/courses/{courseId}/enrollments` — Daftar enrollment  
   - `GET /api/v1/admin/courses/{courseId}/contents` — Daftar konten (modul/quiz/test)  
-  - `POST /api/v1/admin/courses/{courseId}/contents` — Tambah konten (body: title, description, sort_order, type: module|quiz|test, content)  
+  - `POST /api/v1/admin/courses/{courseId}/contents` — Tambah konten (body: title, description, sortOrder, type: module|quiz|test, content)  
   - `PUT /api/v1/admin/courses/{courseId}/contents/{contentId}` — Edit konten  
   - `DELETE /api/v1/admin/courses/{courseId}/contents/{contentId}` — Hapus konten
 - **Payment (placeholder):**  
   - `GET /api/v1/admin/payments` — Daftar pembayaran (query: `?limit=50`)  
-  - `POST /api/v1/admin/payments` — Catat pembayaran (body: user_id, amount, currency, type, reference_id, description, status)
+  - `POST /api/v1/admin/payments` — Catat pembayaran (body: userId, amount, currency, type, referenceId, description, status)
   - `PUT /api/v1/admin/payments/{paymentId}` — Konfirmasi pembayaran (approve/reject)
   - `PUT /api/v1/admin/orders/{orderId}/verify` — Verifikasi order checkout (mark paid + enroll)
 - **Report bulanan:**  
-  - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — new_enrollments, payments_count, total_revenue
+  - `GET /api/v1/admin/reports/monthly?year=2025&month=2` — newEnrollments, paymentsCount, totalRevenue
 - **Tryout & soal (event/quiz):**  
   - `GET /api/v1/admin/tryouts` — Daftar semua tryout/quiz  
-  - `POST /api/v1/admin/tryouts` — Buat tryout (body: title, short_title, description, duration_minutes, questions_count, level, opens_at, closes_at, max_participants, status)  
+  - `POST /api/v1/admin/tryouts` — Buat tryout (body: title, shortTitle, description, durationMinutes, questionsCount, level, opensAt, closesAt, maxParticipants, status)  
   - `PUT /api/v1/admin/tryouts/{tryoutId}` — Update tryout  
   - `DELETE /api/v1/admin/tryouts/{tryoutId}` — Hapus tryout  
   - `GET /api/v1/admin/tryouts/{tryoutId}/questions` — Daftar soal tryout/quiz  
   - `GET /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Detail satu soal  
-  - `POST /api/v1/admin/tryouts/{tryoutId}/questions` — Tambah soal (body: sort_order, type, body, options, max_score; type: short | multiple_choice | true_false)  
+  - `POST /api/v1/admin/tryouts/{tryoutId}/questions` — Tambah soal (body: sortOrder, type, body, options, maxScore; type: short | multiple_choice | true_false)  
   - `PUT /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Update soal  
   - `DELETE /api/v1/admin/tryouts/{tryoutId}/questions/{questionId}` — Hapus soal  
 - `POST /api/v1/admin/certificates` — Terbitkan sertifikat

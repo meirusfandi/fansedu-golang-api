@@ -45,7 +45,7 @@
               "name": "Jane Doe",
               "email": "jane@example.com",
               "role": "student",
-              "avatar_url": null
+              "avatarUrl": null
             },
             "token": "jwt-token-here"
           }
@@ -130,7 +130,7 @@
       "requestExample": {
         "body": {
           "token": "reset-token",
-          "new_password": "NewStrongP@ssw0rd"
+          "newPassword": "NewStrongP@ssw0rd"
         }
       },
       "responseExample": {
@@ -155,14 +155,14 @@
             {
               "id": "uuid",
               "title": "Simulasi OSN Informatika 2025",
-              "short_title": "OSN 2025-1",
+              "shortTitle": "OSN 2025-1",
               "description": "Latihan simulasi OSN Informatika.",
-              "duration_minutes": 90,
-              "questions_count": 25,
+              "durationMinutes": 90,
+              "questionsCount": 25,
               "level": "medium",
-              "opens_at": "2025-01-01T00:00:00Z",
-              "closes_at": "2025-01-02T00:00:00Z",
-              "max_participants": 200,
+              "opensAt": "2025-01-01T00:00:00Z",
+              "closesAt": "2025-01-02T00:00:00Z",
+              "maxParticipants": 200,
               "status": "open"
             }
           ]
@@ -185,14 +185,14 @@
           "body": {
             "id": "uuid",
             "title": "Simulasi OSN Informatika 2025",
-            "short_title": "OSN 2025-1",
+            "shortTitle": "OSN 2025-1",
             "description": "Latihan simulasi OSN Informatika.",
-            "duration_minutes": 90,
-            "questions_count": 25,
+            "durationMinutes": 90,
+            "questionsCount": 25,
             "level": "medium",
-            "opens_at": "2025-01-01T00:00:00Z",
-            "closes_at": "2025-01-02T00:00:00Z",
-            "max_participants": 200,
+            "opensAt": "2025-01-01T00:00:00Z",
+            "closesAt": "2025-01-02T00:00:00Z",
+            "maxParticipants": 200,
             "status": "open"
           }
         }
@@ -216,9 +216,9 @@
       "responseExample": {
         "200": {
           "body": {
-            "attempt_id": "uuid",
-            "expires_at": "2025-01-01T01:30:00Z",
-            "time_left_seconds": 5400
+            "attemptId": "uuid",
+            "expiresAt": "2025-01-01T01:30:00Z",
+            "timeLeftSeconds": 5400
           }
         }
       }
@@ -243,8 +243,8 @@
           "body": [
             {
               "id": "uuid",
-              "tryout_session_id": "uuid",
-              "sort_order": 1,
+              "tryoutSessionId": "uuid",
+              "sortOrder": 1,
               "type": "multiple_choice",
               "body": "Berapa kompleksitas waktu binary search?",
               "options": [
@@ -253,7 +253,7 @@
                 "O(n)",
                 "O(n log n)"
               ],
-              "max_score": 1
+              "maxScore": 1
             }
           ]
         }
@@ -274,9 +274,9 @@
           "questionId": "uuid"
         },
         "body": {
-          "answer_text": "O(log n)",
-          "selected_option": "B",
-          "is_marked": true
+          "answerText": "O(log n)",
+          "selectedOption": "B",
+          "isMarked": true
         }
       },
       "responseExample": {
@@ -303,15 +303,15 @@
       "responseExample": {
         "200": {
           "body": {
-            "attempt_id": "uuid",
+            "attemptId": "uuid",
             "score": 68.0,
             "percentile": 78.0,
             "feedback": {
               "summary": "Kinerja Anda sudah baik.",
               "recap": "Skor Anda 68 dari 100.",
-              "strength_areas": ["Algoritma dasar"],
-              "improvement_areas": ["Dynamic Programming"],
-              "recommendation_text": "Fokus latihan DP dan graf."
+              "strengthAreas": ["Algoritma dasar"],
+              "improvementAreas": ["Dynamic Programming"],
+              "recommendationText": "Fokus latihan DP dan graf."
             }
           }
         }
@@ -333,14 +333,14 @@
         "200": {
           "body": {
             "summary": {
-              "total_attempts": 2,
-              "avg_score": 70,
-              "avg_percentile": 80
+              "totalAttempts": 2,
+              "avgScore": 70,
+              "avgPercentile": 80
             },
-            "open_tryouts": [],
-            "recent_attempts": [],
-            "strength_areas": [],
-            "improvement_areas": [],
+            "openTryouts": [],
+            "recentAttempts": [],
+            "strengthAreas": [],
+            "improvementAreas": [],
             "recommendation": "Mulai tryout untuk melihat rekomendasi."
           }
         }
@@ -362,15 +362,15 @@
           "body": [
             {
               "id": "uuid",
-              "user_id": "uuid",
-              "tryout_session_id": "uuid",
-              "started_at": "2025-01-01T00:00:00Z",
-              "submitted_at": "2025-01-01T01:30:00Z",
+              "userId": "uuid",
+              "tryoutSessionId": "uuid",
+              "startedAt": "2025-01-01T00:00:00Z",
+              "submittedAt": "2025-01-01T01:30:00Z",
               "status": "submitted",
               "score": 68.0,
-              "max_score": 100.0,
+              "maxScore": 100.0,
               "percentile": 78.0,
-              "time_seconds_spent": 5400
+              "timeSecondsSpent": 5400
             }
           ]
         }
@@ -394,15 +394,15 @@
         "200": {
           "body": {
             "id": "uuid",
-            "user_id": "uuid",
-            "tryout_session_id": "uuid",
-            "started_at": "2025-01-01T00:00:00Z",
-            "submitted_at": "2025-01-01T01:30:00Z",
+            "userId": "uuid",
+            "tryoutSessionId": "uuid",
+            "startedAt": "2025-01-01T00:00:00Z",
+            "submittedAt": "2025-01-01T01:30:00Z",
             "status": "submitted",
             "score": 68.0,
-            "max_score": 100.0,
+            "maxScore": 100.0,
             "percentile": 78.0,
-            "time_seconds_spent": 5400
+            "timeSecondsSpent": 5400
           }
         }
       }
@@ -423,10 +423,10 @@
           "body": [
             {
               "id": "uuid",
-              "user_id": "uuid",
-              "tryout_session_id": "uuid",
-              "course_id": null,
-              "issued_at": "2025-01-01T00:00:00Z"
+              "userId": "uuid",
+              "tryoutSessionId": "uuid",
+              "courseId": null,
+              "issuedAt": "2025-01-01T00:00:00Z"
             }
           ]
         }
@@ -447,7 +447,7 @@
               "id": "uuid",
               "title": "Pembinaan OSN Informatika",
               "description": "Kelas intensif persiapan OSN Informatika.",
-              "created_by": "uuid"
+              "createdBy": "uuid"
             }
           ]
         }
@@ -472,10 +472,10 @@
         "201": {
           "body": {
             "id": "uuid",
-            "user_id": "uuid",
-            "course_id": "uuid",
+            "userId": "uuid",
+            "courseId": "uuid",
             "status": "enrolled",
-            "enrolled_at": "2025-01-01T00:00:00Z"
+            "enrolledAt": "2025-01-01T00:00:00Z"
           }
         }
       }
@@ -495,10 +495,10 @@
       "responseExample": {
         "200": {
           "body": {
-            "total_students": 120,
-            "active_tryouts": 3,
-            "avg_score": 72.5,
-            "total_certificates": 40
+            "totalStudents": 120,
+            "activeTryouts": 3,
+            "avgScore": 72.5,
+            "totalCertificates": 40
           }
         }
       }
@@ -520,12 +520,12 @@
             {
               "id": "uuid",
               "title": "Simulasi OSN 2025",
-              "short_title": "OSN 2025-1",
-              "duration_minutes": 90,
-              "questions_count": 25,
+              "shortTitle": "OSN 2025-1",
+              "durationMinutes": 90,
+              "questionsCount": 25,
               "level": "medium",
-              "opens_at": "2025-01-01T00:00:00Z",
-              "closes_at": "2025-01-02T00:00:00Z",
+              "opensAt": "2025-01-01T00:00:00Z",
+              "closesAt": "2025-01-02T00:00:00Z",
               "status": "open"
             }
           ]
@@ -544,14 +544,14 @@
         },
         "body": {
           "title": "Simulasi OSN Informatika 2025",
-          "short_title": "OSN 2025-1",
+          "shortTitle": "OSN 2025-1",
           "description": "Latihan simulasi OSN.",
-          "duration_minutes": 90,
-          "questions_count": 25,
+          "durationMinutes": 90,
+          "questionsCount": 25,
           "level": "medium",
-          "opens_at": "2025-01-01T00:00:00Z",
-          "closes_at": "2025-01-02T00:00:00Z",
-          "max_participants": 200,
+          "opensAt": "2025-01-01T00:00:00Z",
+          "closesAt": "2025-01-02T00:00:00Z",
+          "maxParticipants": 200,
           "status": "open"
         }
       },
@@ -560,14 +560,14 @@
           "body": {
             "id": "uuid",
             "title": "Simulasi OSN Informatika 2025",
-            "short_title": "OSN 2025-1",
+            "shortTitle": "OSN 2025-1",
             "description": "Latihan simulasi OSN.",
-            "duration_minutes": 90,
-            "questions_count": 25,
+            "durationMinutes": 90,
+            "questionsCount": 25,
             "level": "medium",
-            "opens_at": "2025-01-01T00:00:00Z",
-            "closes_at": "2025-01-02T00:00:00Z",
-            "max_participants": 200,
+            "opensAt": "2025-01-01T00:00:00Z",
+            "closesAt": "2025-01-02T00:00:00Z",
+            "maxParticipants": 200,
             "status": "open"
           }
         }
@@ -588,14 +588,14 @@
         },
         "body": {
           "title": "Updated title",
-          "short_title": "Updated short",
+          "shortTitle": "Updated short",
           "description": "Updated description",
-          "duration_minutes": 100,
-          "questions_count": 30,
+          "durationMinutes": 100,
+          "questionsCount": 30,
           "level": "hard",
-          "opens_at": "2025-01-01T00:00:00Z",
-          "closes_at": "2025-01-02T00:00:00Z",
-          "max_participants": 250,
+          "opensAt": "2025-01-01T00:00:00Z",
+          "closesAt": "2025-01-02T00:00:00Z",
+          "maxParticipants": 250,
           "status": "open"
         }
       },
@@ -644,12 +644,12 @@
           "body": [
             {
               "id": "uuid",
-              "tryout_session_id": "uuid",
-              "sort_order": 1,
+              "tryoutSessionId": "uuid",
+              "sortOrder": 1,
               "type": "multiple_choice",
               "body": "Berapa kompleksitas waktu binary search?",
               "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
-              "max_score": 1
+              "maxScore": 1
             }
           ]
         }
@@ -674,12 +674,12 @@
         "200": {
           "body": {
             "id": "uuid",
-            "tryout_session_id": "uuid",
-            "sort_order": 1,
+            "tryoutSessionId": "uuid",
+            "sortOrder": 1,
             "type": "multiple_choice",
             "body": "Berapa kompleksitas waktu binary search?",
             "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
-            "max_score": 1
+            "maxScore": 1
           }
         }
       }
@@ -698,7 +698,7 @@
           "tryoutId": "uuid"
         },
         "body": {
-          "sort_order": 1,
+          "sortOrder": 1,
           "type": "multiple_choice",
           "body": "Berapa kompleksitas waktu binary search?",
           "options": [
@@ -707,15 +707,15 @@
             "O(n)",
             "O(n log n)"
           ],
-          "max_score": 1
+          "maxScore": 1
         }
       },
       "responseExample": {
         "201": {
           "body": {
             "id": "uuid",
-            "tryout_session_id": "uuid",
-            "sort_order": 1,
+            "tryoutSessionId": "uuid",
+            "sortOrder": 1,
             "type": "multiple_choice",
             "body": "Berapa kompleksitas waktu binary search?",
             "options": [
@@ -724,7 +724,7 @@
               "O(n)",
               "O(n log n)"
             ],
-            "max_score": 1
+            "maxScore": 1
           }
         }
       }
@@ -744,23 +744,23 @@
           "questionId": "uuid"
         },
         "body": {
-          "sort_order": 2,
+          "sortOrder": 2,
           "type": "short",
           "body": "Updated question text",
           "options": null,
-          "max_score": 2
+          "maxScore": 2
         }
       },
       "responseExample": {
         "200": {
           "body": {
             "id": "uuid",
-            "tryout_session_id": "uuid",
-            "sort_order": 2,
+            "tryoutSessionId": "uuid",
+            "sortOrder": 2,
             "type": "short",
             "body": "Updated question text",
             "options": null,
-            "max_score": 2
+            "maxScore": 2
           }
         }
       }
@@ -807,7 +807,7 @@
             "id": "uuid",
             "title": "Pembinaan OSN Informatika",
             "description": "Kelas intensif persiapan OSN.",
-            "created_by": "uuid"
+            "createdBy": "uuid"
           }
         }
       }
@@ -831,11 +831,11 @@
           "body": [
             {
               "id": "uuid",
-              "user_id": "uuid",
-              "course_id": "uuid",
+              "userId": "uuid",
+              "courseId": "uuid",
               "status": "enrolled",
-              "enrolled_at": "2025-01-01T00:00:00Z",
-              "completed_at": null
+              "enrolledAt": "2025-01-01T00:00:00Z",
+              "completedAt": null
             }
           ]
         }
@@ -852,17 +852,17 @@
           "Authorization": "Bearer <admin-jwt>"
         },
         "body": {
-          "user_id": "uuid",
-          "tryout_session_id": "uuid",
-          "course_id": null
+          "userId": "uuid",
+          "tryoutSessionId": "uuid",
+          "courseId": null
         }
       },
       "responseExample": {
         "201": {
           "body": {
             "id": "uuid",
-            "user_id": "uuid",
-            "issued_at": "2025-01-01T00:00:00Z"
+            "userId": "uuid",
+            "issuedAt": "2025-01-01T00:00:00Z"
           }
         }
       }

@@ -1,5 +1,12 @@
 # Kontrak API Tryout (backend)
 
+## Konvensi JSON (request & response)
+
+Semua kunci properti JSON untuk **tryout, soal, attempt, jawaban, leaderboard terkait tryout** memakai **camelCase** (contoh: `tryoutSessionId`, `sortOrder`, `maxScore`, `opensAt`, `answerText`, `selectedOption`).
+
+- **Respons API** selalu camelCase (struct `encoding/json` di server).
+- **Permintaan (body)** disarankan camelCase. Untuk **admin** (tryout & soal), server tetap bisa menerima **snake_case** sebagai alias input (mis. `sort_order`, `max_score`) agar kompatibel dengan klien lama — ini tidak mengubah bentuk **respons**.
+
 ## Format error (semua endpoint API v1)
 
 Respons error memakai bentuk tunggal:

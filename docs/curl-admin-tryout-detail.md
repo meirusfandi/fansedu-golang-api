@@ -13,7 +13,7 @@ curl -s -X GET "https://api.fansedu.web.id/api/v1/admin/tryouts/{tryoutId}" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
-Ganti `{tryoutId}` dengan UUID tryout. Response: title, opens_at, closes_at, duration_minutes, questions_count, level, status, description, dll.
+Ganti `{tryoutId}` dengan UUID tryout. Response (camelCase): `title`, `opensAt`, `closesAt`, `durationMinutes`, `questionsCount`, `level`, `status`, `description`, dll.
 
 ---
 
@@ -24,7 +24,7 @@ curl -s -X GET "https://api.fansedu.web.id/api/v1/admin/tryouts/{tryoutId}/quest
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
-Response: array of `{ id, tryout_session_id, sort_order, type, body, options, max_score, image_url?, image_urls? }`.
+Response: array of `{ id, tryoutSessionId, sortOrder, type, body, options, maxScore, imageUrl?, imageUrls? }` (semua camelCase).
 
 ---
 

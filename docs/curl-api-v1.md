@@ -129,7 +129,7 @@ curl -s -H "Authorization: Bearer <TOKEN>" http://localhost:8080/api/v1/attempts
 curl -s -X PUT "http://localhost:8080/api/v1/attempts/<ATTEMPT_ID>/answers/<QUESTION_ID>" \
   -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"answer_text":"...","selected_option":"A"}'
+  -d '{"answerText":"...","selectedOption":"A"}'
 
 # Submit attempt (selesai)
 curl -s -X POST http://localhost:8080/api/v1/attempts/<ATTEMPT_ID>/submit \

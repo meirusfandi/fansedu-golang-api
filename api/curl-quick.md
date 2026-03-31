@@ -90,13 +90,13 @@ curl -s http://localhost:8080/api/v1/admin/overview -H "Authorization: Bearer $T
 curl -s -X POST http://localhost:8080/api/v1/admin/tryouts \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Simulasi OSN","duration_minutes":90,"questions_count":25,"level":"medium","opens_at":"2025-06-01T00:00:00Z","closes_at":"2025-06-02T23:59:59Z","status":"open"}'
+  -d '{"title":"Simulasi OSN","durationMinutes":90,"questionsCount":25,"level":"medium","opensAt":"2025-06-01T00:00:00Z","closesAt":"2025-06-02T23:59:59Z","status":"open"}'
 
 # Buat soal (ganti TRYYOUT_UUID)
 curl -s -X POST "http://localhost:8080/api/v1/admin/tryouts/TRYYOUT_UUID/questions" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"sort_order":1,"type":"multiple_choice","body":"Soal contoh?","options":["A","B","C","D"],"max_score":1}'
+  -d '{"sortOrder":1,"type":"multiple_choice","body":"Soal contoh?","options":["A","B","C","D"],"maxScore":1}'
 
 # Buat kursus
 curl -s -X POST http://localhost:8080/api/v1/admin/courses \
@@ -111,7 +111,7 @@ curl -s "http://localhost:8080/api/v1/admin/courses/COURSE_UUID/enrollments" -H 
 curl -s -X POST http://localhost:8080/api/v1/admin/certificates \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"USER_UUID","tryout_session_id":"TRYYOUT_UUID"}'
+  -d '{"userId":"USER_UUID","tryoutSessionId":"TRYYOUT_UUID"}'
 
 # --- ROLES (Administrator) ---
 # Daftar semua role

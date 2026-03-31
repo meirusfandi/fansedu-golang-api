@@ -112,10 +112,10 @@ func CertificateList(deps *Deps) http.HandlerFunc {
 				"issuedAt": list[i].IssuedAt.Format("2006-01-02T15:04:05Z07:00"),
 			}
 			if list[i].TryoutSessionID != nil {
-				out[i]["tryout_session_id"] = *list[i].TryoutSessionID
+				out[i]["tryoutSessionId"] = *list[i].TryoutSessionID
 			}
 			if list[i].CourseID != nil {
-				out[i]["course_id"] = *list[i].CourseID
+				out[i]["courseId"] = *list[i].CourseID
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")

@@ -20,13 +20,13 @@ curl -s -X GET "http://localhost:8080/api/v1/dashboard" \
 
 ```json
 {
-  "site_name": "FansEdu LMS",
-  "open_tryouts": 2,
-  "total_courses": 5,
-  "total_levels": 3,
-  "total_subjects": 9,
-  "total_schools": 27,
-  "total_students": 150
+  "siteName": "FansEdu LMS",
+  "openTryouts": 2,
+  "totalCourses": 5,
+  "totalLevels": 3,
+  "totalSubjects": 9,
+  "totalSchools": 27,
+  "totalStudents": 150
 }
 ```
 
@@ -66,70 +66,70 @@ curl -s -X GET "http://localhost:8080/api/v1/student/dashboard" \
     "name": "Ahmad Siswa",
     "email": "ahmad@example.com",
     "role": "student",
-    "avatar_url": null,
-    "school_id": "660e8400-e29b-41d4-a716-446655440001",
-    "subject_id": "770e8400-e29b-41d4-a716-446655440002",
-    "school_name": "SMAN 1 Solok",
-    "subject_name": "Matematika"
+    "avatarUrl": null,
+    "schoolId": "660e8400-e29b-41d4-a716-446655440001",
+    "subjectId": "770e8400-e29b-41d4-a716-446655440002",
+    "schoolName": "SMAN 1 Solok",
+    "subjectName": "Matematika"
   },
   "summary": {
-    "total_attempts": 3,
-    "avg_score": 72.5,
-    "avg_percentile": 68
+    "totalAttempts": 3,
+    "avgScore": 72.5,
+    "avgPercentile": 68
   },
-  "open_tryouts": [
+  "openTryouts": [
     {
       "id": "880e8400-e29b-41d4-a716-446655440003",
       "title": "Tryout Matematika SMA",
-      "short_title": "Tryout MTK",
+      "shortTitle": "Tryout MTK",
       "description": "Tryout persiapan OSN",
-      "duration_minutes": 90,
-      "questions_count": 20,
+      "durationMinutes": 90,
+      "questionsCount": 20,
       "level": "medium",
-      "subject_id": "770e8400-e29b-41d4-a716-446655440002",
-      "opens_at": "2025-02-01T08:00:00Z",
-      "closes_at": "2025-02-28T22:00:00Z",
-      "max_participants": null,
+      "subjectId": "770e8400-e29b-41d4-a716-446655440002",
+      "opensAt": "2025-02-01T08:00:00Z",
+      "closesAt": "2025-02-28T22:00:00Z",
+      "maxParticipants": null,
       "status": "open"
     }
   ],
-  "recent_attempts": [
+  "recentAttempts": [
     {
       "id": "990e8400-e29b-41d4-a716-446655440004",
-      "user_id": "550e8400-e29b-41d4-a716-446655440000",
-      "tryout_session_id": "880e8400-e29b-41d4-a716-446655440003",
-      "started_at": "2025-02-15T10:00:00Z",
-      "submitted_at": "2025-02-15T11:25:00Z",
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "tryoutSessionId": "880e8400-e29b-41d4-a716-446655440003",
+      "startedAt": "2025-02-15T10:00:00Z",
+      "submittedAt": "2025-02-15T11:25:00Z",
       "status": "submitted",
       "score": 75.5,
-      "max_score": 100,
+      "maxScore": 100,
       "percentile": 72,
-      "time_seconds_spent": 5100
+      "timeSecondsSpent": 5100
     }
   ],
-  "strength_areas": ["Pilihan Ganda"],
-  "improvement_areas": ["Isian Singkat"],
+  "strengthAreas": ["Pilihan Ganda"],
+  "improvementAreas": ["Isian Singkat"],
   "recommendation": "Skor keseluruhan: 75.5% dari total. Fokus perbaiki: Isian Singkat. Rekomendasi: perbanyak latihan soal tipe tersebut dan ulangi materi terkait.",
-  "learning_evaluation": {
-    "attempt_id": "990e8400-e29b-41d4-a716-446655440004",
-    "answer_breakdown": [
+  "learningEvaluation": {
+    "attemptId": "990e8400-e29b-41d4-a716-446655440004",
+    "answerBreakdown": [
       {
-        "question_id": "q-uuid-1",
-        "question_type": "multiple_choice",
-        "max_score": 5,
-        "score_got": 5,
+        "questionId": "q-uuid-1",
+        "questionType": "multiple_choice",
+        "maxScore": 5,
+        "scoreGot": 5,
         "status": "correct"
       },
       {
-        "question_id": "q-uuid-2",
-        "question_type": "short",
-        "max_score": 5,
-        "score_got": 2.5,
+        "questionId": "q-uuid-2",
+        "questionType": "short",
+        "maxScore": 5,
+        "scoreGot": 2.5,
         "status": "partial"
       }
     ],
-    "strength_areas": ["Pilihan Ganda"],
-    "improvement_areas": ["Isian Singkat"],
+    "strengthAreas": ["Pilihan Ganda"],
+    "improvementAreas": ["Isian Singkat"],
     "recommendation": "Skor keseluruhan: 75.5% dari total. Fokus perbaiki: Isian Singkat. Rekomendasi: perbanyak latihan soal tipe tersebut dan ulangi materi terkait."
   }
 }

@@ -233,7 +233,7 @@ curl -s "$BASE/attempts/<ATTEMPT_ID>/questions" -H "Authorization: Bearer $TOKEN
 curl -s -X PUT "$BASE/attempts/<ATTEMPT_ID>/answers/<QUESTION_ID>" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"answer_text":"","selected_option":"A"}'
+  -d '{"answerText":"","selectedOption":"A"}'
 curl -s -X POST "$BASE/attempts/<ATTEMPT_ID>/submit" -H "Authorization: Bearer $TOKEN"
 ```
 

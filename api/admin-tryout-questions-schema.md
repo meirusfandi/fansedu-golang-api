@@ -13,18 +13,18 @@ Base path: **`/api/v1/admin`**. Semua endpoint memerlukan **Authorization: Beare
 | PUT | `/tryouts/{tryoutId}` | Update tryout |
 | DELETE | `/tryouts/{tryoutId}` | Hapus tryout |
 
-**Body POST/PUT tryout (contoh):**
+**Body POST/PUT tryout (contoh, camelCase; snake_case juga diterima sebagai alias input):**
 ```json
 {
   "title": "Simulasi OSN Informatika 2025",
-  "short_title": "OSN 2025-1",
+  "shortTitle": "OSN 2025-1",
   "description": "Latihan simulasi OSN.",
-  "duration_minutes": 90,
-  "questions_count": 25,
+  "durationMinutes": 90,
+  "questionsCount": 25,
   "level": "medium",
-  "opens_at": "2025-01-01T00:00:00Z",
-  "closes_at": "2025-01-02T00:00:00Z",
-  "max_participants": 200,
+  "opensAt": "2025-01-01T00:00:00Z",
+  "closesAt": "2025-01-02T00:00:00Z",
+  "maxParticipants": 200,
   "status": "open"
 }
 ```
@@ -50,32 +50,32 @@ Semua CRUD soal di bawah **`/tryouts/{tryoutId}/questions`**.
 
 **Body soal:**
 - **`body`** — Isi soal. Boleh **plain text** atau **HTML** (rich text). Bisa berisi tag HTML dan `<img src="...">` untuk menyisipkan gambar di dalam teks.
-- **`image_url`** — (opsional) Satu URL gambar utama untuk soal.
-- **`image_urls`** — (opsional) Array URL gambar tambahan, contoh: `["https://...", "https://..."]`. Berguna untuk form yang mengizinkan banyak gambar.
+- **`imageUrl`** — (opsional) Satu URL gambar utama untuk soal.
+- **`imageUrls`** — (opsional) Array URL gambar tambahan, contoh: `["https://...", "https://..."]`. Berguna untuk form yang mengizinkan banyak gambar.
 
 **Body POST soal (contoh — teks + HTML + gambar):**
 ```json
 {
-  "sort_order": 1,
+  "sortOrder": 1,
   "type": "multiple_choice",
   "body": "<p>Perhatikan gambar berikut.</p><p>Nilai <strong>x</strong> adalah ...</p>",
-  "image_url": "https://cdn.example.com/soal1.png",
-  "image_urls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
+  "imageUrl": "https://cdn.example.com/soal1.png",
+  "imageUrls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
   "options": ["10", "12", "15", "20"],
-  "max_score": 5
+  "maxScore": 5
 }
 ```
 
 **Body PUT soal (partial, semua field opsional):**
 ```json
 {
-  "sort_order": 2,
+  "sortOrder": 2,
   "type": "short",
   "body": "<p>Updated question with <em>HTML</em>.</p>",
-  "image_url": "https://...",
-  "image_urls": ["https://..."],
+  "imageUrl": "https://...",
+  "imageUrls": ["https://..."],
   "options": null,
-  "max_score": 2
+  "maxScore": 2
 }
 ```
 
@@ -83,14 +83,14 @@ Semua CRUD soal di bawah **`/tryouts/{tryoutId}/questions`**.
 ```json
 {
   "id": "uuid",
-  "tryout_session_id": "uuid",
-  "sort_order": 1,
+  "tryoutSessionId": "uuid",
+  "sortOrder": 1,
   "type": "multiple_choice",
   "body": "<p>Perhatikan gambar berikut.</p><p>Nilai <strong>x</strong> adalah ...</p>",
-  "image_url": "https://cdn.example.com/soal1.png",
-  "image_urls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
+  "imageUrl": "https://cdn.example.com/soal1.png",
+  "imageUrls": ["https://cdn.example.com/soal1.png", "https://cdn.example.com/diagram.png"],
   "options": ["10", "12", "15", "20"],
-  "max_score": 5
+  "maxScore": 5
 }
 ```
 
