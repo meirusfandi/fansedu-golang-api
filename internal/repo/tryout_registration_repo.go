@@ -11,12 +11,19 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
+// LeaderboardRedisSyncRow — satu baris untuk menyelaraskan Redis leaderboard dengan DB (skor attempt terbaik per user).
+type LeaderboardRedisSyncRow struct {
+	UserID string
+	Score  float64
+}
+
 type TryoutRegistrationRepo interface {
 	Register(ctx context.Context, userID, tryoutID string) error
 	IsRegistered(ctx context.Context, userID, tryoutID string) (bool, error)
 	GetRegisteredAt(ctx context.Context, userID, tryoutID string) (time.Time, bool, error)
 	CountRegisteredForStudent(ctx context.Context, userID string, subjectID *string) (int, error)
 	ListLeaderboard(ctx context.Context, tryoutID string) ([]domain.LeaderboardEntry, error)
+	ListLeaderboardRedisSyncRows(ctx context.Context, tryoutID string) ([]LeaderboardRedisSyncRow, error)
 	EnsureAllStudentsForTryout(ctx context.Context, tryoutID string) error
 	EnsureStudentForAllOpenTryouts(ctx context.Context, userID string) error
 }
@@ -137,6 +144,38 @@ func (r *tryoutRegistrationRepo) ListLeaderboard(ctx context.Context, tryoutID s
 		list = append(list, e)
 	}
 	return list, rows.Err()
+}
+
+// ListLeaderboardRedisSyncRows mengikuti aturan "best attempt" yang sama dengan ListLeaderboard (nilai tertinggi, waktu tercepat).
+func (r *tryoutRegistrationRepo) ListLeaderboardRedisSyncRows(ctx context.Context, tryoutID string) ([]LeaderboardRedisSyncRow, error) {
+	const q = `
+SELECT DISTINCT ON (a.user_id)
+  a.user_id::text,
+  a.score::float8
+FROM attempts a
+INNER JOIN tryout_registrations r
+  ON r.user_id = a.user_id AND r.tryout_session_id = a.tryout_session_id
+WHERE a.tryout_session_id = $1::uuid
+  AND a.status = 'submitted'
+  AND a.score IS NOT NULL
+ORDER BY a.user_id, COALESCE(a.score, 0) DESC, a.time_seconds_spent ASC NULLS LAST
+`
+	rows, err := r.pool.Query(ctx, q, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []LeaderboardRedisSyncRow
+	for rows.Next() {
+		var uid string
+		var score float64
+		if err := rows.Scan(&uid, &score); err != nil {
+			return nil, err
+		}
+		out = append(out, LeaderboardRedisSyncRow{UserID: uid, Score: score})
+	}
+	return out, rows.Err()
 }
 
 func (r *tryoutRegistrationRepo) EnsureAllStudentsForTryout(ctx context.Context, tryoutID string) error {

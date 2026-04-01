@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
-	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -82,7 +81,7 @@ func AdminPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
-		studentUID, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, reviewerID, patch)
+		_, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, reviewerID, patch)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
@@ -95,7 +94,7 @@ func AdminPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
-		syncLeaderboardAfterReview(r.Context(), deps, tryoutID, studentUID, newScore)
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok":         true,
@@ -171,7 +170,7 @@ func TrainerPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
-		studentUID, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, userID, patch)
+		_, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, userID, patch)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
@@ -184,7 +183,7 @@ func TrainerPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
-		syncLeaderboardAfterReview(r.Context(), deps, tryoutID, studentUID, newScore)
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok":         true,
@@ -193,17 +192,6 @@ func TrainerPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			"score":      newScore,
 		})
 	}
-}
-
-func syncLeaderboardAfterReview(ctx context.Context, deps *Deps, tryoutID, studentUserID string, newScore float64) {
-	if deps.Redis == nil {
-		return
-	}
-	reg, err := deps.TryoutRegistrationRepo.IsRegistered(ctx, studentUserID, tryoutID)
-	if err != nil || !reg {
-		return
-	}
-	_ = cache.LeaderboardZAdd(ctx, deps.Redis, tryoutID, studentUserID, newScore)
 }
 
 // AdminPostAttemptAutoGrade POST /api/v1/admin/tryouts/{tryoutId}/attempts/{attemptId}/auto-grade
@@ -218,7 +206,7 @@ func AdminPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body JSON tidak valid.")
 			return
 		}
-		studentUID, newScore, err := deps.AdminService.AutoGradeAttempt(r.Context(), tryoutID, attemptID, opts)
+		_, newScore, err := deps.AdminService.AutoGradeAttempt(r.Context(), tryoutID, attemptID, opts)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
@@ -227,7 +215,7 @@ func AdminPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
-		syncLeaderboardAfterReview(r.Context(), deps, tryoutID, studentUID, newScore)
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok":        true,
@@ -257,7 +245,7 @@ func TrainerPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body JSON tidak valid.")
 			return
 		}
-		studentUID, newScore, err := deps.AdminService.AutoGradeAttempt(r.Context(), tryoutID, attemptID, opts)
+		_, newScore, err := deps.AdminService.AutoGradeAttempt(r.Context(), tryoutID, attemptID, opts)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
@@ -266,7 +254,7 @@ func TrainerPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
-		syncLeaderboardAfterReview(r.Context(), deps, tryoutID, studentUID, newScore)
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok":        true,

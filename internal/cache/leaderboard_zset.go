@@ -17,6 +17,32 @@ func LeaderboardZAdd(ctx context.Context, rdb *redis.Client, tryoutID, userID st
 	}).Err()
 }
 
+// LeaderboardZMember — satu anggota sorted set leaderboard (member = user_id).
+type LeaderboardZMember struct {
+	UserID string
+	Score  float64
+}
+
+// ReplaceTryoutLeaderboardZSet mengganti seluruh ZSET untuk tryout dari DB (DEL lalu ZADD dalam satu transaksi pipeline).
+func ReplaceTryoutLeaderboardZSet(ctx context.Context, rdb *redis.Client, tryoutID string, members []LeaderboardZMember) error {
+	if rdb == nil || tryoutID == "" {
+		return nil
+	}
+	key := LeaderboardZKey(tryoutID)
+	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Del(ctx, key)
+		if len(members) > 0 {
+			zs := make([]redis.Z, len(members))
+			for i, m := range members {
+				zs[i] = redis.Z{Score: m.Score, Member: m.UserID}
+			}
+			pipe.ZAdd(ctx, key, zs...)
+		}
+		return nil
+	})
+	return err
+}
+
 // LeaderboardTop mengembalikan top N (rank tertinggi dulu).
 func LeaderboardTop(ctx context.Context, rdb *redis.Client, tryoutID string, n int) ([]redis.Z, error) {
 	if rdb == nil || tryoutID == "" || n <= 0 {

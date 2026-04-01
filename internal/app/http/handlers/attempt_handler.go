@@ -9,7 +9,6 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
-	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
@@ -207,10 +206,8 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if a.Score != nil {
-			if reg, rerr := deps.TryoutRegistrationRepo.IsRegistered(r.Context(), userID, a.TryoutSessionID); rerr == nil && reg {
-				_ = cache.LeaderboardZAdd(r.Context(), deps.Redis, a.TryoutSessionID, userID, *a.Score)
-			}
+		if a.Status == domain.AttemptStatusSubmitted {
+			ReconcileTryoutLeaderboardRedis(r.Context(), deps, a.TryoutSessionID)
 		}
 
 		// Progress notification -> notify all trainers/guru linked to this student.
