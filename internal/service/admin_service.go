@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -53,6 +54,68 @@ type AdminService interface {
 	GetTryoutAnalysis(ctx context.Context, tryoutID string) (*TryoutAnalysis, error)
 	ListTryoutStudents(ctx context.Context, tryoutID string) ([]TryoutStudentItem, error)
 	GetAttemptAIAnalysis(ctx context.Context, tryoutID, attemptID string) (*AttemptAIAnalysisResponse, error)
+	GetAttemptReview(ctx context.Context, tryoutID, attemptID string) (*AttemptReviewResponse, error)
+	PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (studentUserID string, newScore float64, err error)
+	// AutoGradeAttempt jalankan ulang penilaian otomatis (hapus manual_score; opsional hapus komentar review).
+	AutoGradeAttempt(ctx context.Context, tryoutID, attemptID string, opts AutoGradeAttemptOpts) (studentUserID string, newScore float64, err error)
+}
+
+// AutoGradeAttemptOpts POST .../auto-grade — body opsional.
+type AutoGradeAttemptOpts struct {
+	ClearReviewerComments bool `json:"clearReviewerComments"`
+}
+
+// AttemptAnswerReviewPatch partial update dari JSON (key hadir = ubah; manualScore null = hapus override).
+type AttemptAnswerReviewPatch struct {
+	HasReviewerComment bool
+	ReviewerComment    *string
+	HasManualScore     bool
+	ManualScore        *float64 // jika HasManualScore && ManualScore == nil → kolom manual_score di DB di-NULL-kan
+}
+
+// ErrAttemptReviewNoFields body tidak memuat reviewerComment / manualScore.
+var ErrAttemptReviewNoFields = errors.New("attempt review: no fields to update")
+
+// AttemptReviewResponse GET .../attempts/{attemptId}/review — kisi jawaban untuk penilaian manual.
+type AttemptReviewResponse struct {
+	AttemptID   string                `json:"attemptId"`
+	TryoutID    string                `json:"tryoutId"`
+	Status      string                `json:"status"`
+	SubmittedAt *string               `json:"submittedAt,omitempty"`
+	Score       *float64              `json:"score,omitempty"`
+	MaxScore    *float64              `json:"maxScore,omitempty"`
+	Percentile  *float64              `json:"percentile,omitempty"`
+	Student     AttemptReviewStudent  `json:"student"`
+	Items       []AttemptReviewItem   `json:"items"`
+}
+
+type AttemptReviewStudent struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+}
+
+type AttemptReviewItem struct {
+	QuestionID       string   `json:"questionId"`
+	SortOrder        int      `json:"sortOrder"`
+	Type             string   `json:"type"`
+	Body             string   `json:"body"`
+	MaxScore         float64  `json:"maxScore"`
+	Options          any      `json:"options,omitempty"`
+	CorrectOption    *string  `json:"correctOption,omitempty"`
+	CorrectText      *string  `json:"correctText,omitempty"`
+	AnswerText       *string  `json:"answerText,omitempty"`
+	SelectedOption   *string  `json:"selectedOption,omitempty"`
+	IsMarked         bool     `json:"isMarked"`
+	AutoScore        float64  `json:"autoScore"`
+	AutoIsCorrect    *bool    `json:"autoIsCorrect,omitempty"`
+	ScoreGot         float64  `json:"scoreGot"`
+	IsCorrect        *bool    `json:"isCorrect,omitempty"`
+	ManualScore      *float64 `json:"manualScore,omitempty"`
+	ReviewerComment  *string  `json:"reviewerComment,omitempty"`
+	ReviewedAt       *string  `json:"reviewedAt,omitempty"`
+	ReviewedByUserID *string  `json:"reviewedByUserId,omitempty"`
+	ReviewedByName   *string  `json:"reviewedByName,omitempty"`
 }
 
 type MonthlyReport struct {

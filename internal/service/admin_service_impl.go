@@ -71,11 +71,17 @@ type adminService struct {
 		GetByID(ctx context.Context, id string) (domain.Attempt, error)
 		ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
+		Update(ctx context.Context, a domain.Attempt) error
 	}
 	attemptAnswerRepo interface {
 		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
 		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
 		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+		GetByAttemptAndQuestion(ctx context.Context, attemptID, questionID string) (domain.AttemptAnswer, error)
+		SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
+		UpdateAnswerReview(ctx context.Context, attemptID, questionID string, reviewerComment *string, manualScore *float64, reviewedByUserID string) error
+		EnsureAnswerRowForReview(ctx context.Context, attemptID, questionID string) error
+		ClearManualGradingForAttempt(ctx context.Context, attemptID string, clearReviewMeta bool) error
 	}
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
@@ -146,11 +152,17 @@ func NewAdminService(
 		GetByID(ctx context.Context, id string) (domain.Attempt, error)
 		ListSubmittedByTryoutSessionID(ctx context.Context, tryoutSessionID string) ([]domain.Attempt, error)
 		ParticipantsCountByTryout(ctx context.Context, tryoutSessionID string) (int, error)
+		Update(ctx context.Context, a domain.Attempt) error
 	},
 	attemptAnswerRepo interface {
 		ListByQuestionFromSubmittedAttempts(ctx context.Context, tryoutSessionID, questionID string) ([]domain.AttemptAnswer, error)
 		ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
 		ListByAttemptID(ctx context.Context, attemptID string) ([]domain.AttemptAnswer, error)
+		GetByAttemptAndQuestion(ctx context.Context, attemptID, questionID string) (domain.AttemptAnswer, error)
+		SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
+		UpdateAnswerReview(ctx context.Context, attemptID, questionID string, reviewerComment *string, manualScore *float64, reviewedByUserID string) error
+		EnsureAnswerRowForReview(ctx context.Context, attemptID, questionID string) error
+		ClearManualGradingForAttempt(ctx context.Context, attemptID string, clearReviewMeta bool) error
 	},
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
@@ -652,6 +664,226 @@ func feedbackToAIAnalysisResponse(attemptID string, fb domain.AttemptFeedback) (
 	_ = json.Unmarshal(fb.StrengthAreas, &resp.StrengthAreas)
 	_ = json.Unmarshal(fb.ImprovementAreas, &resp.ImprovementAreas)
 	return &resp, nil
+}
+
+func (s *adminService) GetAttemptReview(ctx context.Context, tryoutID, attemptID string) (*AttemptReviewResponse, error) {
+	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if attempt.TryoutSessionID != tryoutID || attempt.Status != domain.AttemptStatusSubmitted {
+		return nil, ErrNotFound
+	}
+	student, err := s.userRepo.FindByID(ctx, attempt.UserID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
+	answers, err := s.attemptAnswerRepo.ListByAttemptID(ctx, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	ansByQ := make(map[string]domain.AttemptAnswer, len(answers))
+	for _, a := range answers {
+		ansByQ[a.QuestionID] = a
+	}
+	reviewerNames := make(map[string]string)
+	var submittedAt *string
+	if attempt.SubmittedAt != nil {
+		sa := attempt.SubmittedAt.Format(time.RFC3339)
+		submittedAt = &sa
+	}
+	out := &AttemptReviewResponse{
+		AttemptID:   attemptID,
+		TryoutID:    tryoutID,
+		Status:      attempt.Status,
+		SubmittedAt: submittedAt,
+		Score:       attempt.Score,
+		MaxScore:    attempt.MaxScore,
+		Percentile:  attempt.Percentile,
+		Student: AttemptReviewStudent{
+			UserID: student.ID,
+			Name:   student.Name,
+			Email:  student.Email,
+		},
+		Items: make([]AttemptReviewItem, 0, len(questions)),
+	}
+	for _, q := range questions {
+		ans, has := ansByQ[q.ID]
+		var ansPtr *domain.AttemptAnswer
+		if has {
+			a := ans
+			ansPtr = &a
+		}
+		autoScore, autoIC := autoGradeQuestion(q, ansPtr)
+		got, ic := gradeQuestion(q, ansPtr)
+		var opts any
+		if len(q.Options) > 0 {
+			_ = json.Unmarshal(q.Options, &opts)
+		}
+		item := AttemptReviewItem{
+			QuestionID:     q.ID,
+			SortOrder:      q.SortOrder,
+			Type:           q.Type,
+			Body:           q.Body,
+			MaxScore:       q.MaxScore,
+			Options:        opts,
+			CorrectOption:  q.CorrectOption,
+			CorrectText:    q.CorrectText,
+			AutoScore:      autoScore,
+			AutoIsCorrect:  autoIC,
+			ScoreGot:       got,
+			IsCorrect:      ic,
+			ManualScore:    nil,
+			ReviewerComment: nil,
+		}
+		if has {
+			item.IsMarked = ans.IsMarked
+			if ans.AnswerText != nil {
+				v := *ans.AnswerText
+				item.AnswerText = &v
+			}
+			if ans.SelectedOption != nil {
+				v := *ans.SelectedOption
+				item.SelectedOption = &v
+			}
+			item.ManualScore = ans.ManualScore
+			item.ReviewerComment = ans.ReviewerComment
+			if ans.ReviewedByUserID != nil && *ans.ReviewedByUserID != "" {
+				uid := *ans.ReviewedByUserID
+				item.ReviewedByUserID = &uid
+				name, ok := reviewerNames[uid]
+				if !ok {
+					if ru, rerr := s.userRepo.FindByID(ctx, uid); rerr == nil {
+						name = ru.Name
+						reviewerNames[uid] = name
+					}
+				}
+				if name != "" {
+					n := name
+					item.ReviewedByName = &n
+				}
+			}
+			if ans.ReviewedAt != nil {
+				rs := ans.ReviewedAt.UTC().Format(time.RFC3339)
+				item.ReviewedAt = &rs
+			}
+		}
+		out.Items = append(out.Items, item)
+	}
+	return out, nil
+}
+
+func (s *adminService) PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (string, float64, error) {
+	if !patch.HasReviewerComment && !patch.HasManualScore {
+		return "", 0, ErrAttemptReviewNoFields
+	}
+	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return "", 0, ErrNotFound
+	}
+	if attempt.TryoutSessionID != tryoutID || attempt.Status != domain.AttemptStatusSubmitted {
+		return "", 0, ErrNotFound
+	}
+	q, err := s.questionRepo.GetByID(ctx, questionID)
+	if err != nil || q.TryoutSessionID != tryoutID {
+		return "", 0, ErrNotFound
+	}
+	if err := s.attemptAnswerRepo.EnsureAnswerRowForReview(ctx, attemptID, questionID); err != nil {
+		return "", 0, err
+	}
+	cur, err := s.attemptAnswerRepo.GetByAttemptAndQuestion(ctx, attemptID, questionID)
+	if err != nil {
+		return "", 0, err
+	}
+	newComm := cur.ReviewerComment
+	if patch.HasReviewerComment {
+		newComm = patch.ReviewerComment
+	}
+	newManual := cur.ManualScore
+	if patch.HasManualScore {
+		newManual = patch.ManualScore
+	}
+	if err := s.attemptAnswerRepo.UpdateAnswerReview(ctx, attemptID, questionID, newComm, newManual, reviewerUserID); err != nil {
+		return "", 0, err
+	}
+	if err := s.recalculateAttemptTotals(ctx, tryoutID, attemptID); err != nil {
+		return "", 0, err
+	}
+	a2, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return "", 0, err
+	}
+	score := 0.0
+	if a2.Score != nil {
+		score = *a2.Score
+	}
+	return attempt.UserID, score, nil
+}
+
+func (s *adminService) AutoGradeAttempt(ctx context.Context, tryoutID, attemptID string, opts AutoGradeAttemptOpts) (string, float64, error) {
+	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return "", 0, ErrNotFound
+	}
+	if attempt.TryoutSessionID != tryoutID || attempt.Status != domain.AttemptStatusSubmitted {
+		return "", 0, ErrNotFound
+	}
+	if err := s.attemptAnswerRepo.ClearManualGradingForAttempt(ctx, attemptID, opts.ClearReviewerComments); err != nil {
+		return "", 0, err
+	}
+	if err := s.recalculateAttemptTotals(ctx, tryoutID, attemptID); err != nil {
+		return "", 0, err
+	}
+	a2, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return "", 0, err
+	}
+	score := 0.0
+	if a2.Score != nil {
+		score = *a2.Score
+	}
+	return attempt.UserID, score, nil
+}
+
+func (s *adminService) recalculateAttemptTotals(ctx context.Context, tryoutID, attemptID string) error {
+	a, err := s.attemptRepo.GetByID(ctx, attemptID)
+	if err != nil {
+		return err
+	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return err
+	}
+	answers, err := s.attemptAnswerRepo.ListByAttemptID(ctx, attemptID)
+	if err != nil {
+		return err
+	}
+	score, maxScore, outcomes, _, _ := GradeTryoutAttempt(questions, answers)
+	for _, o := range outcomes {
+		_ = s.attemptAnswerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
+	}
+	var percentile *float64
+	if others, perr := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, tryoutID); perr == nil {
+		scores := make([]float64, 0, len(others))
+		for _, o := range others {
+			if o.ID == attemptID {
+				continue
+			}
+			if o.Score != nil {
+				scores = append(scores, *o.Score)
+			}
+		}
+		scores = append(scores, score)
+		percentile = percentileRankPercent(scores, score)
+	}
+	a.Score = &score
+	a.MaxScore = &maxScore
+	a.Percentile = percentile
+	return s.attemptRepo.Update(ctx, a)
 }
 
 func (s *adminService) GetCourseReport(ctx context.Context, courseID string) (*CourseReport, error) {

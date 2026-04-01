@@ -106,6 +106,42 @@ func resolvedCorrectText(q domain.Question) string {
 	return ""
 }
 
+func normalizeAnswerText(s string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
+}
+
+// splitCorrectShortAnswers beberapa jawaban benar untuk isian: dipisah "|" di correct_text.
+func splitCorrectShortAnswers(key string) []string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil
+	}
+	parts := strings.Split(key, "|")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func shortAnswersMatch(studentAnswer, correctKey string) bool {
+	g := normalizeAnswerText(studentAnswer)
+	if g == "" {
+		return false
+	}
+	for _, want := range splitCorrectShortAnswers(correctKey) {
+		if strings.EqualFold(g, normalizeAnswerText(want)) {
+			return true
+		}
+	}
+	return false
+}
+
 // correctOptionFromOptionsJSON mendukung array objek, mis. {"key":"A","correct":true} atau isCorrect / is_correct.
 func correctOptionFromOptionsJSON(raw json.RawMessage) string {
 	if len(raw) == 0 {
@@ -501,6 +537,27 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 		}
 	}
 
+	if ans.ManualScore != nil {
+		m := *ans.ManualScore
+		if m < 0 {
+			m = 0
+		}
+		if m > q.MaxScore {
+			m = q.MaxScore
+		}
+		var ic *bool
+		if q.MaxScore <= 0 {
+			if m <= 0 {
+				ic = boolPtr(false)
+			}
+		} else if m >= q.MaxScore {
+			ic = boolPtr(true)
+		} else if m <= 0 {
+			ic = boolPtr(false)
+		}
+		return m, ic
+	}
+
 	switch q.Type {
 	case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
 		key := resolvedCorrectOption(q)
@@ -526,8 +583,7 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 			if ans.AnswerText == nil || strings.TrimSpace(*ans.AnswerText) == "" {
 				return 0, boolPtr(false)
 			}
-			ok := strings.EqualFold(strings.TrimSpace(*ans.AnswerText), want)
-			if ok {
+			if shortAnswersMatch(*ans.AnswerText, want) {
 				return q.MaxScore, boolPtr(true)
 			}
 			return 0, boolPtr(false)
@@ -547,4 +603,14 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 		}
 		return 0, boolPtr(false)
 	}
+}
+
+// autoGradeQuestion skor otomatis saja (abaikan manual_score), untuk tampilan review admin/trainer.
+func autoGradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (float64, *bool) {
+	if ans == nil {
+		return gradeQuestion(q, nil)
+	}
+	tmp := *ans
+	tmp.ManualScore = nil
+	return gradeQuestion(q, &tmp)
 }
