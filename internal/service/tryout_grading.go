@@ -519,6 +519,17 @@ func slugify(s string) string {
 	return out
 }
 
+// ClampManualScoreToQuestionMax membatasi skor manual reviewer agar konsisten dengan gradeQuestion (0 … q.MaxScore).
+func ClampManualScoreToQuestionMax(m float64, maxScore float64) float64 {
+	if m < 0 {
+		return 0
+	}
+	if m > maxScore {
+		return maxScore
+	}
+	return m
+}
+
 func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64, isCorrect *bool) {
 	if ans == nil {
 		switch q.Type {
@@ -538,13 +549,7 @@ func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64,
 	}
 
 	if ans.ManualScore != nil {
-		m := *ans.ManualScore
-		if m < 0 {
-			m = 0
-		}
-		if m > q.MaxScore {
-			m = q.MaxScore
-		}
+		m := ClampManualScoreToQuestionMax(*ans.ManualScore, q.MaxScore)
 		var ic *bool
 		if q.MaxScore <= 0 {
 			if m <= 0 {

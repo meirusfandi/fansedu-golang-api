@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/meirusfandi/fansedu-golang-api/internal/ai"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
@@ -777,51 +779,69 @@ func (s *adminService) GetAttemptReview(ctx context.Context, tryoutID, attemptID
 	return out, nil
 }
 
-func (s *adminService) PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (string, float64, error) {
+func (s *adminService) PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (AttemptAnswerReviewResult, error) {
 	if !patch.HasReviewerComment && !patch.HasManualScore {
-		return "", 0, ErrAttemptReviewNoFields
+		return AttemptAnswerReviewResult{}, ErrAttemptReviewNoFields
 	}
 	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
-		return "", 0, ErrNotFound
+		return AttemptAnswerReviewResult{}, ErrNotFound
 	}
 	if attempt.TryoutSessionID != tryoutID || attempt.Status != domain.AttemptStatusSubmitted {
-		return "", 0, ErrNotFound
+		return AttemptAnswerReviewResult{}, ErrNotFound
 	}
 	q, err := s.questionRepo.GetByID(ctx, questionID)
 	if err != nil || q.TryoutSessionID != tryoutID {
-		return "", 0, ErrNotFound
+		return AttemptAnswerReviewResult{}, ErrNotFound
 	}
 	if err := s.attemptAnswerRepo.EnsureAnswerRowForReview(ctx, attemptID, questionID); err != nil {
-		return "", 0, err
+		return AttemptAnswerReviewResult{}, err
 	}
 	cur, err := s.attemptAnswerRepo.GetByAttemptAndQuestion(ctx, attemptID, questionID)
 	if err != nil {
-		return "", 0, err
+		return AttemptAnswerReviewResult{}, err
 	}
 	newComm := cur.ReviewerComment
 	if patch.HasReviewerComment {
 		newComm = patch.ReviewerComment
 	}
 	newManual := cur.ManualScore
+	manualClamped := false
 	if patch.HasManualScore {
-		newManual = patch.ManualScore
+		if patch.ManualScore == nil {
+			newManual = nil
+		} else {
+			raw := *patch.ManualScore
+			v := ClampManualScoreToQuestionMax(raw, q.MaxScore)
+			manualClamped = math.Abs(raw-v) > 1e-6
+			newManual = &v
+		}
 	}
 	if err := s.attemptAnswerRepo.UpdateAnswerReview(ctx, attemptID, questionID, newComm, newManual, reviewerUserID); err != nil {
-		return "", 0, err
+		return AttemptAnswerReviewResult{}, err
 	}
 	if err := s.recalculateAttemptTotals(ctx, tryoutID, attemptID); err != nil {
-		return "", 0, err
+		return AttemptAnswerReviewResult{}, err
 	}
 	a2, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
-		return "", 0, err
+		return AttemptAnswerReviewResult{}, err
 	}
 	score := 0.0
 	if a2.Score != nil {
 		score = *a2.Score
 	}
-	return attempt.UserID, score, nil
+	ansAfter, err := s.attemptAnswerRepo.GetByAttemptAndQuestion(ctx, attemptID, questionID)
+	if err != nil {
+		return AttemptAnswerReviewResult{}, err
+	}
+	return AttemptAnswerReviewResult{
+		StudentUserID:       attempt.UserID,
+		AttemptScore:        score,
+		QuestionManualScore: ansAfter.ManualScore,
+		QuestionMaxScore:    q.MaxScore,
+		ManualScoreClamped:  manualClamped,
+	}, nil
 }
 
 func (s *adminService) AutoGradeAttempt(ctx context.Context, tryoutID, attemptID string, opts AutoGradeAttemptOpts) (string, float64, error) {
@@ -847,6 +867,45 @@ func (s *adminService) AutoGradeAttempt(ctx context.Context, tryoutID, attemptID
 		score = *a2.Score
 	}
 	return attempt.UserID, score, nil
+}
+
+func (s *adminService) AutoGradeAllSubmittedAttempts(ctx context.Context, tryoutID string, opts AutoGradeAttemptOpts) (AutoGradeAllSubmittedResult, error) {
+	if _, err := s.tryoutRepo.GetByID(ctx, tryoutID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AutoGradeAllSubmittedResult{}, ErrNotFound
+		}
+		return AutoGradeAllSubmittedResult{}, err
+	}
+	list, err := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return AutoGradeAllSubmittedResult{}, err
+	}
+	out := AutoGradeAllSubmittedResult{
+		TryoutID: tryoutID,
+		Total:    len(list),
+		Results:  make([]AutoGradeSubmittedItem, 0, len(list)),
+	}
+	for _, a := range list {
+		uid, score, err := s.AutoGradeAttempt(ctx, tryoutID, a.ID, opts)
+		if err != nil {
+			out.Failed++
+			out.Results = append(out.Results, AutoGradeSubmittedItem{
+				AttemptID: a.ID,
+				UserID:    a.UserID,
+				Ok:        false,
+				Error:     err.Error(),
+			})
+			continue
+		}
+		out.Succeeded++
+		out.Results = append(out.Results, AutoGradeSubmittedItem{
+			AttemptID: a.ID,
+			UserID:    uid,
+			Ok:        true,
+			Score:     score,
+		})
+	}
+	return out, nil
 }
 
 func (s *adminService) recalculateAttemptTotals(ctx context.Context, tryoutID, attemptID string) error {

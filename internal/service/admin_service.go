@@ -55,14 +55,34 @@ type AdminService interface {
 	ListTryoutStudents(ctx context.Context, tryoutID string) ([]TryoutStudentItem, error)
 	GetAttemptAIAnalysis(ctx context.Context, tryoutID, attemptID string) (*AttemptAIAnalysisResponse, error)
 	GetAttemptReview(ctx context.Context, tryoutID, attemptID string) (*AttemptReviewResponse, error)
-	PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (studentUserID string, newScore float64, err error)
+	PutAttemptAnswerReview(ctx context.Context, tryoutID, attemptID, questionID, reviewerUserID string, patch AttemptAnswerReviewPatch) (AttemptAnswerReviewResult, error)
 	// AutoGradeAttempt jalankan ulang penilaian otomatis (hapus manual_score; opsional hapus komentar review).
 	AutoGradeAttempt(ctx context.Context, tryoutID, attemptID string, opts AutoGradeAttemptOpts) (studentUserID string, newScore float64, err error)
+	// AutoGradeAllSubmittedAttempts menjalankan AutoGradeAttempt untuk setiap attempt submitted pada tryout (satu request).
+	AutoGradeAllSubmittedAttempts(ctx context.Context, tryoutID string, opts AutoGradeAttemptOpts) (AutoGradeAllSubmittedResult, error)
 }
 
 // AutoGradeAttemptOpts POST .../auto-grade — body opsional.
 type AutoGradeAttemptOpts struct {
 	ClearReviewerComments bool `json:"clearReviewerComments"`
+}
+
+// AutoGradeAllSubmittedResult ringkasan POST .../submitted-attempts/auto-grade.
+type AutoGradeAllSubmittedResult struct {
+	TryoutID  string                   `json:"tryoutId"`
+	Total     int                      `json:"total"`
+	Succeeded int                      `json:"succeeded"`
+	Failed    int                      `json:"failed"`
+	Results   []AutoGradeSubmittedItem `json:"results"`
+}
+
+// AutoGradeSubmittedItem satu baris hasil auto-grade massal.
+type AutoGradeSubmittedItem struct {
+	AttemptID string  `json:"attemptId"`
+	UserID    string  `json:"userId"`
+	Ok        bool    `json:"ok"`
+	Score     float64 `json:"score,omitempty"`
+	Error     string  `json:"error,omitempty"`
 }
 
 // AttemptAnswerReviewPatch partial update dari JSON (key hadir = ubah; manualScore null = hapus override).
@@ -75,6 +95,19 @@ type AttemptAnswerReviewPatch struct {
 
 // ErrAttemptReviewNoFields body tidak memuat reviewerComment / manualScore.
 var ErrAttemptReviewNoFields = errors.New("attempt review: no fields to update")
+
+// AttemptAnswerReviewResult hasil PUT .../answers/{questionId}/review.
+// AttemptScore = total skor attempt (jumlah semua soal) setelah dihitung ulang; bukan nilai manual satu soal.
+// QuestionManualScore = nilai manual_score yang tersimpan untuk soal ini (nil jika tidak ada override).
+// QuestionMaxScore = batas atas skor untuk soal ini; input manual tidak boleh melebihi ini (lebih besar akan di-clamp).
+// ManualScoreClamped = true jika nilai yang dikirim disesuaikan ke rentang [0, QuestionMaxScore].
+type AttemptAnswerReviewResult struct {
+	StudentUserID       string
+	AttemptScore        float64
+	QuestionManualScore *float64
+	QuestionMaxScore    float64
+	ManualScoreClamped  bool
+}
 
 // AttemptReviewResponse GET .../attempts/{attemptId}/review — kisi jawaban untuk penilaian manual.
 type AttemptReviewResponse struct {

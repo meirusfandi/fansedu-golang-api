@@ -81,7 +81,7 @@ func AdminPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
-		_, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, reviewerID, patch)
+		out, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, reviewerID, patch)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
@@ -96,12 +96,16 @@ func AdminPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 		}
 		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":         true,
-			"attemptId":  attemptID,
-			"questionId": questionID,
-			"score":      newScore,
-		})
+		resp := map[string]any{
+			"ok":                   true,
+			"attemptId":            attemptID,
+			"questionId":           questionID,
+			"score":                out.AttemptScore,
+			"manualScore":          out.QuestionManualScore,
+			"questionMaxScore":     out.QuestionMaxScore,
+			"manualScoreClamped":   out.ManualScoreClamped,
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -170,7 +174,7 @@ func TrainerPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
-		_, newScore, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, userID, patch)
+		out, err := deps.AdminService.PutAttemptAnswerReview(r.Context(), tryoutID, attemptID, questionID, userID, patch)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
@@ -185,12 +189,16 @@ func TrainerPutAttemptAnswerReview(deps *Deps) http.HandlerFunc {
 		}
 		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":         true,
-			"attemptId":  attemptID,
-			"questionId": questionID,
-			"score":      newScore,
-		})
+		resp := map[string]any{
+			"ok":                   true,
+			"attemptId":            attemptID,
+			"questionId":           questionID,
+			"score":                out.AttemptScore,
+			"manualScore":          out.QuestionManualScore,
+			"questionMaxScore":     out.QuestionMaxScore,
+			"manualScoreClamped":   out.ManualScoreClamped,
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -260,6 +268,80 @@ func TrainerPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 			"ok":        true,
 			"attemptId": attemptID,
 			"score":     newScore,
+		})
+	}
+}
+
+// AdminPostTryoutAutoGradeSubmitted POST /api/v1/admin/tryouts/{tryoutId}/auto-grade-submitted
+// Auto-grade semua attempt berstatus submitted untuk tryout ini (satu request). Body sama seperti per-attempt: { "clearReviewerComments": true } opsional.
+func AdminPostTryoutAutoGradeSubmitted(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tryoutID := chi.URLParam(r, "tryoutId")
+		var opts service.AutoGradeAttemptOpts
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&opts); err != nil && !errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body JSON tidak valid.")
+			return
+		}
+		out, err := deps.AdminService.AutoGradeAllSubmittedAttempts(r.Context(), tryoutID, opts)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			writeInternalError(w, r, err)
+			return
+		}
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":        true,
+			"tryoutId":  out.TryoutID,
+			"total":     out.Total,
+			"succeeded": out.Succeeded,
+			"failed":    out.Failed,
+			"results":   out.Results,
+		})
+	}
+}
+
+// TrainerPostTryoutAutoGradeSubmitted POST /api/v1/trainer|guru/tryouts/{tryoutId}/auto-grade-submitted
+func TrainerPostTryoutAutoGradeSubmitted(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" {
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
+			return
+		}
+		tryoutID := chi.URLParam(r, "tryoutId")
+		if !tryoutTrainerSubjectGuard(r.Context(), deps, userID, tryoutID) {
+			writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+			return
+		}
+		var opts service.AutoGradeAttemptOpts
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&opts); err != nil && !errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body JSON tidak valid.")
+			return
+		}
+		out, err := deps.AdminService.AutoGradeAllSubmittedAttempts(r.Context(), tryoutID, opts)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
+				return
+			}
+			writeInternalError(w, r, err)
+			return
+		}
+		ReconcileTryoutLeaderboardRedis(r.Context(), deps, tryoutID)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":        true,
+			"tryoutId":  out.TryoutID,
+			"total":     out.Total,
+			"succeeded": out.Succeeded,
+			"failed":    out.Failed,
+			"results":   out.Results,
 		})
 	}
 }
