@@ -18,6 +18,7 @@ type AttemptAnswerRepo interface {
 	ListByTryoutFromSubmittedAttempts(ctx context.Context, tryoutSessionID string) ([]domain.AttemptAnswer, error)
 	SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
 	UpdateAnswerReview(ctx context.Context, attemptID, questionID string, reviewerComment *string, manualScore *float64, reviewedByUserID string) error
+	UpdateManualScoreReview(ctx context.Context, attemptID, questionID string, manualScore *float64, reviewedByUserID string) error
 	EnsureAnswerRowForReview(ctx context.Context, attemptID, questionID string) error
 	// ClearManualGradingForAttempt hapus manual_score; jika clearReviewMeta, hapus juga komentar & metadata review.
 	ClearManualGradingForAttempt(ctx context.Context, attemptID string, clearReviewMeta bool) error
@@ -94,6 +95,19 @@ func (r *attemptAnswerRepo) UpdateAnswerReview(ctx context.Context, attemptID, q
 			updated_at = NOW()
 		WHERE attempt_id = $4::uuid AND question_id = $5::uuid
 	`, reviewerComment, manualScore, reviewedByUserID, attemptID, questionID)
+	return err
+}
+
+// UpdateManualScoreReview khusus update manual_score agar tidak menimpa field review lain saat save cepat berulang.
+func (r *attemptAnswerRepo) UpdateManualScoreReview(ctx context.Context, attemptID, questionID string, manualScore *float64, reviewedByUserID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE attempt_answers SET
+			manual_score = $1,
+			reviewed_by_user_id = $2::uuid,
+			reviewed_at = NOW(),
+			updated_at = NOW()
+		WHERE attempt_id = $3::uuid AND question_id = $4::uuid
+	`, manualScore, reviewedByUserID, attemptID, questionID)
 	return err
 }
 

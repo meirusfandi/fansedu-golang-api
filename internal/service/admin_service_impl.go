@@ -82,6 +82,7 @@ type adminService struct {
 		GetByAttemptAndQuestion(ctx context.Context, attemptID, questionID string) (domain.AttemptAnswer, error)
 		SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
 		UpdateAnswerReview(ctx context.Context, attemptID, questionID string, reviewerComment *string, manualScore *float64, reviewedByUserID string) error
+		UpdateManualScoreReview(ctx context.Context, attemptID, questionID string, manualScore *float64, reviewedByUserID string) error
 		EnsureAnswerRowForReview(ctx context.Context, attemptID, questionID string) error
 		ClearManualGradingForAttempt(ctx context.Context, attemptID string, clearReviewMeta bool) error
 	}
@@ -163,6 +164,7 @@ func NewAdminService(
 		GetByAttemptAndQuestion(ctx context.Context, attemptID, questionID string) (domain.AttemptAnswer, error)
 		SetAnswerGrading(ctx context.Context, attemptID, questionID string, isCorrect *bool) error
 		UpdateAnswerReview(ctx context.Context, attemptID, questionID string, reviewerComment *string, manualScore *float64, reviewedByUserID string) error
+		UpdateManualScoreReview(ctx context.Context, attemptID, questionID string, manualScore *float64, reviewedByUserID string) error
 		EnsureAnswerRowForReview(ctx context.Context, attemptID, questionID string) error
 		ClearManualGradingForAttempt(ctx context.Context, attemptID string, clearReviewMeta bool) error
 	},
@@ -557,12 +559,33 @@ func (s *adminService) ListTryoutStudents(ctx context.Context, tryoutID string) 
 	if _, err := s.tryoutRepo.GetByID(ctx, tryoutID); err != nil {
 		return nil, ErrNotFound
 	}
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return nil, err
+	}
 	attempts, err := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, tryoutID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]TryoutStudentItem, 0, len(attempts))
 	for _, a := range attempts {
+		// Sinkronkan nilai siswa dari jawaban aktual agar daftar siswa tidak menampilkan skor stale (mis. masih 0).
+		if answers, aerr := s.attemptAnswerRepo.ListByAttemptID(ctx, a.ID); aerr == nil {
+			scoreFresh, maxFresh, _, _, _ := GradeTryoutAttempt(questions, answers)
+			storedScore := 0.0
+			if a.Score != nil {
+				storedScore = *a.Score
+			}
+			storedMax := 0.0
+			if a.MaxScore != nil {
+				storedMax = *a.MaxScore
+			}
+			if a.Score == nil || a.MaxScore == nil || math.Abs(storedScore-scoreFresh) > 1e-6 || math.Abs(storedMax-maxFresh) > 1e-6 {
+				a.Score = &scoreFresh
+				a.MaxScore = &maxFresh
+				_ = s.attemptRepo.Update(ctx, a)
+			}
+		}
 		u, err := s.userRepo.FindByID(ctx, a.UserID)
 		if err != nil {
 			continue
@@ -797,28 +820,42 @@ func (s *adminService) PutAttemptAnswerReview(ctx context.Context, tryoutID, att
 	if err := s.attemptAnswerRepo.EnsureAnswerRowForReview(ctx, attemptID, questionID); err != nil {
 		return AttemptAnswerReviewResult{}, err
 	}
-	cur, err := s.attemptAnswerRepo.GetByAttemptAndQuestion(ctx, attemptID, questionID)
-	if err != nil {
-		return AttemptAnswerReviewResult{}, err
-	}
-	newComm := cur.ReviewerComment
-	if patch.HasReviewerComment {
-		newComm = patch.ReviewerComment
-	}
-	newManual := cur.ManualScore
 	manualClamped := false
-	if patch.HasManualScore {
-		if patch.ManualScore == nil {
-			newManual = nil
-		} else {
+	// Jalur khusus: update manual_score saja agar tidak menimpa field review lain saat request datang berdekatan.
+	if patch.HasManualScore && !patch.HasReviewerComment {
+		var newManual *float64
+		if patch.ManualScore != nil {
 			raw := *patch.ManualScore
 			v := ClampManualScoreToQuestionMax(raw, q.MaxScore)
 			manualClamped = math.Abs(raw-v) > 1e-6
 			newManual = &v
 		}
-	}
-	if err := s.attemptAnswerRepo.UpdateAnswerReview(ctx, attemptID, questionID, newComm, newManual, reviewerUserID); err != nil {
-		return AttemptAnswerReviewResult{}, err
+		if err := s.attemptAnswerRepo.UpdateManualScoreReview(ctx, attemptID, questionID, newManual, reviewerUserID); err != nil {
+			return AttemptAnswerReviewResult{}, err
+		}
+	} else {
+		cur, err := s.attemptAnswerRepo.GetByAttemptAndQuestion(ctx, attemptID, questionID)
+		if err != nil {
+			return AttemptAnswerReviewResult{}, err
+		}
+		newComm := cur.ReviewerComment
+		if patch.HasReviewerComment {
+			newComm = patch.ReviewerComment
+		}
+		newManual := cur.ManualScore
+		if patch.HasManualScore {
+			if patch.ManualScore == nil {
+				newManual = nil
+			} else {
+				raw := *patch.ManualScore
+				v := ClampManualScoreToQuestionMax(raw, q.MaxScore)
+				manualClamped = math.Abs(raw-v) > 1e-6
+				newManual = &v
+			}
+		}
+		if err := s.attemptAnswerRepo.UpdateAnswerReview(ctx, attemptID, questionID, newComm, newManual, reviewerUserID); err != nil {
+			return AttemptAnswerReviewResult{}, err
+		}
 	}
 	if err := s.recalculateAttemptTotals(ctx, tryoutID, attemptID); err != nil {
 		return AttemptAnswerReviewResult{}, err
