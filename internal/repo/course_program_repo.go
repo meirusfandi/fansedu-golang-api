@@ -65,7 +65,7 @@ func (r *courseProgramRepo) GetProgram(ctx context.Context, courseID string) (st
 		SELECT tryout_session_id::text FROM course_pretests WHERE course_id = $1::uuid
 	`, courseID).Scan(&preID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return track, meetings, nil, nil
 		}
 		return "", nil, nil, err

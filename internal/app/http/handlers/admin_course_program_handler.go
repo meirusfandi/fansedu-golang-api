@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
@@ -20,9 +22,13 @@ func AdminCourseProgramGet(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "course program service not configured")
 			return
 		}
-		courseID := chi.URLParam(r, "courseId")
+		courseID := strings.TrimSpace(chi.URLParam(r, "courseId"))
 		if courseID == "" {
 			writeError(w, http.StatusBadRequest, "bad_request", "courseId required")
+			return
+		}
+		if _, err := uuid.Parse(courseID); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid courseId")
 			return
 		}
 		track, meetings, pre, err := deps.CourseProgramService.GetProgram(r.Context(), courseID)
@@ -65,9 +71,13 @@ func AdminCourseProgramPut(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "course program service not configured")
 			return
 		}
-		courseID := chi.URLParam(r, "courseId")
+		courseID := strings.TrimSpace(chi.URLParam(r, "courseId"))
 		if courseID == "" {
 			writeError(w, http.StatusBadRequest, "bad_request", "courseId required")
+			return
+		}
+		if _, err := uuid.Parse(courseID); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid courseId")
 			return
 		}
 		var req dto.AdminCourseProgramPutRequest
@@ -87,9 +97,12 @@ func AdminCourseProgramPut(deps *Deps) http.HandlerFunc {
 				LiveClassURL:   it.LiveClassURL,
 			})
 		}
-		track := req.TrackType
+		track := strings.TrimSpace(strings.ToLower(req.TrackType))
 		if track == "" {
 			track = domain.CourseTrackMeetings
+		} else if track != domain.CourseTrackMeetings && track != domain.CourseTrackTryout {
+			writeError(w, http.StatusBadRequest, "validation_error", "trackType must be \"meetings\" or \"tryout\"")
+			return
 		}
 		err := deps.CourseProgramService.SaveProgram(r.Context(), courseID, track, meetings, req.PretestTryoutSessionID)
 		if err != nil {

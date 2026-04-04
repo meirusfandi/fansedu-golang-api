@@ -15,6 +15,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -722,13 +723,22 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req dto.CourseCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
 		createdBy, ok := middleware.GetUserID(r.Context())
 		var createdByPtr *string
 		if ok && createdBy != "" {
 			createdByPtr = &createdBy
+		}
+		track := domain.CourseTrackMeetings
+		if req.TrackType != nil && strings.TrimSpace(*req.TrackType) != "" {
+			t := strings.TrimSpace(strings.ToLower(*req.TrackType))
+			if t != domain.CourseTrackMeetings && t != domain.CourseTrackTryout {
+				writeError(w, http.StatusBadRequest, "validation_error", "trackType must be \"meetings\" or \"tryout\"")
+				return
+			}
+			track = t
 		}
 		c := domain.Course{
 			Title:       req.Title,
@@ -737,6 +747,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Thumbnail:   req.Thumbnail,
 			SubjectID:   req.SubjectID,
 			CreatedBy:   createdByPtr,
+			TrackType:   track,
 		}
 		if req.Price != nil {
 			c.Price = *req.Price
@@ -746,6 +757,52 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		if len(req.LinkedTryoutIds) > 0 {
+			if deps.CourseAdminLinkRepo == nil {
+				writeError(w, http.StatusServiceUnavailable, "service_unavailable", "course admin link repo not configured")
+				return
+			}
+			if err := deps.CourseAdminLinkRepo.ReplaceTryoutsForCourse(r.Context(), created.ID, req.LinkedTryoutIds); err != nil {
+				writeInternalError(w, r, err)
+				return
+			}
+		}
+
+		if courseCreateNeedsProgramSave(req, track) {
+			if deps.CourseProgramService == nil {
+				writeError(w, http.StatusServiceUnavailable, "service_unavailable", "course program service not configured")
+				return
+			}
+			meetings := make([]domain.CourseProgramMeeting, 0, len(req.Meetings))
+			for _, it := range req.Meetings {
+				meetings = append(meetings, domain.CourseProgramMeeting{
+					MeetingNumber:  it.MeetingNumber,
+					Title:          it.Title,
+					DetailText:     it.DetailText,
+					PdfURL:         it.PdfURL,
+					PrTitle:        it.PrTitle,
+					PrDescription:  it.PrDescription,
+					LiveClassURL:   it.LiveClassURL,
+				})
+			}
+			if err := deps.CourseProgramService.SaveProgram(r.Context(), created.ID, track, meetings, req.PretestTryoutSessionID); err != nil {
+				if errors.Is(err, repo.ErrCourseProgramValidation) {
+					writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+					return
+				}
+				writeInternalError(w, r, err)
+				return
+			}
+		}
+
+		// Reload agar track_type + konsisten pasca SaveProgram
+		created, err = deps.AdminService.GetCourseByID(r.Context(), created.ID)
+		if err != nil {
+			writeInternalError(w, r, err)
+			return
+		}
+
 		tt := created.TrackType
 		if tt == "" {
 			tt = domain.CourseTrackMeetings
@@ -766,6 +823,20 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// courseCreateNeedsProgramSave true jika body minta journey/program disinkronkan (bukan hanya metadata kelas).
+func courseCreateNeedsProgramSave(req dto.CourseCreateRequest, track string) bool {
+	if len(req.Meetings) > 0 {
+		return true
+	}
+	if req.PretestTryoutSessionID != nil && strings.TrimSpace(*req.PretestTryoutSessionID) != "" {
+		return true
+	}
+	if track == domain.CourseTrackTryout && len(req.LinkedTryoutIds) > 0 {
+		return true
+	}
+	return false
+}
+
 func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "courseId")
@@ -774,9 +845,9 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 			http.Error(w, "course not found", http.StatusNotFound)
 			return
 		}
-		var req dto.CourseCreateRequest
+		var req dto.CourseUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
 		c.Title = req.Title

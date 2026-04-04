@@ -95,6 +95,22 @@ type CourseCreateRequest struct {
 	Price       *int    `json:"price,omitempty"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
+	// Opsional: format kelas sekaligus saat create (sama konsep dengan PUT .../program + linked-tryouts).
+	TrackType               *string                         `json:"trackType,omitempty"`
+	Meetings                []AdminCourseProgramMeetingItem   `json:"meetings,omitempty"`
+	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
+	LinkedTryoutIds         []string                        `json:"linkedTryoutIds,omitempty"`
+}
+
+// CourseUpdateRequest body PUT /api/v1/admin/courses/{courseId} — hanya metadata kelas.
+// Format program hanya lewat PUT .../courses/{id}/program (field tambahan di JSON body update diabaikan oleh decoder).
+type CourseUpdateRequest struct {
+	Title       string  `json:"title"`
+	Slug        *string `json:"slug,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Price       *int    `json:"price,omitempty"`
+	Thumbnail   *string `json:"thumbnail,omitempty"`
+	SubjectID   *string `json:"subjectId,omitempty"`
 }
 
 type CertificateIssueRequest struct {
