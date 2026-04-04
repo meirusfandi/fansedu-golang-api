@@ -165,6 +165,10 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		certificateRepo.Count,
 	)
 	courseService := service.NewCourseService(courseRepo, enrollmentRepo)
+	learningJourneyRepo := repo.NewLearningJourneyRepo(pool)
+	courseProgramRepo := repo.NewCourseProgramRepo(pool)
+	courseProgramService := service.NewCourseProgramService(courseRepo, courseProgramRepo)
+	learningService := service.NewLearningService(courseRepo, learningJourneyRepo)
 	trainerService := service.NewTrainerService(userRepo, trainerRepo)
 	orderRepo := repo.NewOrderRepo(pool)
 	orderItemRepo := repo.NewOrderItemRepo(pool)
@@ -215,6 +219,8 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		DashboardService:       dashboardService,
 		AdminService:           adminService,
 		CourseService:          courseService,
+		CourseProgramService:   courseProgramService,
+		LearningService:        learningService,
 		TrainerService:         trainerService,
 		CheckoutService:        checkoutService,
 		UserRepo:               userRepo,

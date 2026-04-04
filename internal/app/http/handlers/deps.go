@@ -23,8 +23,10 @@ type Deps struct {
 	TryoutService    service.TryoutService
 	AttemptService   service.AttemptService
 	DashboardService service.DashboardService
-	AdminService     service.AdminService
-	CourseService    service.CourseService
+	AdminService          service.AdminService
+	CourseService         service.CourseService
+	CourseProgramService  service.CourseProgramService
+	LearningService       service.LearningService
 	TrainerService   service.TrainerService
 	CheckoutService  service.CheckoutService
 	GeoService       service.GeoService

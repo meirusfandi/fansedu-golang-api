@@ -12,6 +12,10 @@ import (
 )
 
 func adminCourseToDTO(c domain.Course) dto.CourseResponse {
+	tt := c.TrackType
+	if tt == "" {
+		tt = domain.CourseTrackMeetings
+	}
 	return dto.CourseResponse{
 		ID:          c.ID,
 		Title:       c.Title,
@@ -21,6 +25,7 @@ func adminCourseToDTO(c domain.Course) dto.CourseResponse {
 		Thumbnail:   c.Thumbnail,
 		SubjectID:   c.SubjectID,
 		CreatedBy:   c.CreatedBy,
+		TrackType:   tt,
 	}
 }
 
@@ -62,6 +67,8 @@ func AdminCourseManageGet(deps *Deps) http.HandlerFunc {
 				ListEnrollments: "/api/v1/admin/courses/" + courseID + "/enrollments",
 				TryoutQuestions: "/api/v1/admin/tryouts/{tryoutId}/questions",
 				PackageManage:   "PUT /api/v1/admin/landing/packages/{id} body linked_course_ids, atau PUT .../courses/{id}/linked-packages",
+				GetProgram:      "/api/v1/admin/courses/" + courseID + "/program",
+				PutProgram:      "PUT /api/v1/admin/courses/" + courseID + "/program",
 			},
 		}
 

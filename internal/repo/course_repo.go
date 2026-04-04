@@ -27,41 +27,49 @@ func NewCourseRepo(pool *pgxpool.Pool) CourseRepo { return &courseRepo{pool: poo
 
 func (r *courseRepo) Create(ctx context.Context, c domain.Course) (domain.Course, error) {
 	id := uuid.New().String()
+	track := c.TrackType
+	if track == "" {
+		track = domain.CourseTrackMeetings
+	}
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO courses (id, title, slug, description, price, thumbnail, subject_id, created_by)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::uuid, $8::uuid)
+		INSERT INTO courses (id, title, slug, description, price, thumbnail, subject_id, created_by, track_type)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::uuid, $8::uuid, $9)
 		RETURNING created_at, updated_at
-	`, id, c.Title, c.Slug, c.Description, c.Price, c.Thumbnail, c.SubjectID, c.CreatedBy).Scan(&c.CreatedAt, &c.UpdatedAt)
+	`, id, c.Title, c.Slug, c.Description, c.Price, c.Thumbnail, c.SubjectID, c.CreatedBy, track).Scan(&c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return domain.Course{}, err
 	}
 	c.ID = id
+	c.TrackType = track
 	return c, nil
 }
 
 func (r *courseRepo) GetByID(ctx context.Context, id string) (domain.Course, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+		       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 		FROM courses WHERE id = $1::uuid
 	`, id)
 	var c domain.Course
-	err := row.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
 func (r *courseRepo) GetBySlug(ctx context.Context, slug string) (domain.Course, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+		       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 		FROM courses WHERE slug = $1
 	`, slug)
 	var c domain.Course
-	err := row.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
 func (r *courseRepo) List(ctx context.Context) ([]domain.Course, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+		       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 		FROM courses ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -71,7 +79,7 @@ func (r *courseRepo) List(ctx context.Context) ([]domain.Course, error) {
 	var list []domain.Course
 	for rows.Next() {
 		var c domain.Course
-		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -82,7 +90,8 @@ func (r *courseRepo) List(ctx context.Context) ([]domain.Course, error) {
 func (r *courseRepo) ListBySubjectID(ctx context.Context, subjectID *string) ([]domain.Course, error) {
 	if subjectID == nil || *subjectID == "" {
 		rows, err := r.pool.Query(ctx, `
-			SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+			SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+			       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 			FROM courses WHERE subject_id IS NULL ORDER BY created_at DESC
 		`)
 		if err != nil {
@@ -92,7 +101,7 @@ func (r *courseRepo) ListBySubjectID(ctx context.Context, subjectID *string) ([]
 		var list []domain.Course
 		for rows.Next() {
 			var c domain.Course
-			if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt); err != nil {
 				return nil, err
 			}
 			list = append(list, c)
@@ -100,7 +109,8 @@ func (r *courseRepo) ListBySubjectID(ctx context.Context, subjectID *string) ([]
 		return list, rows.Err()
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+		       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 		FROM courses WHERE subject_id = $1::uuid OR subject_id IS NULL ORDER BY created_at DESC
 	`, *subjectID)
 	if err != nil {
@@ -110,7 +120,7 @@ func (r *courseRepo) ListBySubjectID(ctx context.Context, subjectID *string) ([]
 	var list []domain.Course
 	for rows.Next() {
 		var c domain.Course
-		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -120,7 +130,8 @@ func (r *courseRepo) ListBySubjectID(ctx context.Context, subjectID *string) ([]
 
 func (r *courseRepo) ListByCreatedBy(ctx context.Context, createdBy string) ([]domain.Course, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by, created_at, updated_at
+		SELECT id, title, slug, description, price, thumbnail, subject_id, created_by,
+		       COALESCE(NULLIF(TRIM(track_type), ''), 'meetings'), created_at, updated_at
 		FROM courses WHERE created_by = $1::uuid ORDER BY created_at DESC
 	`, createdBy)
 	if err != nil {
@@ -130,7 +141,7 @@ func (r *courseRepo) ListByCreatedBy(ctx context.Context, createdBy string) ([]d
 	var list []domain.Course
 	for rows.Next() {
 		var c domain.Course
-		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Slug, &c.Description, &c.Price, &c.Thumbnail, &c.SubjectID, &c.CreatedBy, &c.TrackType, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -145,9 +156,13 @@ func (r *courseRepo) Count(ctx context.Context) (int, error) {
 }
 
 func (r *courseRepo) Update(ctx context.Context, c domain.Course) error {
+	track := c.TrackType
+	if track == "" {
+		track = domain.CourseTrackMeetings
+	}
 	_, err := r.pool.Exec(ctx, `
-		UPDATE courses SET title=$2, slug=$3, description=$4, price=$5, thumbnail=$6, subject_id=$7::uuid WHERE id = $1::uuid
-	`, c.ID, c.Title, c.Slug, c.Description, c.Price, c.Thumbnail, c.SubjectID)
+		UPDATE courses SET title=$2, slug=$3, description=$4, price=$5, thumbnail=$6, subject_id=$7::uuid, track_type=$8 WHERE id = $1::uuid
+	`, c.ID, c.Title, c.Slug, c.Description, c.Price, c.Thumbnail, c.SubjectID, track)
 	return err
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -20,15 +21,20 @@ func CourseList(deps *Deps) http.HandlerFunc {
 		}
 		out := make([]dto.CourseResponse, len(list))
 		for i := range list {
+			tt := list[i].TrackType
+			if tt == "" {
+				tt = domain.CourseTrackMeetings
+			}
 			out[i] = dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
 				Slug:        list[i].Slug,
 				Description: list[i].Description,
-				Price:  list[i].Price,
+				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
+				TrackType:   tt,
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -49,16 +55,21 @@ func CourseGetBySlug(deps *Deps) http.HandlerFunc {
 			http.Error(w, "course not found", http.StatusNotFound)
 			return
 		}
+		tt := c.TrackType
+		if tt == "" {
+			tt = domain.CourseTrackMeetings
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
 			ID:          c.ID,
 			Title:       c.Title,
 			Slug:        c.Slug,
 			Description: c.Description,
-			Price:  c.Price,
+			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
 			CreatedBy:   c.CreatedBy,
+			TrackType:   tt,
 		})
 	}
 }

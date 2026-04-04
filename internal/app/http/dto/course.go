@@ -9,6 +9,8 @@ type CourseResponse struct {
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
 	CreatedBy   *string `json:"createdBy,omitempty"`
+	// TrackType: "meetings" | "tryout" — alur pertemuan vs latihan tryout terhubung.
+	TrackType   string  `json:"trackType"`
 }
 
 type EnrollmentResponse struct {

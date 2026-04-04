@@ -163,6 +163,12 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/courses", func(r chi.Router) {
 			r.Get("/", handlers.CourseList(deps))
 			r.Get("/slug/{slug}", handlers.CourseGetBySlug(deps))
+			// Learning journey (gabung di /courses): daftar enroll, pohon section/lesson, progress; materi pdfUrl + liveClassUrl.
+			// Harus sebelum /{courseId}/... agar "enrolled", "lessons" tidak tertangkap sebagai courseId.
+			r.With(middleware.Auth(deps.JWTSecret), passwordGuard).Get("/enrolled", handlers.LearningCoursesList(deps))
+			r.With(middleware.Auth(deps.JWTSecret), passwordGuard).Get("/lessons/{lessonId}", handlers.LearningLessonGet(deps))
+			r.With(middleware.Auth(deps.JWTSecret), passwordGuard).Post("/lessons/{lessonId}/complete", handlers.LearningLessonComplete(deps))
+			r.With(middleware.Auth(deps.JWTSecret), passwordGuard).Get("/{courseRef}/journey", handlers.LearningCourseGet(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/enroll", handlers.CourseEnroll(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Get("/{courseId}/messages", handlers.CourseMessagesList(deps))
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/{courseId}/messages", handlers.CourseMessageCreate(deps))
@@ -278,6 +284,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("courses.manage")).Get("/courses/{courseId}/manage", handlers.AdminCourseManageGet(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Put("/courses/{courseId}/linked-packages", handlers.AdminCourseLinkedPackagesPut(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Put("/courses/{courseId}/linked-tryouts", handlers.AdminCourseLinkedTryoutsPut(deps))
+			r.With(middleware.RequirePermission("courses.manage")).Get("/courses/{courseId}/program", handlers.AdminCourseProgramGet(deps))
+			r.With(middleware.RequirePermission("courses.manage")).Put("/courses/{courseId}/program", handlers.AdminCourseProgramPut(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Get("/payments", handlers.AdminListPayments(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Get("/transactions/{orderId}", handlers.AdminTransactionDetail(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments", handlers.AdminCreatePayment(deps))

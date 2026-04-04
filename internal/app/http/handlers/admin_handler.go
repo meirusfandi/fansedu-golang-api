@@ -670,6 +670,10 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 		}
 		out := make([]dto.CourseResponse, len(list))
 		for i := range list {
+			tt := list[i].TrackType
+			if tt == "" {
+				tt = domain.CourseTrackMeetings
+			}
 			out[i] = dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
@@ -679,6 +683,7 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
+				TrackType:   tt,
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -694,6 +699,10 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 			http.Error(w, "course not found", http.StatusNotFound)
 			return
 		}
+		tt := c.TrackType
+		if tt == "" {
+			tt = domain.CourseTrackMeetings
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
 			ID:          c.ID,
@@ -704,6 +713,7 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
 			CreatedBy:   c.CreatedBy,
+			TrackType:   tt,
 		})
 	}
 }
@@ -736,6 +746,10 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		tt := created.TrackType
+		if tt == "" {
+			tt = domain.CourseTrackMeetings
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
@@ -747,6 +761,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Thumbnail:   created.Thumbnail,
 			SubjectID:   created.SubjectID,
 			CreatedBy:   created.CreatedBy,
+			TrackType:   tt,
 		})
 	}
 }

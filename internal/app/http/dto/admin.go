@@ -158,6 +158,33 @@ type RelatedCourseAdminEndpoints struct {
 	ListEnrollments string `json:"listEnrollments"`
 	TryoutQuestions string `json:"tryoutQuestions"`
 	PackageManage   string `json:"packageManageNote"`
+	GetProgram      string `json:"getProgram"`
+	PutProgram      string `json:"putProgram"`
+}
+
+// AdminCourseProgramMeetingItem satu pertemuan (1–8): judul, detail, PDF, PR, link live.
+type AdminCourseProgramMeetingItem struct {
+	MeetingNumber  int     `json:"meetingNumber"`
+	Title          string  `json:"title"`
+	DetailText     *string `json:"detailText,omitempty"`
+	PdfURL         *string `json:"pdfUrl,omitempty"`
+	PrTitle        *string `json:"prTitle,omitempty"`
+	PrDescription  *string `json:"prDescription,omitempty"`
+	LiveClassURL   *string `json:"liveClassUrl,omitempty"`
+}
+
+// AdminCourseProgramResponse GET .../courses/{courseId}/program
+type AdminCourseProgramResponse struct {
+	TrackType               string                          `json:"trackType"`
+	Meetings                []AdminCourseProgramMeetingItem `json:"meetings"`
+	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
+}
+
+// AdminCourseProgramPutRequest PUT .../courses/{courseId}/program — setelah simpan, learning journey di-rebuild dari data ini.
+type AdminCourseProgramPutRequest struct {
+	TrackType               string                          `json:"trackType"`
+	Meetings                []AdminCourseProgramMeetingItem `json:"meetings"`
+	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
 }
 
 // AdminCourseLinkedPackagesPutRequest body PUT .../linked-packages
