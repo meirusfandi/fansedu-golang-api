@@ -29,6 +29,7 @@ type Deps struct {
 	LearningService       service.LearningService
 	TrainerService   service.TrainerService
 	CheckoutService  service.CheckoutService
+	VoucherService   service.VoucherService
 	GeoService       service.GeoService
 
 	UserRepo                 repo.UserRepo

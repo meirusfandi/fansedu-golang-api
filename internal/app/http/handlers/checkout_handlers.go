@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -159,16 +160,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
 				return
 			}
-			if err == service.ErrPromoInvalid {
-				writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
-				return
-			}
-			if err == service.ErrPromoExpired {
-				writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
-				return
-			}
-			if err == service.ErrPromoMaxUses {
-				writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
+			if writeCheckoutPromoError(w, err) {
 				return
 			}
 			if err == service.ErrPackageNoLinkedCourses {
@@ -241,16 +233,7 @@ func CheckoutInitiate(deps *Deps) http.HandlerFunc {
 						writeError(w, http.StatusNotFound, "not_found", "program not found for slug "+courseSlug)
 						return
 					}
-					if err == service.ErrPromoInvalid {
-						writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
-						return
-					}
-					if err == service.ErrPromoExpired {
-						writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
-						return
-					}
-					if err == service.ErrPromoMaxUses {
-						writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
+					if writeCheckoutPromoError(w, err) {
 						return
 					}
 					writeInternalError(w, r, err)
@@ -565,6 +548,26 @@ func CompletePurchaseAuth(deps *Deps) http.HandlerFunc {
 			NextAction:      nextAction,
 		})
 	}
+}
+
+func writeCheckoutPromoError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, service.ErrPromoInvalid):
+		writeError(w, http.StatusBadRequest, "invalid_promo", "kode promo tidak valid")
+	case errors.Is(err, service.ErrPromoExpired):
+		writeError(w, http.StatusBadRequest, "promo_expired", "kode promo sudah kadaluarsa")
+	case errors.Is(err, service.ErrPromoMaxUses):
+		writeError(w, http.StatusBadRequest, "promo_max_uses", "kode promo sudah mencapai batas penggunaan")
+	case errors.Is(err, service.ErrPromoInactive):
+		writeError(w, http.StatusBadRequest, "promo_inactive", "kode promo tidak aktif")
+	case errors.Is(err, service.ErrPromoWrongScope):
+		writeError(w, http.StatusBadRequest, "promo_wrong_scope", "kode promo tidak berlaku untuk jenis pembelian ini")
+	case errors.Is(err, service.ErrPromoRequiresClaim):
+		writeError(w, http.StatusBadRequest, "voucher_requires_claim", "voucher harus diklaim ke akun Anda terlebih dahulu")
+	default:
+		return false
+	}
+	return true
 }
 
 func generateBootstrapToken(jwtSecret []byte, userID, role string) string {

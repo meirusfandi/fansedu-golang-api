@@ -88,6 +88,7 @@ var rolePermissions = map[string]map[string]struct{}{
 		"admin.overview.read": {},
 		"payments.manage":     {},
 		"orders.verify":       {},
+		"vouchers.manage":     {},
 		"reports.read":        {},
 		"analytics.read":      {},
 		"admin.audit.read":    {},
@@ -105,6 +106,7 @@ var rolePermissions = map[string]map[string]struct{}{
 		"admin.audit.read":    {},
 		"errors.read":         {},
 		"errors.manage":       {},
+		"vouchers.manage":     {},
 	},
 	domain.UserRoleContentAdmin: {
 		"admin.overview.read": {},
@@ -114,6 +116,7 @@ var rolePermissions = map[string]map[string]struct{}{
 		"master-data.manage":  {},
 		"admin.audit.read":    {},
 		"errors.read":         {},
+		"vouchers.manage":     {},
 	},
 }
 

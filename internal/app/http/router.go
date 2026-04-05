@@ -103,6 +103,12 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.Auth(deps.JWTSecret)).Post("/orders/{orderId}/payment-proof", handlers.CheckoutPaymentProof(deps))
 			r.Post("/orders/{orderId}/complete-purchase-auth", handlers.CompletePurchaseAuth(deps))
 		})
+
+		r.Route("/vouchers", func(r chi.Router) {
+			r.Use(middleware.Auth(deps.JWTSecret))
+			r.Post("/claim", handlers.VoucherClaim(deps))
+			r.Get("/mine", handlers.VoucherListMine(deps))
+		})
 		r.Post("/analytics/pageview", handlers.AnalyticsTrackPageview(deps))
 		r.Post("/analytics/events", handlers.AnalyticsTrackEvent(deps))
 		r.Post("/webhook/payment", handlers.PaymentWebhook(deps))
@@ -300,6 +306,13 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/confirm", handlers.AdminConfirmPaymentByAction(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/reject", handlers.AdminRejectPaymentByAction(deps))
 			r.With(middleware.RequirePermission("orders.verify")).Put("/orders/{orderId}/verify", handlers.AdminVerifyOrder(deps))
+			r.Route("/vouchers", func(r chi.Router) {
+				r.With(middleware.RequirePermission("vouchers.manage")).Get("/", handlers.AdminListVouchers(deps))
+				r.With(middleware.RequirePermission("vouchers.manage")).Post("/", handlers.AdminCreateVoucher(deps))
+				r.With(middleware.RequirePermission("vouchers.manage")).Get("/{voucherId}", handlers.AdminGetVoucher(deps))
+				r.With(middleware.RequirePermission("vouchers.manage")).Put("/{voucherId}", handlers.AdminUpdateVoucher(deps))
+				r.With(middleware.RequirePermission("vouchers.manage")).Delete("/{voucherId}", handlers.AdminDeleteVoucher(deps))
+			})
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/summary", handlers.AdminAnalyticsSummary(deps))
 			r.With(middleware.RequirePermission("analytics.read")).Get("/analytics/visitors", handlers.AdminAnalyticsVisitors(deps))
 			r.With(middleware.RequirePermission("admin.audit.read")).Get("/audit-logs", handlers.AdminAuditLogsList(deps))

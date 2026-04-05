@@ -85,6 +85,8 @@ type inviteRepoForCheckout interface {
 type promoRepoForCheckout interface {
 	GetByCode(ctx context.Context, code string) (domain.PromoCode, error)
 	IncrementUsedCount(ctx context.Context, id string) error
+	HasUnusedClaim(ctx context.Context, userID, promoCodeID string) (bool, error)
+	MarkClaimUsedForOrder(ctx context.Context, userID, promoCodeID, orderID string) error
 }
 
 type courseRepoForCheckout interface {
@@ -245,51 +247,9 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 
 	// Semua harga dalam rupiah. Promo fixed: DiscountValue = rupiah.
 	normalRupiah := course.Price * quantity
-	discountRupiah := 0
-	var discountPercent *float64
-	appliedPromoCode := ""
-
-	if promoCode != "" && s.promoRepo != nil {
-		promo, err := s.promoRepo.GetByCode(ctx, promoCode)
-		if err != nil {
-			return nil, ErrPromoInvalid
-		}
-		now := time.Now()
-		if now.Before(promo.ValidFrom) {
-			return nil, ErrPromoInvalid
-		}
-		if promo.ValidUntil != nil && now.After(*promo.ValidUntil) {
-			return nil, ErrPromoExpired
-		}
-		if promo.MaxUses != nil && promo.UsedCount >= *promo.MaxUses {
-			return nil, ErrPromoMaxUses
-		}
-		switch promo.DiscountType {
-		case domain.PromoDiscountTypePercent:
-			if promo.DiscountValue <= 0 || promo.DiscountValue > 100 {
-				return nil, ErrPromoInvalid
-			}
-			discountRupiah = normalRupiah * promo.DiscountValue / 100
-			p := float64(promo.DiscountValue)
-			discountPercent = &p
-		case domain.PromoDiscountTypeFixed:
-			if promo.DiscountValue <= 0 {
-				return nil, ErrPromoInvalid
-			}
-			discountValRupiah := promo.DiscountValue
-			if discountValRupiah >= normalRupiah {
-				discountRupiah = normalRupiah
-				p := 100.0
-				discountPercent = &p
-			} else {
-				discountRupiah = discountValRupiah
-				p := float64(discountValRupiah*100) / float64(normalRupiah)
-				discountPercent = &p
-			}
-		default:
-			return nil, ErrPromoInvalid
-		}
-		appliedPromoCode = promo.Code
+	discountRupiah, discountPercent, appliedPromoCode, appliedPromo, err := s.applyPromoDiscount(ctx, promoCode, user.ID, normalRupiah, true)
+	if err != nil {
+		return nil, err
 	}
 
 	finalRupiah := normalRupiah - discountRupiah
@@ -345,10 +305,7 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 		return nil, err
 	}
 
-	if appliedPromoCode != "" && s.promoRepo != nil {
-		promo, _ := s.promoRepo.GetByCode(ctx, appliedPromoCode)
-		_ = s.promoRepo.IncrementUsedCount(ctx, promo.ID)
-	}
+	s.incrementPromoIfNeededOnInitiate(ctx, appliedPromoCode, appliedPromo)
 
 	dp := 0.0
 	if discountPercent != nil {
@@ -503,51 +460,9 @@ func (s *checkoutService) InitiatePackage(ctx context.Context, packageSlug, emai
 	}
 
 	normalRupiah := unitPrice * quantity
-	discountRupiah := 0
-	var discountPercent *float64
-	appliedPromoCode := ""
-
-	if promoCode != "" && s.promoRepo != nil {
-		promo, err := s.promoRepo.GetByCode(ctx, promoCode)
-		if err != nil {
-			return nil, ErrPromoInvalid
-		}
-		now := time.Now()
-		if now.Before(promo.ValidFrom) {
-			return nil, ErrPromoInvalid
-		}
-		if promo.ValidUntil != nil && now.After(*promo.ValidUntil) {
-			return nil, ErrPromoExpired
-		}
-		if promo.MaxUses != nil && promo.UsedCount >= *promo.MaxUses {
-			return nil, ErrPromoMaxUses
-		}
-		switch promo.DiscountType {
-		case domain.PromoDiscountTypePercent:
-			if promo.DiscountValue <= 0 || promo.DiscountValue > 100 {
-				return nil, ErrPromoInvalid
-			}
-			discountRupiah = normalRupiah * promo.DiscountValue / 100
-			p := float64(promo.DiscountValue)
-			discountPercent = &p
-		case domain.PromoDiscountTypeFixed:
-			if promo.DiscountValue <= 0 {
-				return nil, ErrPromoInvalid
-			}
-			discountValRupiah := promo.DiscountValue
-			if discountValRupiah >= normalRupiah {
-				discountRupiah = normalRupiah
-				p := 100.0
-				discountPercent = &p
-			} else {
-				discountRupiah = discountValRupiah
-				p := float64(discountValRupiah*100) / float64(normalRupiah)
-				discountPercent = &p
-			}
-		default:
-			return nil, ErrPromoInvalid
-		}
-		appliedPromoCode = promo.Code
+	discountRupiah, discountPercent, appliedPromoCode, appliedPromoPkg, err := s.applyPromoDiscount(ctx, promoCode, user.ID, normalRupiah, false)
+	if err != nil {
+		return nil, err
 	}
 
 	finalRupiah := normalRupiah - discountRupiah
@@ -611,10 +526,7 @@ func (s *checkoutService) InitiatePackage(ctx context.Context, packageSlug, emai
 		}
 	}
 
-	if appliedPromoCode != "" && s.promoRepo != nil {
-		promo, _ := s.promoRepo.GetByCode(ctx, appliedPromoCode)
-		_ = s.promoRepo.IncrementUsedCount(ctx, promo.ID)
-	}
+	s.incrementPromoIfNeededOnInitiate(ctx, appliedPromoCode, appliedPromoPkg)
 
 	dp := 0.0
 	if discountPercent != nil {
@@ -746,6 +658,9 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 		return err
 	}
 
+	order.Status = domain.OrderStatusPaid
+	s.finalizePromoAfterPayment(ctx, order)
+
 	items, err := s.orderItemRepo.ListByOrderID(ctx, orderID)
 	if err != nil {
 		return err
@@ -792,6 +707,9 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 	if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusPaid); err != nil {
 		return err
 	}
+	order.Status = domain.OrderStatusPaid
+	s.finalizePromoAfterPayment(ctx, order)
+
 	items, err := s.orderItemRepo.ListByOrderID(ctx, orderID)
 	if err != nil {
 		return err

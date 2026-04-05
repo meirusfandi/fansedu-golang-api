@@ -119,6 +119,50 @@ type CertificateIssueRequest struct {
 	CourseID        *string `json:"courseId,omitempty"`
 }
 
+// --- Voucher / promo (checkout kelas & paket) ---
+type AdminVoucherCreateRequest struct {
+	Code              string  `json:"code"`
+	DiscountType      string  `json:"discountType"`
+	DiscountValue     int     `json:"discountValue"`
+	ValidFrom         *string `json:"validFrom,omitempty"`
+	ValidUntil        *string `json:"validUntil,omitempty"`
+	MaxUses           *int    `json:"maxUses,omitempty"`
+	IsActive          *bool   `json:"isActive,omitempty"`
+	RequiresClaim     *bool   `json:"requiresClaim,omitempty"`
+	AppliesToCourses  *bool   `json:"appliesToCourses,omitempty"`
+	AppliesToPackages *bool   `json:"appliesToPackages,omitempty"`
+}
+
+type AdminVoucherUpdateRequest struct {
+	Code              *string `json:"code,omitempty"`
+	DiscountType      *string `json:"discountType,omitempty"`
+	DiscountValue     *int    `json:"discountValue,omitempty"`
+	ValidFrom         *string `json:"validFrom,omitempty"`
+	ValidUntil        *string `json:"validUntil,omitempty"`
+	MaxUses           *int    `json:"maxUses,omitempty"`
+	IsActive          *bool   `json:"isActive,omitempty"`
+	RequiresClaim     *bool   `json:"requiresClaim,omitempty"`
+	AppliesToCourses  *bool   `json:"appliesToCourses,omitempty"`
+	AppliesToPackages *bool   `json:"appliesToPackages,omitempty"`
+}
+
+type AdminVoucherResponse struct {
+	ID                 string  `json:"id"`
+	Code               string  `json:"code"`
+	DiscountType       string  `json:"discountType"`
+	DiscountValue      int     `json:"discountValue"`
+	ValidFrom          string  `json:"validFrom"`
+	ValidUntil         *string `json:"validUntil,omitempty"`
+	MaxUses            *int    `json:"maxUses,omitempty"`
+	UsedCount          int     `json:"usedCount"`
+	IsActive           bool    `json:"isActive"`
+	RequiresClaim      bool    `json:"requiresClaim"`
+	AppliesToCourses   bool    `json:"appliesToCourses"`
+	AppliesToPackages  bool    `json:"appliesToPackages"`
+	CreatedAt          string  `json:"createdAt"`
+	UpdatedAt          string  `json:"updatedAt"`
+}
+
 type CourseContentRequest struct {
 	Title       string      `json:"title"`
 	Description *string     `json:"description,omitempty"`

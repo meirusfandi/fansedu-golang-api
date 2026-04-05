@@ -203,6 +203,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		appURL = "http://localhost:5173"
 	}
 	checkoutService := service.NewCheckoutService(courseRepo, landingPackageRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo, promoRepo, mailer, userInviteRepo, appURL)
+	voucherService := service.NewVoucherService(promoRepo)
 
 	return &handlers.Deps{
 		DB:                      pool,
@@ -223,6 +224,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		LearningService:        learningService,
 		TrainerService:         trainerService,
 		CheckoutService:        checkoutService,
+		VoucherService:         voucherService,
 		UserRepo:               userRepo,
 		QuestionRepo:           questionRepo,
 		AttemptAnswerRepo:      attemptAnswerRepo,
