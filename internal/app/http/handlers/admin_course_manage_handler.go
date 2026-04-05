@@ -67,8 +67,9 @@ func AdminCourseManageGet(deps *Deps) http.HandlerFunc {
 				ListEnrollments: "/api/v1/admin/courses/" + courseID + "/enrollments",
 				TryoutQuestions: "/api/v1/admin/tryouts/{tryoutId}/questions",
 				PackageManage:   "PUT /api/v1/admin/landing/packages/{id} body linked_course_ids, atau PUT .../courses/{id}/linked-packages",
-				GetProgram:      "/api/v1/admin/courses/" + courseID + "/program",
-				PutProgram:      "PUT /api/v1/admin/courses/" + courseID + "/program",
+				GetProgram:           "/api/v1/admin/courses/" + courseID + "/program",
+				PutProgram:           "PUT /api/v1/admin/courses/" + courseID + "/program",
+				UploadCourseMaterial: "POST /api/v1/admin/upload/course-material (multipart field: file)",
 			},
 		}
 

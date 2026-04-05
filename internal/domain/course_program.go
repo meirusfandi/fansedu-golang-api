@@ -6,6 +6,7 @@ type CourseProgramMeeting struct {
 	Title           string
 	DetailText      *string
 	PdfURL          *string
+	PptURL          *string
 	PrTitle         *string
 	PrDescription   *string
 	LiveClassURL    *string

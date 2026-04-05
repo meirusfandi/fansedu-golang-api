@@ -59,6 +59,7 @@ type LearningLessonBriefDTO struct {
 	Title            string  `json:"title"`
 	SortOrder        int     `json:"sortOrder"`
 	TryoutSessionID  *string `json:"tryoutSessionId,omitempty"`
+	PptURL           *string `json:"pptUrl,omitempty"`
 	Completed        bool    `json:"completed"`
 	Locked           bool    `json:"locked"`
 	ProgressPercent  float64 `json:"progressPercent"`
@@ -73,6 +74,7 @@ type LearningLessonDetailDTO struct {
 	Title            string  `json:"title"`
 	Content          *string `json:"content,omitempty"`
 	PdfURL           *string `json:"pdfUrl,omitempty"`
+	PptURL           *string `json:"pptUrl,omitempty"`
 	LiveClassURL     *string `json:"liveClassUrl,omitempty"`
 	TryoutSessionID  *string `json:"tryoutSessionId,omitempty"`
 	Locked           bool    `json:"locked"`
@@ -232,6 +234,7 @@ func (s *learningService) GetCourseJourney(ctx context.Context, userID, courseRe
 				Title:            l.Title,
 				SortOrder:        l.SortOrder,
 				TryoutSessionID:  l.TryoutSessionID,
+				PptURL:           l.PptURL,
 				Completed:        comp,
 				Locked:           lockedByID[l.ID],
 				ProgressPercent:  lp,
@@ -304,6 +307,7 @@ func (s *learningService) GetLesson(ctx context.Context, userID, lessonID string
 		Title:            row.Title,
 		Content:          row.Content,
 		PdfURL:           row.PdfURL,
+		PptURL:           row.PptURL,
 		LiveClassURL:     row.LiveClassURL,
 		TryoutSessionID:  row.TryoutSessionID,
 		Locked:           locked,

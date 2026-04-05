@@ -201,6 +201,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Use(middleware.TrainerOnly())
 			r.Get("/profile", handlers.TrainerProfileGet(deps))
 			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
+			r.Post("/upload/course-material", handlers.TrainerCourseMaterialUpload(deps))
+			r.Get("/courses/{courseId}/program", handlers.TrainerCourseProgramGet(deps))
+			r.Put("/courses/{courseId}/program", handlers.TrainerCourseProgramPut(deps))
 			r.Get("/courses", handlers.TrainerCoursesList(deps))
 			r.Post("/courses", handlers.TrainerCourseCreate(deps))
 			r.Get("/status", handlers.TrainerStatus(deps))
@@ -230,6 +233,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/profile", handlers.TrainerProfileGet(deps))
 			r.Put("/profile", handlers.TrainerProfileUpdate(deps))
 			r.Put("/profile/password", handlers.GuruProfilePassword(deps))
+			r.Post("/upload/course-material", handlers.TrainerCourseMaterialUpload(deps))
+			r.Get("/courses/{courseId}/program", handlers.TrainerCourseProgramGet(deps))
+			r.Put("/courses/{courseId}/program", handlers.TrainerCourseProgramPut(deps))
 			r.Get("/courses", handlers.GuruCoursesList(deps))
 			r.Get("/students", handlers.GuruStudentsList(deps))
 			r.Get("/earnings", handlers.GuruEarningsList(deps))
@@ -272,6 +278,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("users.manage")).Get("/users/{userId}", handlers.AdminGetUser(deps))
 			r.With(middleware.RequirePermission("users.manage")).Put("/users/{userId}", handlers.AdminUpdateUser(deps))
 			r.With(middleware.RequirePermission("users.manage")).Post("/tools/hash-password", handlers.AdminGeneratePasswordHash(deps))
+			r.With(middleware.RequirePermission("courses.manage")).Post("/upload/course-material", handlers.AdminCourseMaterialUpload(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Get("/courses", handlers.AdminListCourses(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Get("/courses/{courseId}", handlers.AdminGetCourse(deps))
 			r.With(middleware.RequirePermission("courses.manage")).Post("/courses", handlers.AdminCreateCourse(deps))
@@ -387,6 +394,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 	}
 
 	r.Route("/api/v1", registerV1)
+
+	// File statis untuk materi upload (PPT/PDF bukti, dll.). Produksi: sering dialihkan ke nginx/S3.
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	return r
 }

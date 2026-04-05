@@ -781,6 +781,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 					Title:          it.Title,
 					DetailText:     it.DetailText,
 					PdfURL:         it.PdfURL,
+					PptURL:         it.PptURL,
 					PrTitle:        it.PrTitle,
 					PrDescription:  it.PrDescription,
 					LiveClassURL:   it.LiveClassURL,

@@ -174,16 +174,18 @@ type RelatedCourseAdminEndpoints struct {
 	ListEnrollments string `json:"listEnrollments"`
 	TryoutQuestions string `json:"tryoutQuestions"`
 	PackageManage   string `json:"packageManageNote"`
-	GetProgram      string `json:"getProgram"`
-	PutProgram      string `json:"putProgram"`
+	GetProgram           string `json:"getProgram"`
+	PutProgram           string `json:"putProgram"`
+	UploadCourseMaterial string `json:"uploadCourseMaterial"`
 }
 
-// AdminCourseProgramMeetingItem satu pertemuan (1–8): judul, detail, PDF, PR, link live.
+// AdminCourseProgramMeetingItem satu pertemuan (1–8): judul, detail, PDF, PPT, PR, link live.
 type AdminCourseProgramMeetingItem struct {
 	MeetingNumber  int     `json:"meetingNumber"`
 	Title          string  `json:"title"`
 	DetailText     *string `json:"detailText,omitempty"`
 	PdfURL         *string `json:"pdfUrl,omitempty"`
+	PptURL         *string `json:"pptUrl,omitempty"`
 	PrTitle        *string `json:"prTitle,omitempty"`
 	PrDescription  *string `json:"prDescription,omitempty"`
 	LiveClassURL   *string `json:"liveClassUrl,omitempty"`
