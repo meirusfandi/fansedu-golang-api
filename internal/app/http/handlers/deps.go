@@ -8,6 +8,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
+	"github.com/meirusfandi/fansedu-golang-api/internal/usecase/questiongen"
 )
 
 type Deps struct {
@@ -31,6 +32,7 @@ type Deps struct {
 	CheckoutService  service.CheckoutService
 	VoucherService   service.VoucherService
 	GeoService       service.GeoService
+	QuestionGenUsecase *questiongen.Usecase
 
 	UserRepo                 repo.UserRepo
 	QuestionRepo             repo.QuestionRepo
@@ -45,6 +47,7 @@ type Deps struct {
 	OrderRepo                 repo.OrderRepo
 	OrderItemRepo             repo.OrderItemRepo
 	PromoRepo                 repo.PromoRepo
+	QuestionGenRepo           repo.QuestionGenRepo
 	AnalyticsRepo             repo.AnalyticsRepo
 	NotificationRepo          repo.NotificationRepo
 	TrainerRepo               repo.TrainerRepo

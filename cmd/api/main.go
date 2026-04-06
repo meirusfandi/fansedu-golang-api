@@ -22,6 +22,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/mail"
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
+	"github.com/meirusfandi/fansedu-golang-api/internal/usecase/questiongen"
 )
 
 func main() {
@@ -173,6 +174,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	orderRepo := repo.NewOrderRepo(pool)
 	orderItemRepo := repo.NewOrderItemRepo(pool)
 	promoRepo := repo.NewPromoRepo(pool)
+	questionGenRepo := repo.NewQuestionGenRepo(pool)
 	analyticsRepo := repo.NewAnalyticsRepo(pool)
 	appErrLogRepo := repo.NewApplicationErrorLogRepo(pool)
 	landingPackageRepo := repo.NewLandingPackageRepoPg(pool)
@@ -204,6 +206,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	}
 	checkoutService := service.NewCheckoutService(courseRepo, landingPackageRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo, promoRepo, mailer, userInviteRepo, appURL)
 	voucherService := service.NewVoucherService(promoRepo)
+	questionGenUsecase := questiongen.New(questionGenRepo)
 
 	return &handlers.Deps{
 		DB:                      pool,
@@ -225,6 +228,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		TrainerService:         trainerService,
 		CheckoutService:        checkoutService,
 		VoucherService:         voucherService,
+		QuestionGenUsecase:     questionGenUsecase,
 		UserRepo:               userRepo,
 		QuestionRepo:           questionRepo,
 		AttemptAnswerRepo:      attemptAnswerRepo,
@@ -245,6 +249,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		OrderRepo:              orderRepo,
 		OrderItemRepo:          orderItemRepo,
 		PromoRepo:              promoRepo,
+		QuestionGenRepo:        questionGenRepo,
 		AnalyticsRepo:          analyticsRepo,
 		ApplicationErrorLogRepo: appErrLogRepo,
 		NotificationRepo:       notificationRepo,
