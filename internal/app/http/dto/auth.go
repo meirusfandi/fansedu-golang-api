@@ -60,3 +60,28 @@ type PasswordHashResponse struct {
 	Hash      string `json:"hash"`
 }
 
+// RegisterMasterDataResponse data untuk form registrasi siswa/guru.
+type RegisterMasterDataResponse struct {
+	Levels []RegisterLevelOption `json:"levels"`
+}
+
+type RegisterLevelOption struct {
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Slug        string                  `json:"slug"`
+	Description *string                 `json:"description,omitempty"`
+	Classes     []RegisterClassOption   `json:"classes"`
+	Subjects    []RegisterSubjectOption `json:"subjects"`
+}
+
+type RegisterClassOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type RegisterSubjectOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+

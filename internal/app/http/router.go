@@ -82,6 +82,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", handlers.AuthRegister(deps))
 			r.Post("/register-with-invite", handlers.AuthRegisterWithInvite(deps))
+			r.Get("/register/master-data", handlers.AuthRegisterMasterData(deps))
 			r.Post("/login", handlers.AuthLogin(deps))
 			r.Post("/hash-password", handlers.AdminGeneratePasswordHash(deps))
 			r.Post("/admin/password-bypass", handlers.AuthAdminPasswordBypass(deps))
