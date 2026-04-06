@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
-	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
