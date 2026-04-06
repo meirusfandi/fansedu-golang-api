@@ -49,6 +49,7 @@ type User struct {
 	AvatarURL       *string
 	SchoolID        *string
 	SubjectID       *string
+	LevelID         *string
 	Phone           *string
 	Whatsapp        *string
 	ClassLevel      *string

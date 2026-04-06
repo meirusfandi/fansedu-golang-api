@@ -61,9 +61,61 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		}
 		phoneTrim := strings.TrimSpace(req.Phone)
 		waTrim := strings.TrimSpace(req.Whatsapp)
+		levelID := strings.TrimSpace(req.LevelID)
+		subjectID := strings.TrimSpace(req.SubjectID)
+		classLevel := strings.TrimSpace(req.ClassLevel)
 		if registerRequiresPhoneOrWhatsapp(roleCode) && phoneTrim == "" && waTrim == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "phone or whatsapp is required for student and guru registration")
 			return
+		}
+		if levelID != "" || subjectID != "" || classLevel != "" {
+			if deps.LevelRepo == nil || deps.SubjectRepo == nil {
+				writeError(w, http.StatusServiceUnavailable, "service_unavailable", "master data unavailable")
+				return
+			}
+		}
+		if levelID != "" {
+			if _, err := deps.LevelRepo.GetByID(ctx, levelID); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", "levelId tidak valid")
+				return
+			}
+		}
+		if subjectID != "" {
+			if _, err := deps.SubjectRepo.GetByID(ctx, subjectID); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", "subjectId tidak valid")
+				return
+			}
+		}
+		// student wajib isi kelas; guru opsional.
+		if roleCode == domain.UserRoleStudent && classLevel == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "classLevel wajib diisi untuk siswa")
+			return
+		}
+		if classLevel != "" && levelID != "" {
+			lv, err := deps.LevelRepo.GetByID(ctx, levelID)
+			if err == nil && !classLevelAllowed(lv.Slug, classLevel) {
+				writeError(w, http.StatusBadRequest, "validation_error", "classLevel tidak sesuai jenjang")
+				return
+			}
+		}
+		// Jika level + subject dikirim, pastikan subject termasuk bidang pada level tsb.
+		if levelID != "" && subjectID != "" {
+			ids, err := deps.LevelRepo.ListSubjectIDsByLevel(ctx, levelID)
+			if err != nil {
+				writeInternalError(w, r, err)
+				return
+			}
+			ok := false
+			for _, id := range ids {
+				if strings.EqualFold(strings.TrimSpace(id), subjectID) {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				writeError(w, http.StatusBadRequest, "validation_error", "subjectId tidak sesuai levelId")
+				return
+			}
 		}
 		var phonePtr, waPtr *string
 		if phoneTrim != "" {
@@ -76,6 +128,22 @@ func AuthRegister(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			writeInternalError(w, r, err)
 			return
+		}
+		// Simpan metadata akademik saat register (opsional untuk guru; lengkap untuk siswa).
+		if levelID != "" || subjectID != "" || classLevel != "" {
+			if levelID != "" {
+				u.LevelID = &levelID
+			}
+			if subjectID != "" {
+				u.SubjectID = &subjectID
+			}
+			if classLevel != "" {
+				u.ClassLevel = &classLevel
+			}
+			if err := deps.UserRepo.Update(ctx, u); err != nil {
+				writeInternalError(w, r, err)
+				return
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)

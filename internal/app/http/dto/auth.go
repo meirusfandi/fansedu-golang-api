@@ -7,6 +7,9 @@ type RegisterRequest struct {
 	Role      string `json:"role"` // optional: slug atau user_role_code yang ada di tabel roles; kosong = default dari tabel roles
 	Phone     string `json:"phone,omitempty"`
 	Whatsapp  string `json:"whatsapp,omitempty"`
+	LevelID   string `json:"levelId,omitempty"`
+	SubjectID string `json:"subjectId,omitempty"`
+	ClassLevel string `json:"classLevel,omitempty"`
 }
 
 type LoginRequest struct {

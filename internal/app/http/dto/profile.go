@@ -25,6 +25,7 @@ type UserProfileResponse struct {
 	SchoolID        *string        `json:"schoolId"`
 	SchoolName      string         `json:"schoolName"`
 	SubjectID       *string        `json:"subjectId"`
+	LevelID         *string        `json:"levelId"`
 	School          *SchoolProfile `json:"school"`
 }
 
@@ -46,6 +47,7 @@ type UserProfileUpdateRequest struct {
 	SchoolID    *string `json:"schoolId,omitempty"`
 	SchoolName  *string `json:"schoolName,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
+	LevelID     *string `json:"levelId,omitempty"`
 }
 
 // TrainerProfileUpdateRequest alias agar kontrak API trainer tetap sama.

@@ -40,6 +40,10 @@ func registerClassOptions(levelSlug string) []dto.RegisterClassOption {
 // Mengembalikan jenjang pendidikan + bidang pelajaran + opsi kelas per jenjang.
 func AuthRegisterMasterData(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if deps == nil || deps.LevelRepo == nil || deps.SubjectRepo == nil {
+			writeError(w, http.StatusServiceUnavailable, "service_unavailable", "master data unavailable")
+			return
+		}
 		levels, err := deps.LevelRepo.List(r.Context())
 		if err != nil {
 			writeInternalError(w, r, err)

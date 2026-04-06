@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,24 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
+
+func classLevelAllowed(levelSlug, classLevel string) bool {
+	levelSlug = strings.ToLower(strings.TrimSpace(levelSlug))
+	n, err := strconv.Atoi(strings.TrimSpace(classLevel))
+	if err != nil {
+		return false
+	}
+	switch levelSlug {
+	case "sd":
+		return n >= 1 && n <= 6
+	case "smp":
+		return n >= 7 && n <= 9
+	case "sma":
+		return n >= 10 && n <= 12
+	default:
+		return false
+	}
+}
 
 var trainerSchoolSlugClean = regexp.MustCompile(`[^a-z0-9-]+`)
 
@@ -101,6 +120,7 @@ func BuildUserProfileResponse(ctx context.Context, deps *Deps, u domain.User, sc
 		Instagram:       u.Instagram,
 		SchoolID:        u.SchoolID,
 		SubjectID:       u.SubjectID,
+		LevelID:         u.LevelID,
 	}
 	if deps.RoleRepo != nil {
 		if row, err := deps.RoleRepo.GetByUserRoleCode(ctx, u.Role); err == nil {
@@ -187,6 +207,17 @@ func ApplyUserProfileUpdate(ctx context.Context, deps *Deps, u *domain.User, req
 			u.SubjectID = &subjectID
 		}
 	}
+	if req.LevelID != nil {
+		levelID := strings.TrimSpace(*req.LevelID)
+		if levelID == "" {
+			u.LevelID = nil
+		} else {
+			if _, err := deps.LevelRepo.GetByID(ctx, levelID); err != nil {
+				return profileApplyErr(http.StatusBadRequest, "bad_request", "level not found")
+			}
+			u.LevelID = &levelID
+		}
+	}
 
 	if req.Phone != nil {
 		u.Phone = req.Phone
@@ -195,7 +226,20 @@ func ApplyUserProfileUpdate(ctx context.Context, deps *Deps, u *domain.User, req
 		u.Whatsapp = req.Whatsapp
 	}
 	if req.ClassLevel != nil {
-		u.ClassLevel = req.ClassLevel
+		classLevel := strings.TrimSpace(*req.ClassLevel)
+		if classLevel == "" {
+			u.ClassLevel = nil
+		} else {
+			// Jika level tersedia, validasi kelas mengikuti jenjang:
+			// SD (1-6), SMP (7-9), SMA (10-12).
+			if u.LevelID != nil {
+				level, err := deps.LevelRepo.GetByID(ctx, *u.LevelID)
+				if err == nil && !classLevelAllowed(level.Slug, classLevel) {
+					return profileApplyErr(http.StatusBadRequest, "bad_request", "classLevel tidak sesuai jenjang")
+				}
+			}
+			u.ClassLevel = &classLevel
+		}
 	}
 	if req.City != nil {
 		u.City = req.City
