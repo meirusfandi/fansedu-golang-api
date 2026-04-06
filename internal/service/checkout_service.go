@@ -16,6 +16,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/mail"
+	"github.com/meirusfandi/fansedu-golang-api/internal/paymentgateway"
 )
 
 var (
@@ -75,6 +76,7 @@ type checkoutService struct {
 	mailer         mail.Mailer
 	inviteRepo     inviteRepoForCheckout
 	appURL         string
+	midtrans       *paymentgateway.MidtransClient
 }
 
 type landingRepoForCheckout interface {
@@ -146,6 +148,7 @@ func NewCheckoutService(
 	mailer mail.Mailer,
 	inviteRepo inviteRepoForCheckout,
 	appURL string,
+	midtrans *paymentgateway.MidtransClient,
 ) CheckoutService {
 	return &checkoutService{
 		courseRepo:     courseRepo,
@@ -159,6 +162,7 @@ func NewCheckoutService(
 		mailer:         mailer,
 		inviteRepo:     inviteRepo,
 		appURL:         appURL,
+		midtrans:       midtrans,
 	}
 }
 
@@ -650,7 +654,21 @@ func (s *checkoutService) CreatePaymentSession(ctx context.Context, orderID, pay
 		return "", err
 	}
 
-	// Stub: return a placeholder URL. Replace with real Midtrans/Stripe API call.
+	// If Midtrans configured, create real Snap transaction.
+	if s.midtrans != nil && s.midtrans.Enabled() {
+		user, _ := s.userRepo.FindByID(ctx, order.UserID)
+		var mreq paymentgateway.CreateSnapRequest
+		mreq.OrderID = orderID
+		mreq.Amount = order.TotalPrice
+		mreq.Customer.FirstName = user.Name
+		mreq.Customer.Email = user.Email
+		mres, err := s.midtrans.CreateSnapTransaction(ctx, mreq)
+		if err != nil {
+			return "", err
+		}
+		return mres.RedirectURL, nil
+	}
+	// Fallback local placeholder for dev-only without gateway keys.
 	return "/checkout/pay?order_id=" + orderID + "&method=" + paymentMethod, nil
 }
 

@@ -19,6 +19,7 @@ type Deps struct {
 	JWTSecret              []byte
 	AdminPasswordBypassKey string
 	MigrateBypassKey       string
+	MidtransServerKey      string
 
 	AuthService      service.AuthService
 	TryoutService    service.TryoutService

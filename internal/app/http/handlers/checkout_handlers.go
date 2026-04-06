@@ -12,6 +12,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
+	"github.com/meirusfandi/fansedu-golang-api/internal/paymentgateway"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -333,18 +334,55 @@ func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 func PaymentWebhook(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
+			// Internal simple payload
 			OrderID string `json:"orderId"`
+			// Midtrans payload
+			MidOrderID        string `json:"order_id"`
+			TransactionStatus string `json:"transaction_status"`
+			FraudStatus       string `json:"fraud_status"`
+			StatusCode        string `json:"status_code"`
+			GrossAmount       string `json:"gross_amount"`
+			SignatureKey      string `json:"signature_key"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "Body permintaan tidak valid.")
 			return
 		}
-		if body.OrderID == "" {
+		orderID := strings.TrimSpace(body.OrderID)
+		if orderID == "" {
+			orderID = strings.TrimSpace(body.MidOrderID)
+		}
+		if orderID == "" {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "orderId wajib diisi.")
 			return
 		}
-		// TODO: verify gateway signature (Midtrans/Stripe) using header or body
-		if err := deps.CheckoutService.HandlePaymentWebhook(r.Context(), body.OrderID); err != nil {
+		if strings.TrimSpace(body.MidOrderID) != "" {
+			// Midtrans signature verification when key configured.
+			if strings.TrimSpace(deps.MidtransServerKey) != "" {
+				ok := paymentgateway.VerifyMidtransSignature(
+					body.MidOrderID,
+					body.StatusCode,
+					body.GrossAmount,
+					body.SignatureKey,
+					deps.MidtransServerKey,
+				)
+				if !ok {
+					writeError(w, http.StatusUnauthorized, "invalid_signature", "signature tidak valid")
+					return
+				}
+			}
+			// Only settle paid status.
+			tx := strings.ToLower(strings.TrimSpace(body.TransactionStatus))
+			if tx != "settlement" && tx != "capture" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			if tx == "capture" && strings.ToLower(strings.TrimSpace(body.FraudStatus)) != "accept" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+		if err := deps.CheckoutService.HandlePaymentWebhook(r.Context(), orderID); err != nil {
 			writeInternalError(w, r, err)
 			return
 		}

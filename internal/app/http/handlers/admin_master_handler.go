@@ -14,6 +14,7 @@ import (
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/cache"
+	"github.com/meirusfandi/fansedu-golang-api/internal/config"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
@@ -244,6 +245,18 @@ func schoolToResp(e domain.School) dto.SchoolResponse {
 }
 
 // --- Settings ---
+func AdminListEnvSettingKeys(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_ = deps
+		out := make([]dto.EnvSettingKeyMeta, 0, len(config.EnvSettingKeys))
+		for _, k := range config.EnvSettingKeys {
+			out = append(out, dto.EnvSettingKeyMeta{Key: k, Sensitive: config.IsSensitiveSettingKey(k)})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
 func AdminListSettings(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		list, err := deps.SettingRepo.List(r.Context())
@@ -253,7 +266,7 @@ func AdminListSettings(deps *Deps) http.HandlerFunc {
 		}
 		out := make([]dto.SettingResponse, len(list))
 		for i := range list {
-			out[i] = settingToResp(list[i])
+			out[i] = settingToResp(list[i], true)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
@@ -268,7 +281,7 @@ func AdminGetSetting(deps *Deps) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(settingToResp(e))
+		_ = json.NewEncoder(w).Encode(settingToResp(e, false))
 	}
 }
 func AdminCreateSetting(deps *Deps) http.HandlerFunc {
@@ -295,7 +308,7 @@ func AdminCreateSetting(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(settingToResp(created))
+		_ = json.NewEncoder(w).Encode(settingToResp(created, false))
 	}
 }
 func AdminUpdateSetting(deps *Deps) http.HandlerFunc {
@@ -330,20 +343,36 @@ func AdminUpdateSetting(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		updated, err := deps.SettingRepo.GetByID(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(settingToResp(updated, false))
 	}
 }
 func AdminDeleteSetting(deps *Deps) http.HandlerFunc {
 	return deleteMaster(deps.SettingRepo.Delete)
 }
-func settingToResp(e domain.Setting) dto.SettingResponse {
+func settingToResp(e domain.Setting, maskSecrets bool) dto.SettingResponse {
 	var valueJSON interface{}
 	if len(e.ValueJSON) > 0 {
 		_ = json.Unmarshal(e.ValueJSON, &valueJSON)
 	}
+	var val *string
+	if e.Value != nil {
+		if maskSecrets && config.IsSensitiveSettingKey(e.Key) {
+			s := "***"
+			val = &s
+		} else {
+			val = e.Value
+		}
+	}
 	return dto.SettingResponse{
 		ID: e.ID, Key: e.Key, Slug: e.Slug,
-		Value: e.Value, ValueJSON: valueJSON, Description: e.Description,
+		Value: val, ValueJSON: valueJSON, Description: e.Description,
 		CreatedAt: e.CreatedAt.Format(time.RFC3339), UpdatedAt: e.UpdatedAt.Format(time.RFC3339),
 	}
 }

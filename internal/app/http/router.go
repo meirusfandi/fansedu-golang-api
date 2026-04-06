@@ -357,6 +357,7 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 				})
 			})
 			r.With(middleware.RequirePermission("master-data.manage")).Get("/settings", handlers.AdminListSettings(deps))
+			r.With(middleware.RequirePermission("master-data.manage")).Get("/settings/env-keys", handlers.AdminListEnvSettingKeys(deps))
 			r.With(middleware.RequirePermission("master-data.manage")).Post("/settings", handlers.AdminCreateSetting(deps))
 			r.With(middleware.RequirePermission("master-data.manage")).Get("/settings/{id}", handlers.AdminGetSetting(deps))
 			r.With(middleware.RequirePermission("master-data.manage")).Put("/settings/{id}", handlers.AdminUpdateSetting(deps))

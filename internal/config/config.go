@@ -46,6 +46,11 @@ type Config struct {
 	SMTPUser     string // kosong = sama dengan SMTPFrom (umum untuk Brevo)
 	SMTPPassword string // BREVO_SMTP_KEY atau SMTP_PASSWORD
 	SMTPFrom     string // alamat From (harus sender yang sah di Brevo)
+
+	// Midtrans (opsional): jika server key terisi, checkout/payment-session pakai Snap API.
+	MidtransServerKey    string
+	MidtransIsProduction bool
+	MidtransSnapBaseURL  string // optional override
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -126,18 +131,16 @@ func Load() Config {
 		SMTPUser:                   getenv("SMTP_USER", ""),
 		SMTPPassword:               smtpPassword,
 		SMTPFrom:                   getenv("SMTP_FROM", "admin@fansedu.web.id"),
-	}
-
-	if cfg.Env == EnvProduction {
-		validateProduction(cfg)
-	} else {
-		logDevWarnings(cfg)
+		MidtransServerKey:          getenv("MIDTRANS_SERVER_KEY", ""),
+		MidtransIsProduction:       strings.EqualFold(getenv("MIDTRANS_IS_PRODUCTION", "false"), "true"),
+		MidtransSnapBaseURL:        getenv("MIDTRANS_SNAP_BASE_URL", ""),
 	}
 
 	return cfg
 }
 
-func validateProduction(cfg Config) {
+// ValidateProduction enforces required secrets for production. Call after Load and optional ApplySettingsOverrides.
+func ValidateProduction(cfg Config) {
 	if cfg.DatabaseURL == "" {
 		log.Fatal("production: DATABASE_URL is required")
 	}
@@ -147,7 +150,8 @@ func validateProduction(cfg Config) {
 	log.Printf("config: env=production port=%s", cfg.Port)
 }
 
-func logDevWarnings(cfg Config) {
+// LogDevWarnings prints non-fatal hints for development. Call after Load and optional ApplySettingsOverrides.
+func LogDevWarnings(cfg Config) {
 	if cfg.DatabaseURL == "" {
 		log.Printf("warning: DATABASE_URL is empty (db features will fail)")
 	}

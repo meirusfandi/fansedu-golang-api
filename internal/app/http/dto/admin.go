@@ -381,6 +381,12 @@ type SettingResponse struct {
 	UpdatedAt   string      `json:"updatedAt"`
 }
 
+// EnvSettingKeyMeta documents keys that the API merges from settings at startup (same name as env vars).
+type EnvSettingKeyMeta struct {
+	Key       string `json:"key"`
+	Sensitive bool   `json:"sensitive"`
+}
+
 // --- Event ---
 type EventRequest struct {
 	Title        string  `json:"title"`

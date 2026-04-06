@@ -20,6 +20,7 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/config"
 	"github.com/meirusfandi/fansedu-golang-api/internal/db"
 	"github.com/meirusfandi/fansedu-golang-api/internal/mail"
+	"github.com/meirusfandi/fansedu-golang-api/internal/paymentgateway"
 	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 	"github.com/meirusfandi/fansedu-golang-api/internal/usecase/questiongen"
@@ -54,8 +55,15 @@ func main() {
 			log.Fatalf("db connect: %v", err)
 		}
 		defer pool.Close()
+		cfg = config.ApplySettingsOverrides(ctx, pool, cfg)
 	} else if cfg.IsProduction() {
 		log.Fatal("production: DATABASE_URL is required")
+	}
+
+	if cfg.IsProduction() {
+		config.ValidateProduction(cfg)
+	} else {
+		config.LogDevWarnings(cfg)
 	}
 
 	rdb, err := config.NewRedisClient(cfg)
@@ -112,6 +120,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 			JWTSecret:              jwtSecret,
 			AdminPasswordBypassKey: adminPasswordBypassKey,
 			MigrateBypassKey:       migrateBypassKey,
+			MidtransServerKey:      cfg.MidtransServerKey,
 		}
 	}
 
@@ -204,7 +213,8 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 	if appURL == "" {
 		appURL = "http://localhost:5173"
 	}
-	checkoutService := service.NewCheckoutService(courseRepo, landingPackageRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo, promoRepo, mailer, userInviteRepo, appURL)
+	midtransClient := paymentgateway.NewMidtransClient(cfg.MidtransServerKey, cfg.MidtransIsProduction, cfg.MidtransSnapBaseURL)
+	checkoutService := service.NewCheckoutService(courseRepo, landingPackageRepo, userRepo, orderRepo, orderItemRepo, paymentRepo, enrollmentRepo, promoRepo, mailer, userInviteRepo, appURL, midtransClient)
 	voucherService := service.NewVoucherService(promoRepo)
 	questionGenUsecase := questiongen.New(questionGenRepo)
 
@@ -216,6 +226,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		JWTSecret:               jwtSecret,
 		AdminPasswordBypassKey: adminPasswordBypassKey,
 		MigrateBypassKey:       migrateBypassKey,
+		MidtransServerKey:      cfg.MidtransServerKey,
 		GeoService:             geoSvc,
 		AuthService:            authService,
 		TryoutService:          tryoutService,
