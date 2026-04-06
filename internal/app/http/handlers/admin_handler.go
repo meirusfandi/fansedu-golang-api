@@ -1098,7 +1098,14 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			ptype = domain.PaymentTypeCoursePurchase
 		}
 		var paidAt *time.Time
-		if status == domain.PaymentStatusPaid {
+		if req.PaidAt != nil && strings.TrimSpace(*req.PaidAt) != "" {
+			t, err := time.Parse(time.RFC3339, strings.TrimSpace(*req.PaidAt))
+			if err != nil {
+				http.Error(w, "paidAt must be RFC3339", http.StatusBadRequest)
+				return
+			}
+			paidAt = &t
+		} else if status == domain.PaymentStatusPaid {
 			now := time.Now()
 			paidAt = &now
 		}
@@ -1107,13 +1114,15 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			currency = "IDR"
 		}
 		p := domain.Payment{
-			UserID: req.UserID,
-			Amount: req.Amount,
+			UserID:      req.UserID,
+			Amount:      req.Amount,
 			Currency:    currency,
 			Status:      status,
 			Type:        ptype,
 			ReferenceID: req.ReferenceID,
 			Description: req.Description,
+			OrderID:     req.OrderID,
+			ProofURL:    req.ProofURL,
 			PaidAt:      paidAt,
 		}
 		created, err := deps.AdminService.CreatePayment(r.Context(), p)
@@ -1327,6 +1336,7 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 }
 
 // AdminVerifyOrder: PUT /api/v1/admin/orders/:orderId/verify — verifikasi pembayaran, enroll user, kirim email.
+// Body opsional: { "purchasedAt": "2026-01-15T10:00:00Z" } untuk menyelaraskan tanggal pembelian.
 func AdminVerifyOrder(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderID := chi.URLParam(r, "orderId")
@@ -1334,7 +1344,18 @@ func AdminVerifyOrder(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "bad_request", "orderId required")
 			return
 		}
-		if err := deps.CheckoutService.VerifyOrder(r.Context(), orderID); err != nil {
+		var body dto.AdminVerifyOrderRequest
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		var purchasedAt *time.Time
+		if body.PurchasedAt != nil && strings.TrimSpace(*body.PurchasedAt) != "" {
+			t, err := time.Parse(time.RFC3339, strings.TrimSpace(*body.PurchasedAt))
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "bad_request", "purchasedAt harus RFC3339")
+				return
+			}
+			purchasedAt = &t
+		}
+		if err := deps.CheckoutService.VerifyOrder(r.Context(), orderID, purchasedAt); err != nil {
 			if err == service.ErrOrderNotFound {
 				writeError(w, http.StatusNotFound, "order_not_found", "order tidak ditemukan")
 				return

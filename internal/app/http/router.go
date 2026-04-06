@@ -305,6 +305,11 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.With(middleware.RequirePermission("payments.manage")).Put("/payments/{paymentId}", handlers.AdminConfirmPayment(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/confirm", handlers.AdminConfirmPaymentByAction(deps))
 			r.With(middleware.RequirePermission("payments.manage")).Post("/payments/{paymentId}/reject", handlers.AdminRejectPaymentByAction(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Post("/orders/manual", handlers.AdminCreateManualOrder(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Post("/orders/{orderId}/payment-proof", handlers.AdminOrderPaymentProof(deps))
+			r.With(middleware.RequirePermission("payments.manage")).Patch("/orders/{orderId}/purchase-meta", handlers.AdminPatchOrderPurchaseMeta(deps))
+			r.With(middleware.RequirePermission("courses.manage")).Post("/enrollments/grant", handlers.AdminGrantEnrollment(deps))
+			r.With(middleware.RequirePermission("courses.manage")).Patch("/enrollments/{enrollmentId}", handlers.AdminPatchEnrollment(deps))
 			r.With(middleware.RequirePermission("orders.verify")).Put("/orders/{orderId}/verify", handlers.AdminVerifyOrder(deps))
 			r.Route("/vouchers", func(r chi.Router) {
 				r.With(middleware.RequirePermission("vouchers.manage")).Get("/", handlers.AdminListVouchers(deps))

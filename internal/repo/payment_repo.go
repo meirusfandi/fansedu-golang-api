@@ -18,6 +18,7 @@ type PaymentRepo interface {
 	ListByUserID(ctx context.Context, userID string, limit int) ([]domain.Payment, error)
 	GetByID(ctx context.Context, id string) (domain.Payment, error)
 	Update(ctx context.Context, p domain.Payment) error
+	BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error
 	CountPaidInMonth(ctx context.Context, year, month int) (int, error)
 	TotalAmountPaidInMonth(ctx context.Context, year, month int) (int64, error)
 }
@@ -206,6 +207,14 @@ func (r *paymentRepo) GetByID(ctx context.Context, id string) (domain.Payment, e
 		p.RejectionNote = &rejectionNote.String
 	}
 	return p, nil
+}
+
+// BackdateByOrderID menyelaraskan paid_at dan created_at pembayaran terkait order (untuk koreksi admin).
+func (r *paymentRepo) BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE payments SET paid_at = $2, created_at = $2, updated_at = NOW() WHERE order_id = $1::uuid
+	`, orderID, t)
+	return err
 }
 
 func (r *paymentRepo) Update(ctx context.Context, p domain.Payment) error {

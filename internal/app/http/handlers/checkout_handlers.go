@@ -3,10 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -369,68 +366,13 @@ var allowedPaymentProofContentTypes = map[string]struct{}{
 func CheckoutPaymentProof(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderID := chi.URLParam(r, "orderId")
-		if orderID == "" {
-			writeError(w, http.StatusBadRequest, "bad_request", "orderId required")
+		proofPath, senderAccountNo, senderName, st, code, msg := extractPaymentProofUpload(r, orderID)
+		if st != 0 {
+			writeError(w, st, code, msg)
 			return
 		}
-		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
-			writeError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
-			return
-		}
-		file, fh, err := r.FormFile("proof")
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "proof file required")
-			return
-		}
-		defer file.Close()
-		senderAccountNo := strings.TrimSpace(r.FormValue("senderAccountNo"))
-		senderName := strings.TrimSpace(r.FormValue("senderName"))
 
-		filename := "proof.dat"
-		if fh != nil && fh.Filename != "" {
-			filename = fh.Filename
-		}
-		safeName := strings.ReplaceAll(filepath.Base(filename), "..", "")
-		if safeName == "" {
-			safeName = "proof"
-		}
-		if fh == nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Berkas bukti pembayaran tidak valid.")
-			return
-		}
-		if fh.Size > maxPaymentProofBytes {
-			writeError(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "Ukuran file bukti pembayaran melebihi batas.")
-			return
-		}
-		ct := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
-		if ct != "" {
-			if _, ok := allowedPaymentProofContentTypes[ct]; !ok {
-				writeError(w, http.StatusBadRequest, "INVALID_FILE_TYPE", "Tipe file tidak diizinkan. Gunakan JPG, PNG, WebP, atau PDF.")
-				return
-			}
-		} else {
-			ext := strings.ToLower(filepath.Ext(safeName))
-			if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".pdf" {
-				writeError(w, http.StatusBadRequest, "INVALID_FILE_TYPE", "Ekstensi file tidak diizinkan. Gunakan .jpg, .png, .webp, atau .pdf.")
-				return
-			}
-		}
-		dir := filepath.Join(paymentProofUploadDir, orderID)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			writeInternalError(w, r, err)
-			return
-		}
-		dstPath := filepath.Join(dir, safeName)
-		dst, err := os.Create(dstPath)
-		if err != nil {
-			writeInternalError(w, r, err)
-			return
-		}
-		_, _ = io.Copy(dst, file)
-		dst.Close()
-		proofPath := "/" + filepath.ToSlash(dstPath)
-
-		if err := deps.CheckoutService.SubmitPaymentProof(r.Context(), orderID, proofPath, senderAccountNo, senderName); err != nil {
+		if err := deps.CheckoutService.SubmitPaymentProof(r.Context(), orderID, proofPath, senderAccountNo, senderName, nil); err != nil {
 			if err == service.ErrOrderNotFound {
 				writeError(w, http.StatusNotFound, "order_not_found", "order tidak ditemukan")
 				return

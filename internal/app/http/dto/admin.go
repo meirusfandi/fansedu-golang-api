@@ -267,6 +267,39 @@ type PaymentCreateRequest struct {
 	ReferenceID *string `json:"referenceId,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Status      string  `json:"status"`
+	OrderID     *string `json:"orderId,omitempty"`
+	ProofURL    *string `json:"proofUrl,omitempty"`
+	PaidAt      *string `json:"paidAt,omitempty"` // RFC3339
+}
+
+// AdminManualOrderRequest POST /admin/orders/manual
+type AdminManualOrderRequest struct {
+	UserID     string   `json:"userId"`
+	CourseIDs  []string `json:"courseIds"`
+	TotalPrice *int     `json:"totalPrice,omitempty"`
+}
+
+// AdminVerifyOrderRequest body opsional PUT /admin/orders/{orderId}/verify
+type AdminVerifyOrderRequest struct {
+	PurchasedAt *string `json:"purchasedAt,omitempty"` // RFC3339 — tanggal pembelian & enrolled_at
+}
+
+// AdminPatchOrderPurchaseMetaRequest PATCH /admin/orders/{orderId}/purchase-meta
+type AdminPatchOrderPurchaseMetaRequest struct {
+	PurchasedAt    *string `json:"purchasedAt,omitempty"`    // order.created_at
+	PaymentProofAt *string `json:"paymentProofAt,omitempty"` // order.payment_proof_at
+}
+
+// AdminGrantEnrollmentRequest POST /admin/enrollments/grant
+type AdminGrantEnrollmentRequest struct {
+	UserID     string  `json:"userId"`
+	CourseID   string  `json:"courseId"`
+	EnrolledAt *string `json:"enrolledAt,omitempty"` // RFC3339, default now
+}
+
+// AdminPatchEnrollmentRequest PATCH /admin/enrollments/{enrollmentId}
+type AdminPatchEnrollmentRequest struct {
+	EnrolledAt string `json:"enrolledAt"` // RFC3339
 }
 
 type PaymentResponse struct {

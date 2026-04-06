@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/mail"
 )
@@ -24,6 +26,8 @@ var (
 	ErrPromoExpired    = errors.New("kode promo sudah kadaluarsa")
 	ErrPromoMaxUses    = errors.New("kode promo sudah mencapai batas penggunaan")
 	ErrPackageNoLinkedCourses = errors.New("paket belum dihubungkan ke kelas manapun")
+	ErrManualOrderNoCourses     = errors.New("minimal satu courseId diperlukan")
+	ErrManualOrderUserNotFound  = errors.New("pengguna tidak ditemukan")
 )
 
 type CheckoutInitiateResult struct {
@@ -53,8 +57,10 @@ type CheckoutService interface {
 	InitiatePackage(ctx context.Context, packageSlug, email, name, promoCode, optionalLoggedInUserID, roleHint, buyerRole string, quantity int, students []domain.OrderStudent) (*CheckoutInitiateResult, error)
 	CreatePaymentSession(ctx context.Context, orderID, paymentMethod string) (paymentURL string, err error)
 	HandlePaymentWebhook(ctx context.Context, orderID string) error
-	SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
-	VerifyOrder(ctx context.Context, orderID string) error
+	SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string, proofAt *time.Time) error
+	VerifyOrder(ctx context.Context, orderID string, purchasedAt *time.Time) error
+	// CreateAdminManualOrder membuat order pending + order_items untuk input admin (tanpa checkout publik).
+	CreateAdminManualOrder(ctx context.Context, userID string, courseIDs []string, totalPrice *int) (domain.Order, error)
 }
 
 type checkoutService struct {
@@ -106,7 +112,9 @@ type orderRepoForCheckout interface {
 	GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error)
 	GetPendingByUserAndPackage(ctx context.Context, userID, packageID string) (domain.Order, bool, error)
 	UpdateStatus(ctx context.Context, id, status string) error
-	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
+	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string, proofAt *time.Time) error
+	UpdateOrderCreatedAt(ctx context.Context, orderID string, createdAt time.Time) error
+	UpdatePaymentProofAtOnly(ctx context.Context, orderID string, proofAt time.Time) error
 }
 
 type orderItemRepoForCheckout interface {
@@ -118,6 +126,7 @@ type paymentRepoForCheckout interface {
 	Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 	GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
 	Update(ctx context.Context, p domain.Payment) error
+	BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error
 }
 
 type enrollmentRepoForCheckout interface {
@@ -666,7 +675,7 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 		return err
 	}
 
-	if err := s.enrollOrderTargets(ctx, order, items); err != nil {
+	if err := s.enrollOrderTargets(ctx, order, items, time.Now()); err != nil {
 		return err
 	}
 
@@ -674,7 +683,7 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 }
 
 // SubmitPaymentProof menyimpan bukti transfer dan mengirim email "Bukti Diterima".
-func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error {
+func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string, proofAt *time.Time) error {
 	order, err := s.orderRepo.GetByID(ctx, orderID)
 	if err != nil {
 		return ErrOrderNotFound
@@ -682,7 +691,7 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 	if order.Status != domain.OrderStatusPending {
 		return ErrOrderNotPending
 	}
-	if err := s.orderRepo.UpdatePaymentProof(ctx, orderID, proofURL, senderAccountNo, senderName); err != nil {
+	if err := s.orderRepo.UpdatePaymentProof(ctx, orderID, proofURL, senderAccountNo, senderName, proofAt); err != nil {
 		return err
 	}
 	items, _ := s.orderItemRepo.ListByOrderID(ctx, orderID)
@@ -696,7 +705,8 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 }
 
 // VerifyOrder dipanggil admin: set order paid, enroll user, kirim email "Pembayaran Terverifikasi".
-func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error {
+// purchasedAt opsional: menyelaraskan tanggal pembelian (order.created_at, enrollment.enrolled_at, payments terkait order).
+func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string, purchasedAt *time.Time) error {
 	order, err := s.orderRepo.GetByID(ctx, orderID)
 	if err != nil {
 		return ErrOrderNotFound
@@ -714,8 +724,16 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 	if err != nil {
 		return err
 	}
-	if err := s.enrollOrderTargets(ctx, order, items); err != nil {
+	enrolledAt := time.Now()
+	if purchasedAt != nil {
+		enrolledAt = *purchasedAt
+	}
+	if err := s.enrollOrderTargets(ctx, order, items, enrolledAt); err != nil {
 		return err
+	}
+	if purchasedAt != nil {
+		_ = s.orderRepo.UpdateOrderCreatedAt(ctx, orderID, *purchasedAt)
+		_ = s.paymentRepo.BackdateByOrderID(ctx, orderID, *purchasedAt)
 	}
 	programName := s.orderProgramTitle(ctx, order, items)
 	user, _ := s.userRepo.FindByID(ctx, order.UserID)
@@ -733,6 +751,72 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string) error
 	return nil
 }
 
+func (s *checkoutService) CreateAdminManualOrder(ctx context.Context, userID string, courseIDs []string, totalPrice *int) (domain.Order, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return domain.Order{}, ErrManualOrderUserNotFound
+	}
+	if _, err := s.userRepo.FindByID(ctx, userID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Order{}, ErrManualOrderUserNotFound
+		}
+		return domain.Order{}, err
+	}
+	seen := make(map[string]struct{})
+	var uniq []string
+	for _, raw := range courseIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return domain.Order{}, ErrManualOrderNoCourses
+	}
+	sum := 0
+	prices := make(map[string]int, len(uniq))
+	for _, cid := range uniq {
+		c, err := s.courseRepo.GetByID(ctx, cid)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.Order{}, ErrCourseNotFound
+			}
+			return domain.Order{}, err
+		}
+		prices[cid] = c.Price
+		sum += c.Price
+	}
+	total := sum
+	if totalPrice != nil && *totalPrice >= 0 {
+		total = *totalPrice
+	}
+	order, err := s.orderRepo.Create(ctx, domain.Order{
+		UserID:      userID,
+		Status:      domain.OrderStatusPending,
+		TotalPrice:  total,
+		NormalPrice: sum,
+		Quantity:    1,
+	})
+	if err != nil {
+		return domain.Order{}, err
+	}
+	for _, cid := range uniq {
+		if _, err := s.orderItemRepo.Create(ctx, domain.OrderItem{
+			OrderID:  order.ID,
+			CourseID: cid,
+			Price:    prices[cid],
+		}); err != nil {
+			return domain.Order{}, err
+		}
+	}
+	return order, nil
+}
+
 func (s *checkoutService) orderProgramTitle(ctx context.Context, order domain.Order, items []domain.OrderItem) string {
 	if order.PackageID != nil && s.landingRepo != nil {
 		if pkg, err := s.landingRepo.GetByID(ctx, *order.PackageID); err == nil && pkg.Name != "" {
@@ -748,9 +832,8 @@ func (s *checkoutService) orderProgramTitle(ctx context.Context, order domain.Or
 }
 
 // enrollOrderTargets enrolls buyer (default) or collective students (if provided).
-func (s *checkoutService) enrollOrderTargets(ctx context.Context, order domain.Order, items []domain.OrderItem) error {
+func (s *checkoutService) enrollOrderTargets(ctx context.Context, order domain.Order, items []domain.OrderItem, enrolledAt time.Time) error {
 	targetUserIDs := collectOrderTargetUserIDs(order)
-	now := time.Now()
 	for _, targetUserID := range targetUserIDs {
 		for _, item := range items {
 			_, err := s.enrollmentRepo.GetByUserAndCourse(ctx, targetUserID, item.CourseID)
@@ -761,7 +844,7 @@ func (s *checkoutService) enrollOrderTargets(ctx context.Context, order domain.O
 				UserID:     targetUserID,
 				CourseID:   item.CourseID,
 				Status:     domain.EnrollmentStatusEnrolled,
-				EnrolledAt: now,
+				EnrolledAt: enrolledAt,
 			}); err != nil {
 				return err
 			}

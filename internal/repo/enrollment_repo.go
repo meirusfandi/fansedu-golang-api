@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
@@ -12,6 +13,7 @@ import (
 
 type EnrollmentRepo interface {
 	Create(ctx context.Context, e domain.CourseEnrollment) (domain.CourseEnrollment, error)
+	UpdateEnrolledAt(ctx context.Context, enrollmentID string, enrolledAt time.Time) error
 	GetByUserAndCourse(ctx context.Context, userID, courseID string) (domain.CourseEnrollment, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.CourseEnrollment, error)
 	ListByCourseID(ctx context.Context, courseID string) ([]domain.CourseEnrollment, error)
@@ -27,16 +29,33 @@ func NewEnrollmentRepo(pool *pgxpool.Pool) EnrollmentRepo { return &enrollmentRe
 
 func (r *enrollmentRepo) Create(ctx context.Context, e domain.CourseEnrollment) (domain.CourseEnrollment, error) {
 	id := uuid.New().String()
+	var enrolledArg interface{}
+	if !e.EnrolledAt.IsZero() {
+		enrolledArg = e.EnrolledAt
+	}
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO course_enrollments (id, user_id, course_id, status)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::enrollment_status)
+		INSERT INTO course_enrollments (id, user_id, course_id, status, enrolled_at)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::enrollment_status, COALESCE($5::timestamptz, NOW()))
 		RETURNING id, enrolled_at, created_at
-	`, id, e.UserID, e.CourseID, e.Status).Scan(&e.ID, &e.EnrolledAt, &e.CreatedAt)
+	`, id, e.UserID, e.CourseID, e.Status, enrolledArg).Scan(&e.ID, &e.EnrolledAt, &e.CreatedAt)
 	if err != nil {
 		return domain.CourseEnrollment{}, err
 	}
 	e.ID = id
 	return e, nil
+}
+
+func (r *enrollmentRepo) UpdateEnrolledAt(ctx context.Context, enrollmentID string, enrolledAt time.Time) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE course_enrollments SET enrolled_at = $2 WHERE id = $1::uuid
+	`, enrollmentID, enrolledAt)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func (r *enrollmentRepo) GetByUserAndCourse(ctx context.Context, userID, courseID string) (domain.CourseEnrollment, error) {

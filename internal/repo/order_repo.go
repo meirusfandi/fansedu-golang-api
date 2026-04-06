@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,7 +20,9 @@ type OrderRepo interface {
 	GetPendingByUserAndCourse(ctx context.Context, userID, courseID string) (domain.Order, bool, error)
 	GetPendingByUserAndPackage(ctx context.Context, userID, packageID string) (domain.Order, bool, error)
 	UpdateStatus(ctx context.Context, id, status string) error
-	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error
+	UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string, proofAt *time.Time) error
+	UpdateOrderCreatedAt(ctx context.Context, orderID string, createdAt time.Time) error
+	UpdatePaymentProofAtOnly(ctx context.Context, orderID string, proofAt time.Time) error
 }
 
 type orderRepo struct{ pool *pgxpool.Pool }
@@ -268,11 +271,32 @@ func (r *orderRepo) UpdateStatus(ctx context.Context, id, status string) error {
 	return err
 }
 
-func (r *orderRepo) UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string) error {
+func (r *orderRepo) UpdatePaymentProof(ctx context.Context, orderID, proofURL, senderAccountNo, senderName string, proofAt *time.Time) error {
+	var at interface{}
+	if proofAt != nil {
+		at = *proofAt
+	} else {
+		at = nil // COALESCE below → NOW()
+	}
 	_, err := r.pool.Exec(ctx, `
-		UPDATE orders SET payment_proof_url = $2, payment_proof_at = NOW(), sender_account_no = $3, sender_name = $4, updated_at = NOW()
+		UPDATE orders SET payment_proof_url = $2, payment_proof_at = COALESCE($5::timestamptz, NOW()),
+			sender_account_no = $3, sender_name = $4, updated_at = NOW()
 		WHERE id = $1::uuid
-	`, orderID, nullIfEmpty(proofURL), nullIfEmpty(senderAccountNo), nullIfEmpty(senderName))
+	`, orderID, nullIfEmpty(proofURL), nullIfEmpty(senderAccountNo), nullIfEmpty(senderName), at)
+	return err
+}
+
+func (r *orderRepo) UpdateOrderCreatedAt(ctx context.Context, orderID string, createdAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE orders SET created_at = $2, updated_at = NOW() WHERE id = $1::uuid
+	`, orderID, createdAt)
+	return err
+}
+
+func (r *orderRepo) UpdatePaymentProofAtOnly(ctx context.Context, orderID string, proofAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE orders SET payment_proof_at = $2, updated_at = NOW() WHERE id = $1::uuid
+	`, orderID, proofAt)
 	return err
 }
 
