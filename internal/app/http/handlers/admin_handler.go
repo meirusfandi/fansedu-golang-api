@@ -47,18 +47,48 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		levelNames := map[string]string{}
+		if deps.LevelRepo != nil {
+			if levels, lerr := deps.LevelRepo.List(r.Context()); lerr == nil {
+				for _, lv := range levels {
+					levelNames[lv.ID] = lv.Name
+				}
+			}
+		}
+		subjectNames := map[string]string{}
+		if deps.SubjectRepo != nil {
+			if subs, serr := deps.SubjectRepo.List(r.Context()); serr == nil {
+				for _, s := range subs {
+					subjectNames[s.ID] = s.Name
+				}
+			}
+		}
 		out := make([]dto.UserListResponse, len(list))
 		for i := range list {
-			out[i] = dto.UserListResponse{
-				ID:        list[i].ID,
-				Email:     list[i].Email,
-				Name:      list[i].Name,
-				Role:      list[i].Role,
-				AvatarURL: list[i].AvatarURL,
-				SchoolID:  list[i].SchoolID,
-				SubjectID: list[i].SubjectID,
-				CreatedAt: list[i].CreatedAt.Format(time.RFC3339),
+			u := list[i]
+			row := dto.UserListResponse{
+				ID:         u.ID,
+				Email:      u.Email,
+				Name:       u.Name,
+				Role:       domain.DisplayRoleForAPI(u.Role),
+				AvatarURL:  u.AvatarURL,
+				SchoolID:   u.SchoolID,
+				LevelID:    u.LevelID,
+				ClassLevel: u.ClassLevel,
+				SubjectID:  u.SubjectID,
+				CreatedAt:  u.CreatedAt.Format(time.RFC3339),
 			}
+			if u.LevelID != nil && *u.LevelID != "" {
+				if n, ok := levelNames[*u.LevelID]; ok {
+					row.LevelName = &n
+				}
+			}
+			if u.SubjectID != nil && *u.SubjectID != "" {
+				if n, ok := subjectNames[*u.SubjectID]; ok {
+					row.SubjectName = &n
+				}
+			}
+			out[i] = row
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
@@ -74,15 +104,17 @@ func AdminGetUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 		resp := dto.UserDetailResponse{
-			ID:        u.ID,
-			Email:     u.Email,
-			Name:      u.Name,
-			Role:      u.Role,
-			AvatarURL: u.AvatarURL,
-			SchoolID:  u.SchoolID,
-			SubjectID: u.SubjectID,
-			CreatedAt: u.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: u.UpdatedAt.Format(time.RFC3339),
+			ID:         u.ID,
+			Email:      u.Email,
+			Name:       u.Name,
+			Role:       domain.DisplayRoleForAPI(u.Role),
+			AvatarURL:  u.AvatarURL,
+			SchoolID:   u.SchoolID,
+			LevelID:    u.LevelID,
+			ClassLevel: u.ClassLevel,
+			SubjectID:  u.SubjectID,
+			CreatedAt:  u.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:  u.UpdatedAt.Format(time.RFC3339),
 		}
 		if u.SchoolID != nil && *u.SchoolID != "" {
 			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
@@ -90,6 +122,15 @@ func AdminGetUser(deps *Deps) http.HandlerFunc {
 					ID: school.ID, Name: school.Name, Slug: school.Slug,
 					Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
 					CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
+				}
+			}
+		}
+		if u.LevelID != nil && *u.LevelID != "" && deps.LevelRepo != nil {
+			if lv, err := deps.LevelRepo.GetByID(r.Context(), *u.LevelID); err == nil {
+				resp.Level = &dto.LevelResponse{
+					ID: lv.ID, Name: lv.Name, Slug: lv.Slug,
+					Description: lv.Description, SortOrder: lv.SortOrder, IconURL: lv.IconURL,
+					CreatedAt: lv.CreatedAt.Format(time.RFC3339), UpdatedAt: lv.UpdatedAt.Format(time.RFC3339),
 				}
 			}
 		}

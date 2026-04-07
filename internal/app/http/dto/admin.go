@@ -11,28 +11,35 @@ type AdminOverviewResponse struct {
 }
 
 type UserListResponse struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	Name      string  `json:"name"`
-	Role      string  `json:"role"`
-	AvatarURL *string `json:"avatarUrl,omitempty"`
-	SchoolID  *string `json:"schoolId,omitempty"`
-	SubjectID *string `json:"subjectId,omitempty"`
-	CreatedAt string  `json:"createdAt"`
+	ID          string  `json:"id"`
+	Email       string  `json:"email"`
+	Name        string  `json:"name"`
+	Role        string  `json:"role"`
+	AvatarURL   *string `json:"avatarUrl,omitempty"`
+	SchoolID    *string `json:"schoolId,omitempty"`
+	LevelID     *string `json:"levelId,omitempty"`
+	LevelName   *string `json:"levelName,omitempty"`   // jenjang (mis. SMA, SMP)
+	ClassLevel  *string `json:"classLevel,omitempty"`  // kelas/spesifik (mis. X IPA)
+	SubjectID   *string `json:"subjectId,omitempty"`
+	SubjectName *string `json:"subjectName,omitempty"` // bidang / mata pelajaran utama
+	CreatedAt   string  `json:"createdAt"`
 }
 
 type UserDetailResponse struct {
-	ID        string           `json:"id"`
-	Email     string           `json:"email"`
-	Name      string           `json:"name"`
-	Role      string           `json:"role"`
-	AvatarURL *string          `json:"avatarUrl,omitempty"`
-	SchoolID  *string          `json:"schoolId,omitempty"`
-	SubjectID *string          `json:"subjectId,omitempty"`
-	School    *SchoolResponse  `json:"school,omitempty"`
-	Subject   *SubjectResponse `json:"subject,omitempty"`
-	CreatedAt string           `json:"createdAt"`
-	UpdatedAt string           `json:"updatedAt"`
+	ID         string           `json:"id"`
+	Email      string           `json:"email"`
+	Name       string           `json:"name"`
+	Role       string           `json:"role"`
+	AvatarURL  *string          `json:"avatarUrl,omitempty"`
+	SchoolID   *string          `json:"schoolId,omitempty"`
+	LevelID    *string          `json:"levelId,omitempty"`
+	ClassLevel *string          `json:"classLevel,omitempty"`
+	SubjectID  *string          `json:"subjectId,omitempty"`
+	School     *SchoolResponse  `json:"school,omitempty"`
+	Level      *LevelResponse   `json:"level,omitempty"`
+	Subject    *SubjectResponse `json:"subject,omitempty"`
+	CreatedAt  string           `json:"createdAt"`
+	UpdatedAt  string           `json:"updatedAt"`
 }
 
 type UserCreateRequest struct {
