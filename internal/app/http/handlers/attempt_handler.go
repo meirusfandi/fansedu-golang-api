@@ -217,37 +217,33 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 			tryout, _ := deps.TryoutService.GetByID(r.Context(), a.TryoutSessionID)
 			trainers, _ := deps.TrainerRepo.ListTrainersByStudent(r.Context(), userID)
 			for _, t := range trainers {
+				body := fmt.Sprintf("%s menyelesaikan tryout %s.", student.Name, tryout.Title)
+				if tryout.GradingMode == domain.TryoutGradingModeManual {
+					body += " Menunggu penilaian manual."
+				} else if a.Score != nil {
+					body += fmt.Sprintf(" Skor: %.0f", *a.Score)
+				}
 				_, _ = deps.NotificationRepo.Create(r.Context(), domain.Notification{
 					UserID: t.ID,
 					Title:  "Progress Siswa",
-					Body: fmt.Sprintf(
-						"%s menyelesaikan tryout %s. Skor: %.0f",
-						student.Name,
-						tryout.Title,
-						func() float64 {
-							if a.Score != nil {
-								return *a.Score
-							}
-							return 0
-						}(),
-					),
-					Type: "progress_update",
+					Body:   body,
+					Type:   "progress_update",
 				})
 			}
 		}
 
-		score, maxScore := 0.0, 0.0
-		if a.Score != nil {
-			score = *a.Score
-		}
+		maxScore := 0.0
 		if a.MaxScore != nil {
 			maxScore = *a.MaxScore
 		}
+		tryoutMeta, _ := deps.TryoutService.GetByID(r.Context(), a.TryoutSessionID)
+		pending := tryoutMeta.GradingMode == domain.TryoutGradingModeManual
 		resp := dto.SubmitResponse{
-			AttemptID:   a.ID,
-			Score:       score,
-			MaxScore:    maxScore,
-			Percentile:  a.Percentile,
+			AttemptID:      a.ID,
+			Score:          a.Score,
+			MaxScore:       maxScore,
+			GradingPending: pending,
+			Percentile:     a.Percentile,
 		}
 		if fb != nil {
 			resp.Feedback = &dto.FeedbackResponse{

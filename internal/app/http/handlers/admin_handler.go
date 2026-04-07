@@ -300,6 +300,7 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			ClosesAt:        req.ClosesAt,
 			MaxParticipants: req.MaxParticipants,
 			Status:          req.Status,
+			GradingMode:     normalizeTryoutGradingMode(req.GradingMode),
 		}
 		if err := validateTryoutForCreate(&t); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
@@ -347,6 +348,12 @@ func AdminUpdateTryout(deps *Deps) http.HandlerFunc {
 		if err := validateTryoutAfterAdminUpdate(&existing); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
 			return
+		}
+		if existing.GradingMode == domain.TryoutGradingModeAuto {
+			if err := deps.AdminService.ValidateTryoutAutoGradingPrerequisites(r.Context(), id); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+				return
+			}
 		}
 		if err := deps.AdminService.UpdateTryout(r.Context(), existing); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

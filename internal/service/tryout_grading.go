@@ -385,13 +385,59 @@ func buildOverallTryoutAnalysis(outcomes []QuestionReviewOutcome, scoreGot, maxS
 	}
 }
 
-// GradeTryoutAttempt menghitung skor, benar/salah per soal, agregat modul, dan analisis keseluruhan.
-func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAnswer) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg, overall TryoutOverallAnalysis) {
+// QuestionMissingAutoGradingKey true jika mode auto tidak bisa menilai soal (kunci PG/BS atau isian belum ada).
+func QuestionMissingAutoGradingKey(q domain.Question) bool {
+	switch q.Type {
+	case domain.QuestionTypeMultipleChoice, domain.QuestionTypeTrueFalse:
+		return resolvedCorrectOption(q) == ""
+	case domain.QuestionTypeShort:
+		return resolvedCorrectText(q) == ""
+	default:
+		return true
+	}
+}
+
+func manualReviewAnalysisSummary(hasAnswer bool, score float64, isCorrect *bool) string {
+	if !hasAnswer {
+		return "Soal tidak dijawab."
+	}
+	if isCorrect == nil && score == 0 {
+		return "Jawaban tercatat; menunggu penilaian pengajar."
+	}
+	if isCorrect != nil && *isCorrect {
+		return "Jawaban dinilai benar."
+	}
+	if isCorrect != nil && !*isCorrect {
+		return "Jawaban dinilai belum memenuhi skor penuh."
+	}
+	return "Jawaban telah dinilai."
+}
+
+func manualBuildPerQuestionAnalysis(q domain.Question, hasAns bool, ans *domain.AttemptAnswer, score float64, maxScr float64, isCorrect *bool) string {
+	typeLabel := humanQuestionTypeLabel(q.Type)
+	if !hasAns || ans == nil {
+		return fmt.Sprintf("%s: tidak dijawab.", typeLabel)
+	}
+	if isCorrect == nil && score == 0 {
+		return fmt.Sprintf("%s: jawaban tercatat; menunggu penilaian pengajar.", typeLabel)
+	}
+	if maxScr > 0 && score >= maxScr {
+		return fmt.Sprintf("%s: skor penuh (%.0f / %.0f).", typeLabel, score, maxScr)
+	}
+	return fmt.Sprintf("%s: skor %.0f / %.0f.", typeLabel, score, maxScr)
+}
+
+// GradeTryoutAttemptWithMode: manual = hanya skor dari manual_score reviewer; kunci tidak ditampilkan di outcome.
+func GradeTryoutAttemptWithMode(questions []domain.Question, answers []domain.AttemptAnswer, manualTryout bool) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg, overall TryoutOverallAnalysis) {
 	answerMap := make(map[string]domain.AttemptAnswer)
 	for _, a := range answers {
 		answerMap[a.QuestionID] = a
 	}
 	modMap := make(map[string]*ModuleAnalysisAgg)
+	grader := gradeQuestion
+	if manualTryout {
+		grader = gradeQuestionManualOnly
+	}
 
 	for _, q := range questions {
 		maxScore += q.MaxScore
@@ -400,7 +446,7 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 		if has {
 			ansPtr = &ans
 		}
-		score, isCorrect := gradeQuestion(q, ansPtr)
+		score, isCorrect := grader(q, ansPtr)
 		totalScore += score
 
 		k, lbl := moduleKeyLabel(q)
@@ -430,11 +476,18 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 				out.SelectedOption = &v
 			}
 		}
-		out.CorrectOption = strPtr(resolvedCorrectOption(q))
-		out.CorrectText = strPtr(resolvedCorrectText(q))
+		if !manualTryout {
+			out.CorrectOption = strPtr(resolvedCorrectOption(q))
+			out.CorrectText = strPtr(resolvedCorrectText(q))
+		}
 		out.QuestionTypeLabel = humanQuestionTypeLabel(q.Type)
-		out.AnalysisSummary = reviewAnalysisSummary(has, isCorrect)
-		out.AnalysisDetail = buildPerQuestionAnalysis(q, has, ansPtr, isCorrect, score, q.MaxScore)
+		if manualTryout {
+			out.AnalysisSummary = manualReviewAnalysisSummary(has, score, isCorrect)
+			out.AnalysisDetail = manualBuildPerQuestionAnalysis(q, has, ansPtr, score, q.MaxScore, isCorrect)
+		} else {
+			out.AnalysisSummary = reviewAnalysisSummary(has, isCorrect)
+			out.AnalysisDetail = buildPerQuestionAnalysis(q, has, ansPtr, isCorrect, score, q.MaxScore)
+		}
 		outcomes = append(outcomes, out)
 
 		if modMap[k] == nil {
@@ -461,7 +514,15 @@ func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAns
 		return aggs[i].ModuleLabel < aggs[j].ModuleLabel
 	})
 	overall = buildOverallTryoutAnalysis(outcomes, totalScore, maxScore)
+	if manualTryout {
+		overall.Summary = "Tryout ini dinilai manual. " + overall.Summary
+	}
 	return totalScore, maxScore, outcomes, aggs, overall
+}
+
+// GradeTryoutAttempt menghitung skor, benar/salah per soal, agregat modul, dan analisis keseluruhan (mode auto).
+func GradeTryoutAttempt(questions []domain.Question, answers []domain.AttemptAnswer) (totalScore, maxScore float64, outcomes []QuestionReviewOutcome, aggs []ModuleAnalysisAgg, overall TryoutOverallAnalysis) {
+	return GradeTryoutAttemptWithMode(questions, answers, false)
 }
 
 func parseTags(raw json.RawMessage) []string {
@@ -528,6 +589,17 @@ func ClampManualScoreToQuestionMax(m float64, maxScore float64) float64 {
 		return maxScore
 	}
 	return m
+}
+
+// gradeQuestionManualOnly hanya memakai manual_score (jika ada); tidak memakai kunci PG/isian untuk otomatis.
+func gradeQuestionManualOnly(q domain.Question, ans *domain.AttemptAnswer) (score float64, isCorrect *bool) {
+	if ans != nil && ans.ManualScore != nil {
+		return gradeQuestion(q, ans)
+	}
+	if ans == nil {
+		return 0, nil
+	}
+	return 0, nil
 }
 
 func gradeQuestion(q domain.Question, ans *domain.AttemptAnswer) (score float64, isCorrect *bool) {

@@ -28,8 +28,9 @@ type AnswerPutRequest struct {
 
 type SubmitResponse struct {
 	AttemptID       string                 `json:"attemptId"`
-	Score           float64                `json:"score"`
+	Score           *float64               `json:"score,omitempty"` // null untuk tryout penilaian manual sampai pengajar mengisi nilai
 	MaxScore        float64                `json:"maxScore"`
+	GradingPending  bool                   `json:"gradingPending,omitempty"` // true = nilai dari pengajar (manual)
 	Percentile      *float64               `json:"percentile,omitempty"` // dihilangkan jika belum / tidak bisa dihitung (bukan 0 palsu)
 	Feedback        *FeedbackResponse      `json:"feedback,omitempty"`
 	Review          []AttemptReviewRow     `json:"review,omitempty"`

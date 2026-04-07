@@ -220,6 +220,10 @@ func AdminPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
+			if errors.Is(err, service.ErrManualGradingTryout) {
+				writeError(w, http.StatusBadRequest, "MANUAL_GRADING_TRYOUT", "Tryout ini memakai penilaian manual; tidak bisa auto-grade.")
+				return
+			}
 			writeInternalError(w, r, err)
 			return
 		}
@@ -259,6 +263,10 @@ func TrainerPostAttemptAutoGrade(deps *Deps) http.HandlerFunc {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
 				return
 			}
+			if errors.Is(err, service.ErrManualGradingTryout) {
+				writeError(w, http.StatusBadRequest, "MANUAL_GRADING_TRYOUT", "Tryout ini memakai penilaian manual; tidak bisa auto-grade.")
+				return
+			}
 			writeInternalError(w, r, err)
 			return
 		}
@@ -287,6 +295,10 @@ func AdminPostTryoutAutoGradeSubmitted(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, service.ErrManualGradingTryout) {
+				writeError(w, http.StatusBadRequest, "MANUAL_GRADING_TRYOUT", "Tryout ini memakai penilaian manual; tidak bisa auto-grade.")
 				return
 			}
 			writeInternalError(w, r, err)
@@ -328,6 +340,10 @@ func TrainerPostTryoutAutoGradeSubmitted(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
+				return
+			}
+			if errors.Is(err, service.ErrManualGradingTryout) {
+				writeError(w, http.StatusBadRequest, "MANUAL_GRADING_TRYOUT", "Tryout ini memakai penilaian manual; tidak bisa auto-grade.")
 				return
 			}
 			writeInternalError(w, r, err)

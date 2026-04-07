@@ -32,6 +32,15 @@ func isValidTryoutStatus(status string) bool {
 	}
 }
 
+func normalizeTryoutGradingMode(s string) string {
+	switch strings.TrimSpace(strings.ToLower(s)) {
+	case domain.TryoutGradingModeManual:
+		return domain.TryoutGradingModeManual
+	default:
+		return domain.TryoutGradingModeAuto
+	}
+}
+
 // validateTryoutForCreate memastikan data wajib terisi sebelum INSERT.
 func validateTryoutForCreate(t *domain.TryoutSession) error {
 	t.Title = strings.TrimSpace(t.Title)
@@ -60,6 +69,7 @@ func validateTryoutForCreate(t *domain.TryoutSession) error {
 	if t.MaxParticipants != nil && *t.MaxParticipants < 0 {
 		return fmt.Errorf("maxParticipants must be >= 0")
 	}
+	t.GradingMode = normalizeTryoutGradingMode(t.GradingMode)
 	return nil
 }
 
@@ -89,6 +99,7 @@ func validateTryoutAfterAdminUpdate(t *domain.TryoutSession) error {
 	if t.MaxParticipants != nil && *t.MaxParticipants < 0 {
 		return fmt.Errorf("maxParticipants must be >= 0")
 	}
+	t.GradingMode = normalizeTryoutGradingMode(t.GradingMode)
 	return nil
 }
 
@@ -102,5 +113,11 @@ func restoreTryoutFieldsIfEmptyPatch(t *domain.TryoutSession, orig domain.Tryout
 	}
 	if strings.TrimSpace(t.Status) == "" {
 		t.Status = orig.Status
+	}
+	if strings.TrimSpace(t.GradingMode) == "" {
+		t.GradingMode = orig.GradingMode
+	}
+	if t.GradingMode == "" {
+		t.GradingMode = domain.TryoutGradingModeAuto
 	}
 }

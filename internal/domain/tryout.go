@@ -10,6 +10,11 @@ const (
 	TryoutStatusDraft  = "draft"
 	TryoutStatusOpen   = "open"
 	TryoutStatusClosed = "closed"
+
+	// TryoutGradingModeAuto: kunci jawaban + penilaian otomatis saat submit.
+	TryoutGradingModeAuto = "auto"
+	// TryoutGradingModeManual: jawaban disimpan saat submit; skor diisi admin/guru lewat review.
+	TryoutGradingModeManual = "manual"
 )
 
 type TryoutSession struct {
@@ -25,6 +30,7 @@ type TryoutSession struct {
 	ClosesAt         time.Time
 	MaxParticipants  *int
 	Status           string
+	GradingMode      string // auto | manual
 	CreatedBy        *string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

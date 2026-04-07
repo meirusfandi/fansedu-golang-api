@@ -31,6 +31,8 @@ type AdminService interface {
 	CreateTryout(ctx context.Context, t domain.TryoutSession) (domain.TryoutSession, error)
 	UpdateTryout(ctx context.Context, t domain.TryoutSession) error
 	DeleteTryout(ctx context.Context, id string) error
+	// ValidateTryoutAutoGradingPrerequisites memastikan setiap soal punya kunci jawaban (mode auto).
+	ValidateTryoutAutoGradingPrerequisites(ctx context.Context, tryoutID string) error
 	ListQuestions(ctx context.Context, tryoutID string) ([]domain.Question, error)
 	GetQuestion(ctx context.Context, questionID string) (domain.Question, error)
 	CreateQuestion(ctx context.Context, q domain.Question) (domain.Question, error)
@@ -95,6 +97,9 @@ type AttemptAnswerReviewPatch struct {
 
 // ErrAttemptReviewNoFields body tidak memuat reviewerComment / manualScore.
 var ErrAttemptReviewNoFields = errors.New("attempt review: no fields to update")
+
+// ErrManualGradingTryout tryout mode manual — penilaian otomatis / batch auto-grade tidak dipakai.
+var ErrManualGradingTryout = errors.New("tryout menggunakan penilaian manual; gunakan review per soal")
 
 // AttemptAnswerReviewResult hasil PUT .../answers/{questionId}/review.
 // AttemptScore = total skor attempt (jumlah semua soal) setelah dihitung ulang; bukan nilai manual satu soal.

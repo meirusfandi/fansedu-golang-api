@@ -24,6 +24,8 @@ type TryoutResponse struct {
 	ClosesAt         time.Time `json:"closesAt"`
 	MaxParticipants  *int      `json:"maxParticipants,omitempty"`
 	Status           string    `json:"status"`
+	// GradingMode: "auto" (kunci + otomatis) | "manual" (skor dari admin/guru lewat review).
+	GradingMode      string    `json:"gradingMode"`
 }
 
 type TryoutCreateRequest struct {
@@ -38,6 +40,7 @@ type TryoutCreateRequest struct {
 	ClosesAt         time.Time `json:"closesAt"`
 	MaxParticipants  *int      `json:"maxParticipants,omitempty"`
 	Status           string    `json:"status"`
+	GradingMode      string    `json:"gradingMode,omitempty"`
 }
 
 type TryoutStartResponse struct {

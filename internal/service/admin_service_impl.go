@@ -296,6 +296,19 @@ func (s *adminService) DeleteTryout(ctx context.Context, id string) error {
 	return s.tryoutRepo.Delete(ctx, id)
 }
 
+func (s *adminService) ValidateTryoutAutoGradingPrerequisites(ctx context.Context, tryoutID string) error {
+	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
+	if err != nil {
+		return err
+	}
+	for _, q := range questions {
+		if QuestionMissingAutoGradingKey(q) {
+			return fmt.Errorf("mode auto: soal urutan %d (id %s) belum punya kunci jawaban lengkap", q.SortOrder, q.ID)
+		}
+	}
+	return nil
+}
+
 func (s *adminService) ListQuestions(ctx context.Context, tryoutID string) ([]domain.Question, error) {
 	return s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
 }
@@ -567,23 +580,34 @@ func (s *adminService) ListTryoutStudents(ctx context.Context, tryoutID string) 
 	if err != nil {
 		return nil, err
 	}
+	tryout, terr := s.tryoutRepo.GetByID(ctx, tryoutID)
+	manualTryout := terr == nil && tryout.GradingMode == domain.TryoutGradingModeManual
+
 	out := make([]TryoutStudentItem, 0, len(attempts))
 	for _, a := range attempts {
-		// Sinkronkan nilai siswa dari jawaban aktual agar daftar siswa tidak menampilkan skor stale (mis. masih 0).
-		if answers, aerr := s.attemptAnswerRepo.ListByAttemptID(ctx, a.ID); aerr == nil {
-			scoreFresh, maxFresh, _, _, _ := GradeTryoutAttempt(questions, answers)
-			storedScore := 0.0
-			if a.Score != nil {
-				storedScore = *a.Score
+		if manualTryout {
+			if err := s.recalculateAttemptTotals(ctx, tryoutID, a.ID); err == nil {
+				if a2, gerr := s.attemptRepo.GetByID(ctx, a.ID); gerr == nil {
+					a = a2
+				}
 			}
-			storedMax := 0.0
-			if a.MaxScore != nil {
-				storedMax = *a.MaxScore
-			}
-			if a.Score == nil || a.MaxScore == nil || math.Abs(storedScore-scoreFresh) > 1e-6 || math.Abs(storedMax-maxFresh) > 1e-6 {
-				a.Score = &scoreFresh
-				a.MaxScore = &maxFresh
-				_ = s.attemptRepo.Update(ctx, a)
+		} else {
+			// Sinkronkan nilai dari penilaian otomatis + kunci.
+			if answers, aerr := s.attemptAnswerRepo.ListByAttemptID(ctx, a.ID); aerr == nil {
+				scoreFresh, maxFresh, _, _, _ := GradeTryoutAttempt(questions, answers)
+				storedScore := 0.0
+				if a.Score != nil {
+					storedScore = *a.Score
+				}
+				storedMax := 0.0
+				if a.MaxScore != nil {
+					storedMax = *a.MaxScore
+				}
+				if a.Score == nil || a.MaxScore == nil || math.Abs(storedScore-scoreFresh) > 1e-6 || math.Abs(storedMax-maxFresh) > 1e-6 {
+					a.Score = &scoreFresh
+					a.MaxScore = &maxFresh
+					_ = s.attemptRepo.Update(ctx, a)
+				}
 			}
 		}
 		u, err := s.userRepo.FindByID(ctx, a.UserID)
@@ -703,6 +727,11 @@ func (s *adminService) GetAttemptReview(ctx context.Context, tryoutID, attemptID
 	if err != nil {
 		return nil, ErrNotFound
 	}
+	tryout, err := s.tryoutRepo.GetByID(ctx, tryoutID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	manualTryout := tryout.GradingMode == domain.TryoutGradingModeManual
 	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
 	if err != nil {
 		return nil, err
@@ -744,7 +773,13 @@ func (s *adminService) GetAttemptReview(ctx context.Context, tryoutID, attemptID
 			ansPtr = &a
 		}
 		autoScore, autoIC := autoGradeQuestion(q, ansPtr)
-		got, ic := gradeQuestion(q, ansPtr)
+		var got float64
+		var ic *bool
+		if manualTryout {
+			got, ic = gradeQuestionManualOnly(q, ansPtr)
+		} else {
+			got, ic = gradeQuestion(q, ansPtr)
+		}
 		var opts any
 		if len(q.Options) > 0 {
 			_ = json.Unmarshal(q.Options, &opts)
@@ -882,6 +917,13 @@ func (s *adminService) PutAttemptAnswerReview(ctx context.Context, tryoutID, att
 }
 
 func (s *adminService) AutoGradeAttempt(ctx context.Context, tryoutID, attemptID string, opts AutoGradeAttemptOpts) (string, float64, error) {
+	tout, err := s.tryoutRepo.GetByID(ctx, tryoutID)
+	if err != nil {
+		return "", 0, ErrNotFound
+	}
+	if tout.GradingMode == domain.TryoutGradingModeManual {
+		return "", 0, ErrManualGradingTryout
+	}
 	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
 		return "", 0, ErrNotFound
@@ -907,11 +949,15 @@ func (s *adminService) AutoGradeAttempt(ctx context.Context, tryoutID, attemptID
 }
 
 func (s *adminService) AutoGradeAllSubmittedAttempts(ctx context.Context, tryoutID string, opts AutoGradeAttemptOpts) (AutoGradeAllSubmittedResult, error) {
-	if _, err := s.tryoutRepo.GetByID(ctx, tryoutID); err != nil {
+	tout, err := s.tryoutRepo.GetByID(ctx, tryoutID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return AutoGradeAllSubmittedResult{}, ErrNotFound
 		}
 		return AutoGradeAllSubmittedResult{}, err
+	}
+	if tout.GradingMode == domain.TryoutGradingModeManual {
+		return AutoGradeAllSubmittedResult{}, ErrManualGradingTryout
 	}
 	list, err := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, tryoutID)
 	if err != nil {
@@ -950,6 +996,11 @@ func (s *adminService) recalculateAttemptTotals(ctx context.Context, tryoutID, a
 	if err != nil {
 		return err
 	}
+	tryout, err := s.tryoutRepo.GetByID(ctx, tryoutID)
+	if err != nil {
+		return err
+	}
+	manualTryout := tryout.GradingMode == domain.TryoutGradingModeManual
 	questions, err := s.questionRepo.ListByTryoutSessionID(ctx, tryoutID)
 	if err != nil {
 		return err
@@ -958,7 +1009,7 @@ func (s *adminService) recalculateAttemptTotals(ctx context.Context, tryoutID, a
 	if err != nil {
 		return err
 	}
-	score, maxScore, outcomes, _, _ := GradeTryoutAttempt(questions, answers)
+	score, maxScore, outcomes, _, _ := GradeTryoutAttemptWithMode(questions, answers, manualTryout)
 	for _, o := range outcomes {
 		_ = s.attemptAnswerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
 	}

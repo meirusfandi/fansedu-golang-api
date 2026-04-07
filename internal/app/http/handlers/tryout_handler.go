@@ -711,6 +711,10 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 }
 
 func tryoutToDTO(t domain.TryoutSession) dto.TryoutResponse {
+	gm := t.GradingMode
+	if gm == "" {
+		gm = domain.TryoutGradingModeAuto
+	}
 	return dto.TryoutResponse{
 		ID:              t.ID,
 		Title:           t.Title,
@@ -724,5 +728,6 @@ func tryoutToDTO(t domain.TryoutSession) dto.TryoutResponse {
 		ClosesAt:        t.ClosesAt,
 		MaxParticipants: t.MaxParticipants,
 		Status:          t.Status,
+		GradingMode:     gm,
 	}
 }

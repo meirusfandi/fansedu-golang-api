@@ -108,5 +108,10 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			return fmt.Errorf("status: %w", err)
 		}
 	}
+	if raw, ok := dto.PickTryoutJSONField(m, "gradingMode", "grading_mode"); ok {
+		if err := json.Unmarshal(raw, &t.GradingMode); err != nil {
+			return fmt.Errorf("gradingMode: %w", err)
+		}
+	}
 	return nil
 }

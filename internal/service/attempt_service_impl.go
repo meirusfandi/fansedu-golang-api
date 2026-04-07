@@ -121,29 +121,54 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	if err != nil {
 		return domain.Attempt{}, nil, nil, fmt.Errorf("submit: load questions: %w", err)
 	}
-	score, maxScore, outcomes, modAggs, overall := GradeTryoutAttempt(questions, answers)
-	for _, o := range outcomes {
-		_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
+	tryout, err := s.tryoutRepo.GetByID(ctx, a.TryoutSessionID)
+	if err != nil {
+		return domain.Attempt{}, nil, nil, fmt.Errorf("submit: load tryout: %w", err)
+	}
+	manualTryout := tryout.GradingMode == domain.TryoutGradingModeManual
+
+	var score float64
+	var maxScore float64
+	var outcomes []QuestionReviewOutcome
+	var modAggs []ModuleAnalysisAgg
+	var overall TryoutOverallAnalysis
+	if manualTryout {
+		score, maxScore, outcomes, modAggs, overall = GradeTryoutAttemptWithMode(questions, answers, true)
+		for _, o := range outcomes {
+			_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, nil)
+		}
+	} else {
+		score, maxScore, outcomes, modAggs, overall = GradeTryoutAttemptWithMode(questions, answers, false)
+		for _, o := range outcomes {
+			_ = s.answerRepo.SetAnswerGrading(ctx, attemptID, o.QuestionID, o.IsCorrect)
+		}
 	}
 	analysis := &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs, Overall: overall}
 	// Persentil: hanya jika ada ≥2 skor (peserta lain + attempt ini); jika tidak, NULL (bukan 0 palsu).
+	// Manual: tanpa skor final — percentile dihitung setelah pengajar mengisi nilai.
 	var percentile *float64
-	if others, perr := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, a.TryoutSessionID); perr == nil {
-		scores := make([]float64, 0, len(others)+1)
-		for _, o := range others {
-			if o.Score != nil {
-				scores = append(scores, *o.Score)
+	if !manualTryout {
+		if others, perr := s.attemptRepo.ListSubmittedByTryoutSessionID(ctx, a.TryoutSessionID); perr == nil {
+			scores := make([]float64, 0, len(others)+1)
+			for _, o := range others {
+				if o.Score != nil {
+					scores = append(scores, *o.Score)
+				}
 			}
+			scores = append(scores, score)
+			percentile = percentileRankPercent(scores, score)
 		}
-		scores = append(scores, score)
-		percentile = percentileRankPercent(scores, score)
 	}
 	now := time.Now()
 	a.SubmittedAt = &now
 	a.Status = domain.AttemptStatusSubmitted
-	a.Score = &score
 	a.MaxScore = &maxScore
 	a.Percentile = percentile
+	if manualTryout {
+		a.Score = nil
+	} else {
+		a.Score = &score
+	}
 	// Waktu pengerjaan (detik) untuk leaderboard
 	if sec := int(now.Sub(a.StartedAt).Seconds()); sec >= 0 {
 		a.TimeSecondsSpent = &sec
@@ -151,25 +176,40 @@ func (s *attemptService) Submit(ctx context.Context, attemptID, userID string) (
 	if err := s.attemptRepo.Update(ctx, a); err != nil {
 		return domain.Attempt{}, nil, nil, err
 	}
-	// Generate feedback berdasarkan jawaban (AI atau fallback), lalu simpan ke attempt_feedback
-	gen, err := s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
-		Questions:        questions,
-		Answers:          answers,
-		Score:            score,
-		MaxScore:         maxScore,
-		OverallNarrative: analysis.Overall.Summary,
-	})
-	if err != nil {
-		recap := "Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + "."
-		if s := strings.TrimSpace(analysis.Overall.Summary); s != "" {
-			recap += " " + s
-		}
+	// Feedback: manual = ringkas; auto = AI / fallback
+	var gen *ai.GeneratedFeedback
+	if manualTryout {
+		summary := "Jawaban telah dikirim."
+		recap := "Tryout ini dinilai oleh pengajar. Nilai akan tampil setelah penilaian selesai."
+		rec := "Terima kasih telah mengerjakan; tunggu pengumuman nilai dari pengajar."
 		gen = &ai.GeneratedFeedback{
-			Summary:          "Tryout selesai.",
+			Summary:          summary,
 			Recap:            recap,
 			StrengthAreas:    []string{},
-			ImprovementAreas: []string{"Lanjutkan berlatih."},
-			Recommendation:   "Lanjutkan berlatih dan perbaiki area yang masih lemah.",
+			ImprovementAreas: []string{},
+			Recommendation:   rec,
+		}
+	} else {
+		var err error
+		gen, err = s.feedbackGenerator.Generate(ctx, ai.FeedbackRequest{
+			Questions:        questions,
+			Answers:          answers,
+			Score:            score,
+			MaxScore:         maxScore,
+			OverallNarrative: analysis.Overall.Summary,
+		})
+		if err != nil {
+			recap := "Skor Anda: " + formatScore(score) + " dari " + formatScore(maxScore) + "."
+			if s := strings.TrimSpace(analysis.Overall.Summary); s != "" {
+				recap += " " + s
+			}
+			gen = &ai.GeneratedFeedback{
+				Summary:          "Tryout selesai.",
+				Recap:            recap,
+				StrengthAreas:    []string{},
+				ImprovementAreas: []string{"Lanjutkan berlatih."},
+				Recommendation:   "Lanjutkan berlatih dan perbaiki area yang masih lemah.",
+			}
 		}
 	}
 	strength, _ := json.Marshal(gen.StrengthAreas)
@@ -198,7 +238,12 @@ func (s *attemptService) TryoutAnalysisForAttempt(ctx context.Context, attemptID
 	if err != nil {
 		return nil, err
 	}
-	_, _, outcomes, modAggs, overall := GradeTryoutAttempt(questions, answers)
+	tryout, err := s.tryoutRepo.GetByID(ctx, tryoutSessionID)
+	if err != nil {
+		return nil, err
+	}
+	manualTryout := tryout.GradingMode == domain.TryoutGradingModeManual
+	_, _, outcomes, modAggs, overall := GradeTryoutAttemptWithMode(questions, answers, manualTryout)
 	return &TryoutSubmitAnalysis{Review: outcomes, Modules: modAggs, Overall: overall}, nil
 }
 
