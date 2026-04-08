@@ -55,6 +55,14 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 				}
 			}
 		}
+		schoolNames := map[string]string{}
+		if deps.SchoolRepo != nil {
+			if schools, serr := deps.SchoolRepo.List(r.Context()); serr == nil {
+				for _, s := range schools {
+					schoolNames[s.ID] = s.Name
+				}
+			}
+		}
 		subjectNames := map[string]string{}
 		if deps.SubjectRepo != nil {
 			if subs, serr := deps.SubjectRepo.List(r.Context()); serr == nil {
@@ -81,6 +89,11 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 			if u.LevelID != nil && *u.LevelID != "" {
 				if n, ok := levelNames[*u.LevelID]; ok {
 					row.LevelName = &n
+				}
+			}
+			if u.SchoolID != nil && *u.SchoolID != "" {
+				if n, ok := schoolNames[*u.SchoolID]; ok {
+					row.SchoolName = &n
 				}
 			}
 			if u.SubjectID != nil && *u.SubjectID != "" {

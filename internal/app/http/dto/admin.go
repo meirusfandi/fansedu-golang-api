@@ -16,12 +16,13 @@ type UserListResponse struct {
 	Name        string  `json:"name"`
 	Role        string  `json:"role"`
 	AvatarURL   *string `json:"avatarUrl,omitempty"`
-	SchoolID    *string `json:"schoolId,omitempty"`
-	LevelID     *string `json:"levelId,omitempty"`
-	LevelName   *string `json:"levelName,omitempty"`   // jenjang (mis. SMA, SMP)
-	ClassLevel  *string `json:"classLevel,omitempty"`  // kelas/spesifik (mis. X IPA)
-	SubjectID   *string `json:"subjectId,omitempty"`
-	SubjectName *string `json:"subjectName,omitempty"` // bidang / mata pelajaran utama
+	SchoolID    *string `json:"schoolId"`
+	SchoolName  *string `json:"schoolName"`
+	LevelID     *string `json:"levelId"`
+	LevelName   *string `json:"levelName"`  // jenjang (mis. SMA, SMP)
+	ClassLevel  *string `json:"classLevel"` // kelas/spesifik (mis. X IPA)
+	SubjectID   *string `json:"subjectId"`
+	SubjectName *string `json:"subjectName"` // bidang / mata pelajaran utama
 	CreatedAt   string  `json:"createdAt"`
 }
 
