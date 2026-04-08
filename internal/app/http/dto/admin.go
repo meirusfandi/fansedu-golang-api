@@ -50,6 +50,8 @@ type UserCreateRequest struct {
 	Role      string  `json:"role"`
 	AvatarURL *string `json:"avatarUrl,omitempty"`
 	SchoolID  *string `json:"schoolId,omitempty"`
+	LevelID   *string `json:"levelId,omitempty"`
+	ClassLevel *string `json:"classLevel,omitempty"`
 	SubjectID *string `json:"subjectId,omitempty"`
 }
 
@@ -59,6 +61,8 @@ type UserUpdateRequest struct {
 	Role      *string `json:"role,omitempty"`
 	AvatarURL *string `json:"avatarUrl,omitempty"`
 	SchoolID  *string `json:"schoolId,omitempty"`
+	LevelID   *string `json:"levelId,omitempty"`
+	ClassLevel *string `json:"classLevel,omitempty"`
 	SubjectID *string `json:"subjectId,omitempty"`
 	Password  *string `json:"password,omitempty"`
 }

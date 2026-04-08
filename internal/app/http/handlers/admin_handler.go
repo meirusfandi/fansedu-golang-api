@@ -42,66 +42,64 @@ func AdminOverview(deps *Deps) http.HandlerFunc {
 func AdminListUsers(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		role := r.URL.Query().Get("role")
-		list, err := deps.AdminService.ListUsers(r.Context(), role)
+		// JOIN langsung ke tabel relasi agar school/level/subject selalu konsisten dengan FK di users.
+		rows, err := deps.DB.Query(r.Context(), `
+			SELECT
+				u.id::text,
+				u.email,
+				u.name,
+				u.role::text,
+				u.avatar_url,
+				u.school_id::text,
+				s.name AS school_name,
+				u.level_id::text,
+				l.name AS level_name,
+				u.class_level,
+				u.subject_id::text,
+				sb.name AS subject_name,
+				u.created_at
+			FROM users u
+			LEFT JOIN schools s ON s.id = u.school_id
+			LEFT JOIN levels l ON l.id = u.level_id
+			LEFT JOIN subjects sb ON sb.id = u.subject_id
+			WHERE ($1::text = '' OR u.role = $1::user_role)
+			ORDER BY u.created_at DESC
+		`, role)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		levelNames := map[string]string{}
-		if deps.LevelRepo != nil {
-			if levels, lerr := deps.LevelRepo.List(r.Context()); lerr == nil {
-				for _, lv := range levels {
-					levelNames[lv.ID] = lv.Name
-				}
+		defer rows.Close()
+		out := make([]dto.UserListResponse, 0)
+		for rows.Next() {
+			var row dto.UserListResponse
+			var roleCode string
+			var createdAt time.Time
+			if err := rows.Scan(
+				&row.ID,
+				&row.Email,
+				&row.Name,
+				&roleCode,
+				&row.AvatarURL,
+				&row.SchoolID,
+				&row.SchoolName,
+				&row.LevelID,
+				&row.LevelName,
+				&row.ClassLevel,
+				&row.SubjectID,
+				&row.SubjectName,
+				&createdAt,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
+			row.Role = domain.DisplayRoleForAPI(roleCode)
+			row.CreatedAt = createdAt.Format(time.RFC3339)
+			out = append(out, row)
 		}
-		schoolNames := map[string]string{}
-		if deps.SchoolRepo != nil {
-			if schools, serr := deps.SchoolRepo.List(r.Context()); serr == nil {
-				for _, s := range schools {
-					schoolNames[s.ID] = s.Name
-				}
-			}
-		}
-		subjectNames := map[string]string{}
-		if deps.SubjectRepo != nil {
-			if subs, serr := deps.SubjectRepo.List(r.Context()); serr == nil {
-				for _, s := range subs {
-					subjectNames[s.ID] = s.Name
-				}
-			}
-		}
-		out := make([]dto.UserListResponse, len(list))
-		for i := range list {
-			u := list[i]
-			row := dto.UserListResponse{
-				ID:         u.ID,
-				Email:      u.Email,
-				Name:       u.Name,
-				Role:       domain.DisplayRoleForAPI(u.Role),
-				AvatarURL:  u.AvatarURL,
-				SchoolID:   u.SchoolID,
-				LevelID:    u.LevelID,
-				ClassLevel: u.ClassLevel,
-				SubjectID:  u.SubjectID,
-				CreatedAt:  u.CreatedAt.Format(time.RFC3339),
-			}
-			if u.LevelID != nil && *u.LevelID != "" {
-				if n, ok := levelNames[*u.LevelID]; ok {
-					row.LevelName = &n
-				}
-			}
-			if u.SchoolID != nil && *u.SchoolID != "" {
-				if n, ok := schoolNames[*u.SchoolID]; ok {
-					row.SchoolName = &n
-				}
-			}
-			if u.SubjectID != nil && *u.SubjectID != "" {
-				if n, ok := subjectNames[*u.SubjectID]; ok {
-					row.SubjectName = &n
-				}
-			}
-			out[i] = row
+		if err := rows.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
@@ -197,7 +195,16 @@ func AdminCreateUser(deps *Deps) http.HandlerFunc {
 				return
 			}
 		}
-		u := domain.User{Email: req.Email, Name: req.Name, Role: roleCode, AvatarURL: req.AvatarURL, SchoolID: req.SchoolID, SubjectID: req.SubjectID}
+		u := domain.User{
+			Email:      req.Email,
+			Name:       req.Name,
+			Role:       roleCode,
+			AvatarURL:  req.AvatarURL,
+			SchoolID:   req.SchoolID,
+			LevelID:    req.LevelID,
+			ClassLevel: req.ClassLevel,
+			SubjectID:  req.SubjectID,
+		}
 		created, err := deps.AdminService.CreateUser(r.Context(), u, req.Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -288,6 +295,20 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 				u.SubjectID = nil
 			} else {
 				u.SubjectID = req.SubjectID
+			}
+		}
+		if req.LevelID != nil {
+			if *req.LevelID == "" {
+				u.LevelID = nil
+			} else {
+				u.LevelID = req.LevelID
+			}
+		}
+		if req.ClassLevel != nil {
+			if *req.ClassLevel == "" {
+				u.ClassLevel = nil
+			} else {
+				u.ClassLevel = req.ClassLevel
 			}
 		}
 		if err := deps.AdminService.UpdateUser(r.Context(), u, req.Password); err != nil {
