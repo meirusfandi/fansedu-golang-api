@@ -25,6 +25,8 @@ type TryoutSession struct {
 	DurationMinutes  int
 	QuestionsCount   int
 	Level            string
+	Subject          *string
+	SchoolLevel      *string
 	SubjectID        *string // bidang: siswa hanya lihat tryout yang subject_id = user.subject_id atau NULL (umum)
 	OpensAt          time.Time
 	ClosesAt         time.Time

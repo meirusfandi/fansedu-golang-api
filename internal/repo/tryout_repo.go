@@ -37,10 +37,10 @@ func (r *tryoutRepo) Create(ctx context.Context, t domain.TryoutSession) (domain
 	var id string
 	gm := normalizeTryoutGradingMode(t.GradingMode)
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO tryout_sessions (title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6::tryout_level, $7::uuid, $8, $9, $10, $11::tryout_status, $12::tryout_grading_mode, $13::uuid)
+		INSERT INTO tryout_sessions (title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6::tryout_level, $7, $8, $9::uuid, $10, $11, $12, $13::tryout_status, $14::tryout_grading_mode, $15::uuid)
 		RETURNING id
-	`, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, gm, t.CreatedBy).Scan(&id)
+	`, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.Subject, t.SchoolLevel, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, gm, t.CreatedBy).Scan(&id)
 	if err != nil {
 		return domain.TryoutSession{}, err
 	}
@@ -51,19 +51,19 @@ func (r *tryoutRepo) Create(ctx context.Context, t domain.TryoutSession) (domain
 
 func (r *tryoutRepo) GetByID(ctx context.Context, id string) (domain.TryoutSession, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions WHERE id = $1::uuid
 	`, id)
 	var t domain.TryoutSession
 	var subjectID *string
-	err := row.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	err := row.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.Subject, &t.SchoolLevel, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
 	t.SubjectID = subjectID
 	return t, err
 }
 
 func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions ORDER BY opens_at DESC, created_at DESC
 	`)
 	if err != nil {
@@ -74,7 +74,7 @@ func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 	for rows.Next() {
 		var t domain.TryoutSession
 		var subjectID *string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.Subject, &t.SchoolLevel, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		t.SubjectID = subjectID
@@ -86,7 +86,7 @@ func (r *tryoutRepo) List(ctx context.Context) ([]domain.TryoutSession, error) {
 // ListOpen: status open dan belum lewat closes_at (masih dalam periode pendaftaran/penyelenggaraan).
 func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status = 'open' AND closes_at >= $1
 		ORDER BY opens_at NULLS LAST, created_at DESC
@@ -99,7 +99,7 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 	for rows.Next() {
 		var t domain.TryoutSession
 		var subjectID *string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.Subject, &t.SchoolLevel, &subjectID, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		t.SubjectID = subjectID
@@ -111,7 +111,7 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 // ListOpenForStudent: status open, closes_at belum lewat, + filter bidang siswa.
 func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error) {
 	query := `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status = 'open' AND closes_at >= $1
 		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
@@ -130,7 +130,7 @@ func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subj
 	for rows.Next() {
 		var t domain.TryoutSession
 		var sid *string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.Subject, &t.SchoolLevel, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		t.SubjectID = sid
@@ -143,7 +143,7 @@ func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subj
 // Status open/closed included; frontend can separate by status or opens_at/closes_at.
 func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
 	query := `
-		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
+		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status != 'draft'
 		AND (subject_id IS NULL OR ($1::text IS NOT NULL AND subject_id = $1::uuid))
@@ -162,7 +162,7 @@ func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string) ([]d
 	for rows.Next() {
 		var t domain.TryoutSession
 		var sid *string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.ShortTitle, &t.Description, &t.DurationMinutes, &t.QuestionsCount, &t.Level, &t.Subject, &t.SchoolLevel, &sid, &t.OpensAt, &t.ClosesAt, &t.MaxParticipants, &t.Status, &t.GradingMode, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		t.SubjectID = sid
@@ -174,9 +174,9 @@ func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string) ([]d
 func (r *tryoutRepo) Update(ctx context.Context, t domain.TryoutSession) error {
 	gm := normalizeTryoutGradingMode(t.GradingMode)
 	_, err := r.pool.Exec(ctx, `
-		UPDATE tryout_sessions SET title=$2, short_title=$3, description=$4, duration_minutes=$5, questions_count=$6, level=$7::tryout_level, subject_id=$8::uuid, opens_at=$9, closes_at=$10, max_participants=$11, status=$12::tryout_status, grading_mode=$13::tryout_grading_mode
+		UPDATE tryout_sessions SET title=$2, short_title=$3, description=$4, duration_minutes=$5, questions_count=$6, level=$7::tryout_level, subject=$8, school_level=$9, subject_id=$10::uuid, opens_at=$11, closes_at=$12, max_participants=$13, status=$14::tryout_status, grading_mode=$15::tryout_grading_mode
 		WHERE id = $1::uuid
-	`, t.ID, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, gm)
+	`, t.ID, t.Title, t.ShortTitle, t.Description, t.DurationMinutes, t.QuestionsCount, t.Level, t.Subject, t.SchoolLevel, t.SubjectID, t.OpensAt, t.ClosesAt, t.MaxParticipants, t.Status, gm)
 	return err
 }
 

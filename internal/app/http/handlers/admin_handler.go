@@ -42,6 +42,14 @@ func AdminOverview(deps *Deps) http.HandlerFunc {
 func AdminListUsers(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		role := r.URL.Query().Get("role")
+		levelBySlug := map[string]domain.Level{}
+		if deps.LevelRepo != nil {
+			if levels, err := deps.LevelRepo.List(r.Context()); err == nil {
+				for _, lv := range levels {
+					levelBySlug[strings.ToLower(strings.TrimSpace(lv.Slug))] = lv
+				}
+			}
+		}
 		// JOIN langsung ke tabel relasi agar school/level/subject selalu konsisten dengan FK di users.
 		rows, err := deps.DB.Query(r.Context(), `
 			SELECT
@@ -94,6 +102,19 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 				return
 			}
 			row.Role = domain.DisplayRoleForAPI(roleCode)
+			// Backward-compatible fallback:
+			// Banyak data lama hanya mengisi class_level (mis. "10", "XI") tanpa users.level_id.
+			// Infer level dari class_level agar kolom jenjang tidak selalu null.
+			if row.LevelID == nil || strings.TrimSpace(*row.LevelID) == "" {
+				if slug := inferLevelSlugFromClassLevel(row.ClassLevel); slug != "" {
+					if lv, ok := levelBySlug[slug]; ok {
+						id := lv.ID
+						name := lv.Name
+						row.LevelID = &id
+						row.LevelName = &name
+					}
+				}
+			}
 			row.CreatedAt = createdAt.Format(time.RFC3339)
 			out = append(out, row)
 		}
@@ -104,6 +125,33 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
 	}
+}
+
+func inferLevelSlugFromClassLevel(classLevel *string) string {
+	if classLevel == nil {
+		return ""
+	}
+	s := strings.ToUpper(strings.TrimSpace(*classLevel))
+	if s == "" {
+		return ""
+	}
+	// Ambil token awal untuk format campuran: "XI IPA", "10A", dsb.
+	token := strings.Fields(s)[0]
+	if strings.HasPrefix(token, "10") || strings.HasPrefix(token, "11") || strings.HasPrefix(token, "12") ||
+		strings.HasPrefix(token, "XII") || strings.HasPrefix(token, "XI") || strings.HasPrefix(token, "X") {
+		return "sma"
+	}
+	if strings.HasPrefix(token, "7") || strings.HasPrefix(token, "8") || strings.HasPrefix(token, "9") ||
+		strings.HasPrefix(token, "VII") || strings.HasPrefix(token, "VIII") || strings.HasPrefix(token, "IX") {
+		return "smp"
+	}
+	if strings.HasPrefix(token, "1") || strings.HasPrefix(token, "2") || strings.HasPrefix(token, "3") ||
+		strings.HasPrefix(token, "4") || strings.HasPrefix(token, "5") || strings.HasPrefix(token, "6") ||
+		strings.HasPrefix(token, "I") || strings.HasPrefix(token, "II") || strings.HasPrefix(token, "III") ||
+		strings.HasPrefix(token, "IV") || strings.HasPrefix(token, "V") || strings.HasPrefix(token, "VI") {
+		return "sd"
+	}
+	return ""
 }
 
 func AdminGetUser(deps *Deps) http.HandlerFunc {
@@ -326,6 +374,25 @@ func AdminListTryouts(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		subjectFilter := strings.TrimSpace(r.URL.Query().Get("subject"))
+		levelFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("level")))
+		if subjectFilter != "" || levelFilter != "" {
+			filtered := make([]domain.TryoutSession, 0, len(list))
+			for _, item := range list {
+				if subjectFilter != "" {
+					if item.Subject == nil || !strings.EqualFold(strings.TrimSpace(*item.Subject), subjectFilter) {
+						continue
+					}
+				}
+				if levelFilter != "" {
+					if item.SchoolLevel == nil || strings.ToLower(strings.TrimSpace(*item.SchoolLevel)) != levelFilter {
+						continue
+					}
+				}
+				filtered = append(filtered, item)
+			}
+			list = filtered
+		}
 		out := make([]dto.TryoutResponse, len(list))
 		for i := range list {
 			out[i] = tryoutToDTO(list[i])
@@ -370,6 +437,8 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			DurationMinutes: req.DurationMinutes,
 			QuestionsCount:  req.QuestionsCount,
 			Level:           req.Level,
+			Subject:         req.Subject,
+			SchoolLevel:     req.SchoolLevel,
 			SubjectID:       req.SubjectID,
 			OpensAt:         req.OpensAt,
 			ClosesAt:        req.ClosesAt,

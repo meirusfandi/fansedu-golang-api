@@ -444,6 +444,38 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			return fmt.Errorf("level: %w", err)
 		}
 	}
+	if raw, ok := PickTryoutJSONField(m, "subject", "subject"); ok {
+		if string(raw) == "null" {
+			r.Subject = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("subject: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				r.Subject = nil
+			} else {
+				r.Subject = &s
+			}
+		}
+	}
+	if raw, ok := PickTryoutJSONField(m, "schoolLevel", "school_level"); ok {
+		if string(raw) == "null" {
+			r.SchoolLevel = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("schoolLevel: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				r.SchoolLevel = nil
+			} else {
+				r.SchoolLevel = &s
+			}
+		}
+	}
 	if raw, ok := PickTryoutJSONField(m, "subjectId", "subject_id"); ok {
 		if string(raw) == "null" {
 			r.SubjectID = nil

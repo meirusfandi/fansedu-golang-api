@@ -7,6 +7,26 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
+func normalizeTryoutSchoolLevel(level *string) *string {
+	if level == nil {
+		return nil
+	}
+	v := strings.ToLower(strings.TrimSpace(*level))
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func isValidTryoutSchoolLevel(level string) bool {
+	switch level {
+	case "sd", "smp", "sma":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeTryoutLevel(level string) string {
 	if strings.TrimSpace(level) == "" {
 		return domain.TryoutLevelMedium
@@ -69,6 +89,24 @@ func validateTryoutForCreate(t *domain.TryoutSession) error {
 	if t.MaxParticipants != nil && *t.MaxParticipants < 0 {
 		return fmt.Errorf("maxParticipants must be >= 0")
 	}
+	if t.Subject != nil {
+		trimmed := strings.TrimSpace(*t.Subject)
+		if trimmed == "" {
+			t.Subject = nil
+		} else {
+			t.Subject = &trimmed
+		}
+	}
+	if t.Subject == nil {
+		return fmt.Errorf("subject is required")
+	}
+	t.SchoolLevel = normalizeTryoutSchoolLevel(t.SchoolLevel)
+	if t.SchoolLevel == nil {
+		return fmt.Errorf("schoolLevel is required")
+	}
+	if !isValidTryoutSchoolLevel(*t.SchoolLevel) {
+		return fmt.Errorf("invalid schoolLevel: use sd, smp, or sma")
+	}
 	t.GradingMode = normalizeTryoutGradingMode(t.GradingMode)
 	return nil
 }
@@ -98,6 +136,24 @@ func validateTryoutAfterAdminUpdate(t *domain.TryoutSession) error {
 	}
 	if t.MaxParticipants != nil && *t.MaxParticipants < 0 {
 		return fmt.Errorf("maxParticipants must be >= 0")
+	}
+	if t.Subject != nil {
+		trimmed := strings.TrimSpace(*t.Subject)
+		if trimmed == "" {
+			t.Subject = nil
+		} else {
+			t.Subject = &trimmed
+		}
+	}
+	if t.Subject == nil {
+		return fmt.Errorf("subject cannot be empty")
+	}
+	t.SchoolLevel = normalizeTryoutSchoolLevel(t.SchoolLevel)
+	if t.SchoolLevel == nil {
+		return fmt.Errorf("schoolLevel cannot be empty")
+	}
+	if !isValidTryoutSchoolLevel(*t.SchoolLevel) {
+		return fmt.Errorf("invalid schoolLevel: use sd, smp, or sma")
 	}
 	t.GradingMode = normalizeTryoutGradingMode(t.GradingMode)
 	return nil

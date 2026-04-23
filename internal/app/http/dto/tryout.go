@@ -19,6 +19,8 @@ type TryoutResponse struct {
 	DurationMinutes  int       `json:"durationMinutes"`
 	QuestionsCount   int       `json:"questionsCount"`
 	Level            string    `json:"level"`
+	Subject          *string   `json:"subject,omitempty"`
+	SchoolLevel      *string   `json:"schoolLevel,omitempty"`
 	SubjectID        *string   `json:"subjectId,omitempty"`
 	OpensAt          time.Time `json:"opensAt"`
 	ClosesAt         time.Time `json:"closesAt"`
@@ -35,6 +37,8 @@ type TryoutCreateRequest struct {
 	DurationMinutes  int       `json:"durationMinutes"`
 	QuestionsCount   int       `json:"questionsCount"`
 	Level            string    `json:"level"`
+	Subject          *string   `json:"subject,omitempty"`
+	SchoolLevel      *string   `json:"schoolLevel,omitempty"`
 	SubjectID        *string   `json:"subjectId,omitempty"`
 	OpensAt          time.Time `json:"opensAt"`
 	ClosesAt         time.Time `json:"closesAt"`

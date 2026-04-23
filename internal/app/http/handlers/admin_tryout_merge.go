@@ -62,6 +62,38 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			return fmt.Errorf("level: %w", err)
 		}
 	}
+	if raw, ok := dto.PickTryoutJSONField(m, "subject", "subject"); ok {
+		if string(raw) == "null" {
+			t.Subject = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("subject: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				t.Subject = nil
+			} else {
+				t.Subject = &s
+			}
+		}
+	}
+	if raw, ok := dto.PickTryoutJSONField(m, "schoolLevel", "school_level"); ok {
+		if string(raw) == "null" {
+			t.SchoolLevel = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("schoolLevel: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				t.SchoolLevel = nil
+			} else {
+				t.SchoolLevel = &s
+			}
+		}
+	}
 	if raw, ok := dto.PickTryoutJSONField(m, "subjectId", "subject_id"); ok {
 		if string(raw) == "null" {
 			t.SubjectID = nil

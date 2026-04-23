@@ -43,6 +43,9 @@ func TryoutList(deps *Deps) http.HandlerFunc {
 				writeInternalError(w, r, err)
 				return
 			}
+			subjectFilter := strings.TrimSpace(r.URL.Query().Get("subject"))
+			levelFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("level")))
+			list = filterTryoutsBySubjectAndLevel(list, subjectFilter, levelFilter)
 			out := make([]dto.TryoutResponse, len(list))
 			for i := range list {
 				out[i] = tryoutToDTO(list[i])
@@ -406,6 +409,9 @@ func StudentTryoutList(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
+		subjectFilter := strings.TrimSpace(r.URL.Query().Get("subject"))
+		levelFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("level")))
+		list = filterTryoutsBySubjectAndLevel(list, subjectFilter, levelFilter)
 		out := make([]dto.TryoutResponse, len(list))
 		for i := range list {
 			out[i] = tryoutToDTO(list[i])
@@ -432,6 +438,9 @@ func StudentTryoutListOpen(deps *Deps) http.HandlerFunc {
 			writeInternalError(w, r, err)
 			return
 		}
+		subjectFilter := strings.TrimSpace(r.URL.Query().Get("subject"))
+		levelFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("level")))
+		list = filterTryoutsBySubjectAndLevel(list, subjectFilter, levelFilter)
 		out := make([]dto.TryoutResponse, len(list))
 		for i := range list {
 			out[i] = tryoutToDTO(list[i])
@@ -723,6 +732,8 @@ func tryoutToDTO(t domain.TryoutSession) dto.TryoutResponse {
 		DurationMinutes: t.DurationMinutes,
 		QuestionsCount:  t.QuestionsCount,
 		Level:           t.Level,
+		Subject:         t.Subject,
+		SchoolLevel:     t.SchoolLevel,
 		SubjectID:       t.SubjectID,
 		OpensAt:         t.OpensAt,
 		ClosesAt:        t.ClosesAt,
@@ -730,4 +741,25 @@ func tryoutToDTO(t domain.TryoutSession) dto.TryoutResponse {
 		Status:          t.Status,
 		GradingMode:     gm,
 	}
+}
+
+func filterTryoutsBySubjectAndLevel(list []domain.TryoutSession, subjectFilter, levelFilter string) []domain.TryoutSession {
+	if subjectFilter == "" && levelFilter == "" {
+		return list
+	}
+	filtered := make([]domain.TryoutSession, 0, len(list))
+	for _, item := range list {
+		if subjectFilter != "" {
+			if item.Subject == nil || !strings.EqualFold(strings.TrimSpace(*item.Subject), subjectFilter) {
+				continue
+			}
+		}
+		if levelFilter != "" {
+			if item.SchoolLevel == nil || strings.ToLower(strings.TrimSpace(*item.SchoolLevel)) != levelFilter {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
