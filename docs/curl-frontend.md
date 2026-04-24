@@ -195,7 +195,40 @@ curl -s "$BASE/student/transactions" -H "Authorization: Bearer $TOKEN"
 # Kelas berdasarkan subject siswa
 curl -s "$BASE/student/courses/by-subject" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/payments" -H "Authorization: Bearer $TOKEN"
+
+# --- Tryout Siswa ---
+# Semua tryout untuk siswa (otomatis filter berdasarkan subject_id DAN level_id siswa)
+# Tryout dengan subject_id/level_id NULL dianggap umum → tetap tampil untuk semua siswa
 curl -s "$BASE/student/tryouts" -H "Authorization: Bearer $TOKEN"
+
+# Tryout open saja (status=open, belum lewat closes_at, + filter subject & level siswa)
+curl -s "$BASE/student/tryouts/open" -H "Authorization: Bearer $TOKEN"
+
+# Tambahan filter opsional via query param: ?subject=Informatika&level=sma
+curl -s "$BASE/student/tryouts?subject=Informatika&level=sma" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/student/tryouts/open?subject=Informatika&level=sma" -H "Authorization: Bearer $TOKEN"
+
+# Detail tryout siswa (hanya bisa akses jika subject cocok)
+curl -s "$BASE/student/tryouts/<TRYOUT_ID>" -H "Authorization: Bearer $TOKEN"
+
+# Status tryout siswa (registrasi, attempt, bisa start/retake)
+curl -s "$BASE/student/tryouts/<TRYOUT_ID>/status" -H "Authorization: Bearer $TOKEN"
+
+# Riwayat tryout siswa (submitted attempts, skor, improvement)
+curl -s "$BASE/student/tryouts/history" -H "Authorization: Bearer $TOKEN"
+
+# Register ke tryout
+curl -s -X POST "$BASE/student/tryouts/<TRYOUT_ID>/register" -H "Authorization: Bearer $TOKEN"
+
+# Start/mulai tryout (buat attempt baru)
+curl -s -X POST "$BASE/student/tryouts/<TRYOUT_ID>/start" -H "Authorization: Bearer $TOKEN"
+
+# Kertas jawaban attempt tryout
+curl -s "$BASE/student/tryouts/<TRYOUT_ID>/attempts/<ATTEMPT_ID>/paper" -H "Authorization: Bearer $TOKEN"
+
+# Next actions (rekomendasi aksi berikutnya)
+curl -s "$BASE/student/next-actions" -H "Authorization: Bearer $TOKEN"
+
 curl -s "$BASE/student/attempts" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/attempts/<ATTEMPT_ID>" -H "Authorization: Bearer $TOKEN"
 curl -s "$BASE/student/certificates" -H "Authorization: Bearer $TOKEN"

@@ -14,8 +14,8 @@ type TryoutRepo interface {
 	GetByID(ctx context.Context, id string) (domain.TryoutSession, error)
 	List(ctx context.Context) ([]domain.TryoutSession, error)
 	ListOpen(ctx context.Context, now time.Time) ([]domain.TryoutSession, error)
-	ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
-	ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error)
+	ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
+	ListForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
 	Update(ctx context.Context, t domain.TryoutSession) error
 	Delete(ctx context.Context, id string) error
 }
@@ -108,20 +108,25 @@ func (r *tryoutRepo) ListOpen(ctx context.Context, now time.Time) ([]domain.Tryo
 	return list, rows.Err()
 }
 
-// ListOpenForStudent: status open, closes_at belum lewat, + filter bidang siswa.
-func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error) {
+// ListOpenForStudent: status open, closes_at belum lewat, + filter bidang dan level siswa.
+func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string, levelID *string) ([]domain.TryoutSession, error) {
 	query := `
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, level_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status = 'open' AND closes_at >= $1
 		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
+		AND (level_id IS NULL OR ($3::text IS NOT NULL AND level_id = $3::uuid))
 		ORDER BY opens_at NULLS LAST, created_at DESC
 	`
 	var subj interface{}
 	if subjectID != nil && *subjectID != "" {
 		subj = *subjectID
 	}
-	rows, err := r.pool.Query(ctx, query, now, subj)
+	var lvl interface{}
+	if levelID != nil && *levelID != "" {
+		lvl = *levelID
+	}
+	rows, err := r.pool.Query(ctx, query, now, subj, lvl)
 	if err != nil {
 		return nil, err
 	}
@@ -139,21 +144,26 @@ func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subj
 	return list, rows.Err()
 }
 
-// ListForStudent returns all tryouts for the student's subject (subject_id IS NULL or = subjectID), excluding draft.
+// ListForStudent returns all tryouts for the student's subject and level (subject_id/level_id IS NULL or matches), excluding draft.
 // Status open/closed included; frontend can separate by status or opens_at/closes_at.
-func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
+func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error) {
 	query := `
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, level_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status != 'draft'
 		AND (subject_id IS NULL OR ($1::text IS NOT NULL AND subject_id = $1::uuid))
+		AND (level_id IS NULL OR ($2::text IS NOT NULL AND level_id = $2::uuid))
 		ORDER BY opens_at DESC, created_at DESC
 	`
 	var subj interface{}
 	if subjectID != nil && *subjectID != "" {
 		subj = *subjectID
 	}
-	rows, err := r.pool.Query(ctx, query, subj)
+	var lvl interface{}
+	if levelID != nil && *levelID != "" {
+		lvl = *levelID
+	}
+	rows, err := r.pool.Query(ctx, query, subj, lvl)
 	if err != nil {
 		return nil, err
 	}

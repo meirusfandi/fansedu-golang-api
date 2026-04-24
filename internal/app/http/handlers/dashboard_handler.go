@@ -109,7 +109,7 @@ func DashboardStudent(deps *Deps) http.HandlerFunc {
 		registeredCount, _ = deps.TryoutRegistrationRepo.CountRegisteredForStudent(r.Context(), userID, u.SubjectID)
 
 		// upcoming count + streak days
-		tryouts, _ := deps.TryoutService.ListForStudent(r.Context(), u.SubjectID)
+		tryouts, _ := deps.TryoutService.ListForStudent(r.Context(), u.SubjectID, u.LevelID)
 		upcomingCount := 0
 		for _, t := range tryouts {
 			if t.Status == domain.TryoutStatusOpen && t.OpensAt.After(now) {
@@ -255,7 +255,7 @@ func StudentNextActions(deps *Deps) http.HandlerFunc {
 
 		// start tryout
 		if len(actions) == 0 {
-			openTryouts, _ := deps.TryoutService.ListOpenForStudent(r.Context(), u.SubjectID)
+			openTryouts, _ := deps.TryoutService.ListOpenForStudent(r.Context(), u.SubjectID, u.LevelID)
 			attempts, _ := deps.AttemptService.ListByUser(r.Context(), userID)
 			attempted := map[string]struct{}{}
 			for _, a := range attempts {

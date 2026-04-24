@@ -401,10 +401,12 @@ func StudentTryoutList(deps *Deps) http.HandlerFunc {
 			return
 		}
 		var subjectID *string
+		var levelID *string
 		if u, err := deps.UserRepo.FindByID(r.Context(), userID); err == nil {
 			subjectID = u.SubjectID
+			levelID = u.LevelID
 		}
-		list, err := deps.TryoutService.ListForStudent(r.Context(), subjectID)
+		list, err := deps.TryoutService.ListForStudent(r.Context(), subjectID, levelID)
 		if err != nil {
 			writeInternalError(w, r, err)
 			return
@@ -430,10 +432,12 @@ func StudentTryoutListOpen(deps *Deps) http.HandlerFunc {
 			return
 		}
 		var subjectID *string
+		var levelID *string
 		if u, err := deps.UserRepo.FindByID(r.Context(), userID); err == nil {
 			subjectID = u.SubjectID
+			levelID = u.LevelID
 		}
-		list, err := deps.TryoutService.ListOpenForStudent(r.Context(), subjectID)
+		list, err := deps.TryoutService.ListOpenForStudent(r.Context(), subjectID, levelID)
 		if err != nil {
 			writeInternalError(w, r, err)
 			return

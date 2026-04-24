@@ -16,7 +16,7 @@ type dashboardService struct {
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 	}
 	tryoutRepo interface {
-		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
+		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
 	}
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
@@ -37,7 +37,7 @@ func NewDashboardService(
 		ListByUserID(ctx context.Context, userID string) ([]domain.Attempt, error)
 	},
 	tryoutRepo interface {
-		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string) ([]domain.TryoutSession, error)
+		ListOpenForStudent(ctx context.Context, now time.Time, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
 	},
 	feedbackRepo interface {
 		GetByAttemptID(ctx context.Context, attemptID string) (domain.AttemptFeedback, error)
@@ -61,10 +61,12 @@ func NewDashboardService(
 
 func (s *dashboardService) GetStudentDashboard(ctx context.Context, userID string) (*DashboardResponse, error) {
 	var subjectID *string
+	var levelID *string
 	if u, err := s.userRepo.FindByID(ctx, userID); err == nil {
 		subjectID = u.SubjectID
+		levelID = u.LevelID
 	}
-	openTryouts, _ := s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID)
+	openTryouts, _ := s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID, levelID)
 	attempts, _ := s.attemptRepo.ListByUserID(ctx, userID)
 	if attempts == nil {
 		attempts = []domain.Attempt{}

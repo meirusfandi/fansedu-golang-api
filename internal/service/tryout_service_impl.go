@@ -21,12 +21,12 @@ func (s *tryoutService) ListOpen(ctx context.Context) ([]domain.TryoutSession, e
 	return s.tryoutRepo.ListOpen(ctx, time.Now())
 }
 
-func (s *tryoutService) ListOpenForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
-	return s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID)
+func (s *tryoutService) ListOpenForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.ListOpenForStudent(ctx, time.Now(), subjectID, levelID)
 }
 
-func (s *tryoutService) ListForStudent(ctx context.Context, subjectID *string) ([]domain.TryoutSession, error) {
-	return s.tryoutRepo.ListForStudent(ctx, subjectID)
+func (s *tryoutService) ListForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.ListForStudent(ctx, subjectID, levelID)
 }
 
 func (s *tryoutService) GetByID(ctx context.Context, id string) (domain.TryoutSession, error) {
