@@ -22,6 +22,7 @@ type TryoutResponse struct {
 	Subject          *string   `json:"subject,omitempty"`
 	SchoolLevel      *string   `json:"schoolLevel,omitempty"`
 	SubjectID        *string   `json:"subjectId,omitempty"`
+	LevelID          *string   `json:"levelId,omitempty"`
 	OpensAt          time.Time `json:"opensAt"`
 	ClosesAt         time.Time `json:"closesAt"`
 	MaxParticipants  *int      `json:"maxParticipants,omitempty"`
@@ -40,6 +41,7 @@ type TryoutCreateRequest struct {
 	Subject          *string   `json:"subject,omitempty"`
 	SchoolLevel      *string   `json:"schoolLevel,omitempty"`
 	SubjectID        *string   `json:"subjectId,omitempty"`
+	LevelID          *string   `json:"levelId,omitempty"`
 	OpensAt          time.Time `json:"opensAt"`
 	ClosesAt         time.Time `json:"closesAt"`
 	MaxParticipants  *int      `json:"maxParticipants,omitempty"`

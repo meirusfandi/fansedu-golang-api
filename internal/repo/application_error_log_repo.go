@@ -65,7 +65,7 @@ func NewApplicationErrorLogRepo(pool *pgxpool.Pool) ApplicationErrorLogRepo {
 
 func (r *applicationErrorLogRepo) Insert(ctx context.Context, e domain.ApplicationErrorLog) error {
 	metaJSON := []byte("{}")
-	if e.Meta != nil && len(e.Meta) > 0 {
+	if len(e.Meta) > 0 {
 		if b, err := json.Marshal(e.Meta); err == nil {
 			metaJSON = b
 		}

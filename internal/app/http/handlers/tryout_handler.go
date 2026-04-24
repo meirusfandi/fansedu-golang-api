@@ -735,6 +735,7 @@ func tryoutToDTO(t domain.TryoutSession) dto.TryoutResponse {
 		Subject:         t.Subject,
 		SchoolLevel:     t.SchoolLevel,
 		SubjectID:       t.SubjectID,
+		LevelID:         t.LevelID,
 		OpensAt:         t.OpensAt,
 		ClosesAt:        t.ClosesAt,
 		MaxParticipants: t.MaxParticipants,

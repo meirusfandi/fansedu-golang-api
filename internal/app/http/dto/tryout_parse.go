@@ -492,6 +492,22 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			}
 		}
 	}
+	if raw, ok := PickTryoutJSONField(m, "levelId", "level_id"); ok {
+		if string(raw) == "null" {
+			r.LevelID = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("levelId: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				r.LevelID = nil
+			} else {
+				r.LevelID = &s
+			}
+		}
+	}
 	if raw, ok := PickTryoutJSONField(m, "opensAt", "opens_at"); ok {
 		tt, err := UnmarshalTryoutTimeJSON(raw)
 		if err != nil {

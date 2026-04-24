@@ -430,6 +430,25 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 		if req.SubjectID != nil && strings.TrimSpace(*req.SubjectID) == "" {
 			req.SubjectID = nil
 		}
+		if req.LevelID != nil && strings.TrimSpace(*req.LevelID) == "" {
+			req.LevelID = nil
+		}
+
+		// Resolve subject name from subjectId if not explicitly provided
+		if (req.Subject == nil || strings.TrimSpace(*req.Subject) == "") && req.SubjectID != nil {
+			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *req.SubjectID); err == nil {
+				req.Subject = &subj.Name
+			}
+		}
+
+		// Resolve schoolLevel from levelId if not explicitly provided
+		if (req.SchoolLevel == nil || strings.TrimSpace(*req.SchoolLevel) == "") && req.LevelID != nil {
+			if lv, err := deps.LevelRepo.GetByID(r.Context(), *req.LevelID); err == nil {
+				slug := strings.ToLower(lv.Slug)
+				req.SchoolLevel = &slug
+			}
+		}
+
 		t := domain.TryoutSession{
 			Title:           req.Title,
 			ShortTitle:      req.ShortTitle,
@@ -440,6 +459,7 @@ func AdminCreateTryout(deps *Deps) http.HandlerFunc {
 			Subject:         req.Subject,
 			SchoolLevel:     req.SchoolLevel,
 			SubjectID:       req.SubjectID,
+			LevelID:         req.LevelID,
 			OpensAt:         req.OpensAt,
 			ClosesAt:        req.ClosesAt,
 			MaxParticipants: req.MaxParticipants,
@@ -489,6 +509,22 @@ func AdminUpdateTryout(deps *Deps) http.HandlerFunc {
 			return
 		}
 		restoreTryoutFieldsIfEmptyPatch(&existing, orig)
+
+		// Resolve subject name from subjectId if subject text is empty
+		if (existing.Subject == nil || strings.TrimSpace(*existing.Subject) == "") && existing.SubjectID != nil {
+			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *existing.SubjectID); err == nil {
+				existing.Subject = &subj.Name
+			}
+		}
+
+		// Resolve schoolLevel from levelId if schoolLevel is empty
+		if (existing.SchoolLevel == nil || strings.TrimSpace(*existing.SchoolLevel) == "") && existing.LevelID != nil {
+			if lv, err := deps.LevelRepo.GetByID(r.Context(), *existing.LevelID); err == nil {
+				slug := strings.ToLower(lv.Slug)
+				existing.SchoolLevel = &slug
+			}
+		}
+
 		if err := validateTryoutAfterAdminUpdate(&existing); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
 			return

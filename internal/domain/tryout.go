@@ -28,6 +28,7 @@ type TryoutSession struct {
 	Subject          *string
 	SchoolLevel      *string
 	SubjectID        *string // bidang: siswa hanya lihat tryout yang subject_id = user.subject_id atau NULL (umum)
+	LevelID          *string // FK ke levels table; digunakan untuk resolve school_level otomatis
 	OpensAt          time.Time
 	ClosesAt         time.Time
 	MaxParticipants  *int

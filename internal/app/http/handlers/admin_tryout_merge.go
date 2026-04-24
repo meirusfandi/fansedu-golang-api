@@ -110,6 +110,22 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			}
 		}
 	}
+	if raw, ok := dto.PickTryoutJSONField(m, "levelId", "level_id"); ok {
+		if string(raw) == "null" {
+			t.LevelID = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return fmt.Errorf("levelId: %w", err)
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				t.LevelID = nil
+			} else {
+				t.LevelID = &s
+			}
+		}
+	}
 	if raw, ok := dto.PickTryoutJSONField(m, "opensAt", "opens_at"); ok {
 		tt, err := dto.UnmarshalTryoutTimeJSON(raw)
 		if err != nil {
