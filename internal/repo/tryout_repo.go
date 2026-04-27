@@ -115,7 +115,15 @@ func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subj
 		FROM tryout_sessions
 		WHERE status = 'open' AND closes_at >= $1
 		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
-		AND (level_id IS NULL OR ($3::text IS NOT NULL AND level_id = $3::uuid))
+		AND (
+			(level_id IS NULL AND NULLIF(BTRIM(COALESCE(school_level, '')), '') IS NULL)
+			OR ($3::text IS NOT NULL AND level_id = $3::uuid)
+			OR (
+				$3::text IS NOT NULL
+				AND level_id IS NULL
+				AND LOWER(BTRIM(COALESCE(school_level, ''))) = LOWER(BTRIM(COALESCE((SELECT slug FROM levels WHERE id = $3::uuid), '')))
+			)
+		)
 		ORDER BY opens_at NULLS LAST, created_at DESC
 	`
 	var subj interface{}
@@ -152,7 +160,15 @@ func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string, leve
 		FROM tryout_sessions
 		WHERE status != 'draft'
 		AND (subject_id IS NULL OR ($1::text IS NOT NULL AND subject_id = $1::uuid))
-		AND (level_id IS NULL OR ($2::text IS NOT NULL AND level_id = $2::uuid))
+		AND (
+			(level_id IS NULL AND NULLIF(BTRIM(COALESCE(school_level, '')), '') IS NULL)
+			OR ($2::text IS NOT NULL AND level_id = $2::uuid)
+			OR (
+				$2::text IS NOT NULL
+				AND level_id IS NULL
+				AND LOWER(BTRIM(COALESCE(school_level, ''))) = LOWER(BTRIM(COALESCE((SELECT slug FROM levels WHERE id = $2::uuid), '')))
+			)
+		)
 		ORDER BY opens_at DESC, created_at DESC
 	`
 	var subj interface{}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -58,6 +59,37 @@ func TryoutList(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func studentCanAccessTryout(ctx context.Context, deps *Deps, userID string, t domain.TryoutSession) (bool, error) {
+	u, err := deps.UserRepo.FindByID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if t.SubjectID != nil && *t.SubjectID != "" {
+		if u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+			return false, nil
+		}
+	}
+	if t.LevelID != nil && *t.LevelID != "" {
+		if u.LevelID == nil || *u.LevelID != *t.LevelID {
+			return false, nil
+		}
+		return true, nil
+	}
+	if t.SchoolLevel != nil && strings.TrimSpace(*t.SchoolLevel) != "" {
+		if u.LevelID == nil || *u.LevelID == "" {
+			return false, nil
+		}
+		lv, err := deps.LevelRepo.GetByID(ctx, *u.LevelID)
+		if err != nil {
+			return false, err
+		}
+		if !strings.EqualFold(strings.TrimSpace(lv.Slug), strings.TrimSpace(*t.SchoolLevel)) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // StudentTryoutRegister registers student to a tryout from student tryout detail.
 // POST /api/v1/student/tryouts/:tryoutId/register
 func StudentTryoutRegister(deps *Deps) http.HandlerFunc {
@@ -75,14 +107,11 @@ func StudentTryoutRegister(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Subject guard (student only)
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, err := deps.UserRepo.FindByID(r.Context(), userID)
-				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 
@@ -120,8 +149,8 @@ func StudentTryoutRegister(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"registered":    true,
-			"tryoutId":      tryoutID,
+			"registered":   true,
+			"tryoutId":     tryoutID,
 			"registeredAt": registeredAt.UTC().Format(time.RFC3339),
 		})
 	}
@@ -145,12 +174,10 @@ func StudentTryoutStart(deps *Deps) http.HandlerFunc {
 		}
 
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, err := deps.UserRepo.FindByID(r.Context(), userID)
-				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 
@@ -193,12 +220,10 @@ func StudentTryoutStatus(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if role, _ := middleware.GetRole(ctx); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, uerr := deps.UserRepo.FindByID(ctx, userID)
-				if uerr != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(ctx, deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 
@@ -302,8 +327,8 @@ func StudentTryoutHistory(deps *Deps) http.HandlerFunc {
 
 		// group submitted attempts by tryoutId
 		type scoreAttempt struct {
-			attemptID string
-			score     float64
+			attemptID   string
+			score       float64
 			submittedAt time.Time
 		}
 		group := map[string][]scoreAttempt{}
@@ -358,11 +383,11 @@ func StudentTryoutHistory(deps *Deps) http.HandlerFunc {
 			}
 
 			item := dto.StudentTryoutHistoryItem{
-				TryoutID: tryoutID,
-				TryoutTitle: title,
-				AttemptID: latest.attemptID,
-				Score: latest.score,
-				SubmittedAt: latest.submittedAt.UTC().Format(time.RFC3339),
+				TryoutID:                tryoutID,
+				TryoutTitle:             title,
+				AttemptID:               latest.attemptID,
+				Score:                   latest.score,
+				SubmittedAt:             latest.submittedAt.UTC().Format(time.RFC3339),
 				ImprovementFromPrevious: improvement,
 			}
 			rows = append(rows, historyRow{item: item, at: latest.submittedAt})
@@ -469,12 +494,10 @@ func TryoutGetByID(deps *Deps) http.HandlerFunc {
 		// Siswa hanya boleh melihat tryout yang sesuai bidang-nya (atau tryout umum subject_id = nil)
 		if userID, ok := middleware.GetUserID(r.Context()); ok && userID != "" {
 			if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-				if t.SubjectID != nil && *t.SubjectID != "" {
-					u, err := deps.UserRepo.FindByID(r.Context(), userID)
-					if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-						writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-						return
-					}
+				allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+				if err != nil || !allowed {
+					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+					return
 				}
 			}
 		}
@@ -503,12 +526,10 @@ func StudentTryoutGetByID(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, err := deps.UserRepo.FindByID(r.Context(), userID)
-				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -535,12 +556,10 @@ func TryoutRegister(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, err := deps.UserRepo.FindByID(r.Context(), userID)
-				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 		if !canRegisterForTryout(t, time.Now()) {
@@ -697,12 +716,10 @@ func TryoutStart(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if role, _ := middleware.GetRole(r.Context()); domain.IsStudentRoleCode(role) {
-			if t.SubjectID != nil && *t.SubjectID != "" {
-				u, err := deps.UserRepo.FindByID(r.Context(), userID)
-				if err != nil || u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
-					writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
-					return
-				}
+			allowed, err := studentCanAccessTryout(r.Context(), deps, userID, t)
+			if err != nil || !allowed {
+				writeError(w, http.StatusNotFound, "TRYOUT_NOT_FOUND", "Tryout tidak ditemukan.")
+				return
 			}
 		}
 		attempt, ok := startTryoutExamForUser(w, r, deps, tryoutID, userID)
