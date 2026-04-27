@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,9 +63,21 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 				s.name AS school_name,
 				u.level_id::text,
 				l.name AS level_name,
+				l.slug AS level_slug,
+				l.description AS level_description,
+				l.sort_order AS level_sort_order,
+				l.icon_url AS level_icon_url,
+				l.created_at AS level_created_at,
+				l.updated_at AS level_updated_at,
 				u.class_level,
 				u.subject_id::text,
 				sb.name AS subject_name,
+				sb.slug AS subject_slug,
+				sb.description AS subject_description,
+				sb.icon_url AS subject_icon_url,
+				sb.sort_order AS subject_sort_order,
+				sb.created_at AS subject_created_at,
+				sb.updated_at AS subject_updated_at,
 				u.created_at
 			FROM users u
 			LEFT JOIN schools s ON s.id = u.school_id
@@ -83,6 +96,12 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 			var row dto.UserListResponse
 			var roleCode string
 			var createdAt time.Time
+			var levelSlug, levelDescription, levelIconURL *string
+			var levelSortOrder *int
+			var levelCreatedAt, levelUpdatedAt *time.Time
+			var subjectSlug, subjectDescription, subjectIconURL *string
+			var subjectSortOrder *int
+			var subjectCreatedAt, subjectUpdatedAt *time.Time
 			if err := rows.Scan(
 				&row.ID,
 				&row.Email,
@@ -93,9 +112,21 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 				&row.SchoolName,
 				&row.LevelID,
 				&row.LevelName,
+				&levelSlug,
+				&levelDescription,
+				&levelSortOrder,
+				&levelIconURL,
+				&levelCreatedAt,
+				&levelUpdatedAt,
 				&row.ClassLevel,
 				&row.SubjectID,
 				&row.SubjectName,
+				&subjectSlug,
+				&subjectDescription,
+				&subjectIconURL,
+				&subjectSortOrder,
+				&subjectCreatedAt,
+				&subjectUpdatedAt,
 				&createdAt,
 			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -112,8 +143,60 @@ func AdminListUsers(deps *Deps) http.HandlerFunc {
 						name := lv.Name
 						row.LevelID = &id
 						row.LevelName = &name
+						row.Level = &dto.LevelResponse{
+							ID:          lv.ID,
+							Name:        lv.Name,
+							Slug:        lv.Slug,
+							Description: lv.Description,
+							SortOrder:   lv.SortOrder,
+							IconURL:     lv.IconURL,
+							CreatedAt:   lv.CreatedAt.Format(time.RFC3339),
+							UpdatedAt:   lv.UpdatedAt.Format(time.RFC3339),
+						}
 					}
 				}
+			}
+			if row.Level == nil && row.LevelID != nil && strings.TrimSpace(*row.LevelID) != "" {
+				lv := dto.LevelResponse{ID: *row.LevelID}
+				if row.LevelName != nil {
+					lv.Name = *row.LevelName
+				}
+				if levelSlug != nil {
+					lv.Slug = *levelSlug
+				}
+				lv.Description = levelDescription
+				if levelSortOrder != nil {
+					lv.SortOrder = *levelSortOrder
+				}
+				lv.IconURL = levelIconURL
+				if levelCreatedAt != nil {
+					lv.CreatedAt = levelCreatedAt.Format(time.RFC3339)
+				}
+				if levelUpdatedAt != nil {
+					lv.UpdatedAt = levelUpdatedAt.Format(time.RFC3339)
+				}
+				row.Level = &lv
+			}
+			if row.SubjectID != nil && strings.TrimSpace(*row.SubjectID) != "" {
+				subj := dto.SubjectResponse{ID: *row.SubjectID}
+				if row.SubjectName != nil {
+					subj.Name = *row.SubjectName
+				}
+				if subjectSlug != nil {
+					subj.Slug = *subjectSlug
+				}
+				subj.Description = subjectDescription
+				subj.IconURL = subjectIconURL
+				if subjectSortOrder != nil {
+					subj.SortOrder = *subjectSortOrder
+				}
+				if subjectCreatedAt != nil {
+					subj.CreatedAt = subjectCreatedAt.Format(time.RFC3339)
+				}
+				if subjectUpdatedAt != nil {
+					subj.UpdatedAt = subjectUpdatedAt.Format(time.RFC3339)
+				}
+				row.Subject = &subj
 			}
 			row.CreatedAt = createdAt.Format(time.RFC3339)
 			out = append(out, row)
@@ -162,49 +245,54 @@ func AdminGetUser(deps *Deps) http.HandlerFunc {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
-		resp := dto.UserDetailResponse{
-			ID:         u.ID,
-			Email:      u.Email,
-			Name:       u.Name,
-			Role:       domain.DisplayRoleForAPI(u.Role),
-			AvatarURL:  u.AvatarURL,
-			SchoolID:   u.SchoolID,
-			LevelID:    u.LevelID,
-			ClassLevel: u.ClassLevel,
-			SubjectID:  u.SubjectID,
-			CreatedAt:  u.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:  u.UpdatedAt.Format(time.RFC3339),
-		}
-		if u.SchoolID != nil && *u.SchoolID != "" {
-			if school, err := deps.SchoolRepo.GetByID(r.Context(), *u.SchoolID); err == nil {
-				resp.School = &dto.SchoolResponse{
-					ID: school.ID, Name: school.Name, Slug: school.Slug,
-					Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
-					CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
-				}
-			}
-		}
-		if u.LevelID != nil && *u.LevelID != "" && deps.LevelRepo != nil {
-			if lv, err := deps.LevelRepo.GetByID(r.Context(), *u.LevelID); err == nil {
-				resp.Level = &dto.LevelResponse{
-					ID: lv.ID, Name: lv.Name, Slug: lv.Slug,
-					Description: lv.Description, SortOrder: lv.SortOrder, IconURL: lv.IconURL,
-					CreatedAt: lv.CreatedAt.Format(time.RFC3339), UpdatedAt: lv.UpdatedAt.Format(time.RFC3339),
-				}
-			}
-		}
-		if u.SubjectID != nil && *u.SubjectID != "" {
-			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *u.SubjectID); err == nil {
-				resp.Subject = &dto.SubjectResponse{
-					ID: subj.ID, Name: subj.Name, Slug: subj.Slug,
-					Description: subj.Description, IconURL: subj.IconURL, SortOrder: subj.SortOrder,
-					CreatedAt: subj.CreatedAt.Format(time.RFC3339), UpdatedAt: subj.UpdatedAt.Format(time.RFC3339),
-				}
-			}
-		}
+		resp := buildAdminUserDetailResponse(r.Context(), deps, u)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}
+}
+
+func buildAdminUserDetailResponse(ctx context.Context, deps *Deps, u domain.User) dto.UserDetailResponse {
+	resp := dto.UserDetailResponse{
+		ID:         u.ID,
+		Email:      u.Email,
+		Name:       u.Name,
+		Role:       domain.DisplayRoleForAPI(u.Role),
+		AvatarURL:  u.AvatarURL,
+		SchoolID:   u.SchoolID,
+		LevelID:    u.LevelID,
+		ClassLevel: u.ClassLevel,
+		SubjectID:  u.SubjectID,
+		CreatedAt:  u.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:  u.UpdatedAt.Format(time.RFC3339),
+	}
+	if u.SchoolID != nil && *u.SchoolID != "" {
+		if school, err := deps.SchoolRepo.GetByID(ctx, *u.SchoolID); err == nil {
+			resp.School = &dto.SchoolResponse{
+				ID: school.ID, Name: school.Name, Slug: school.Slug,
+				Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
+				CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
+			}
+		}
+	}
+	if u.LevelID != nil && *u.LevelID != "" && deps.LevelRepo != nil {
+		if lv, err := deps.LevelRepo.GetByID(ctx, *u.LevelID); err == nil {
+			resp.Level = &dto.LevelResponse{
+				ID: lv.ID, Name: lv.Name, Slug: lv.Slug,
+				Description: lv.Description, SortOrder: lv.SortOrder, IconURL: lv.IconURL,
+				CreatedAt: lv.CreatedAt.Format(time.RFC3339), UpdatedAt: lv.UpdatedAt.Format(time.RFC3339),
+			}
+		}
+	}
+	if u.SubjectID != nil && *u.SubjectID != "" {
+		if subj, err := deps.SubjectRepo.GetByID(ctx, *u.SubjectID); err == nil {
+			resp.Subject = &dto.SubjectResponse{
+				ID: subj.ID, Name: subj.Name, Slug: subj.Slug,
+				Description: subj.Description, IconURL: subj.IconURL, SortOrder: subj.SortOrder,
+				CreatedAt: subj.CreatedAt.Format(time.RFC3339), UpdatedAt: subj.UpdatedAt.Format(time.RFC3339),
+			}
+		}
+	}
+	return resp
 }
 
 func AdminCreateUser(deps *Deps) http.HandlerFunc {
@@ -253,40 +341,24 @@ func AdminCreateUser(deps *Deps) http.HandlerFunc {
 			ClassLevel: req.ClassLevel,
 			SubjectID:  req.SubjectID,
 		}
+		if u.SchoolID != nil && strings.TrimSpace(*u.SchoolID) == "" {
+			u.SchoolID = nil
+		}
+		if u.LevelID != nil && strings.TrimSpace(*u.LevelID) == "" {
+			u.LevelID = nil
+		}
+		if u.SubjectID != nil && strings.TrimSpace(*u.SubjectID) == "" {
+			u.SubjectID = nil
+		}
+		if u.ClassLevel != nil && strings.TrimSpace(*u.ClassLevel) == "" {
+			u.ClassLevel = nil
+		}
 		created, err := deps.AdminService.CreateUser(r.Context(), u, req.Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		resp := dto.UserDetailResponse{
-			ID:        created.ID,
-			Email:     created.Email,
-			Name:      created.Name,
-			Role:      created.Role,
-			AvatarURL: created.AvatarURL,
-			SchoolID:  created.SchoolID,
-			SubjectID: created.SubjectID,
-			CreatedAt: created.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: created.UpdatedAt.Format(time.RFC3339),
-		}
-		if created.SchoolID != nil && *created.SchoolID != "" {
-			if school, err := deps.SchoolRepo.GetByID(r.Context(), *created.SchoolID); err == nil {
-				resp.School = &dto.SchoolResponse{
-					ID: school.ID, Name: school.Name, Slug: school.Slug,
-					Description: school.Description, Address: school.Address, LogoURL: school.LogoURL,
-					CreatedAt: school.CreatedAt.Format(time.RFC3339), UpdatedAt: school.UpdatedAt.Format(time.RFC3339),
-				}
-			}
-		}
-		if created.SubjectID != nil && *created.SubjectID != "" {
-			if subj, err := deps.SubjectRepo.GetByID(r.Context(), *created.SubjectID); err == nil {
-				resp.Subject = &dto.SubjectResponse{
-					ID: subj.ID, Name: subj.Name, Slug: subj.Slug,
-					Description: subj.Description, IconURL: subj.IconURL, SortOrder: subj.SortOrder,
-					CreatedAt: subj.CreatedAt.Format(time.RFC3339), UpdatedAt: subj.UpdatedAt.Format(time.RFC3339),
-				}
-			}
-		}
+		resp := buildAdminUserDetailResponse(r.Context(), deps, created)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(resp)
@@ -363,7 +435,14 @@ func AdminUpdateUser(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		updated, err := deps.AdminService.GetUser(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(buildAdminUserDetailResponse(r.Context(), deps, updated))
 	}
 }
 
@@ -964,14 +1043,14 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			meetings := make([]domain.CourseProgramMeeting, 0, len(req.Meetings))
 			for _, it := range req.Meetings {
 				meetings = append(meetings, domain.CourseProgramMeeting{
-					MeetingNumber:  it.MeetingNumber,
-					Title:          it.Title,
-					DetailText:     it.DetailText,
-					PdfURL:         it.PdfURL,
-					PptURL:         it.PptURL,
-					PrTitle:        it.PrTitle,
-					PrDescription:  it.PrDescription,
-					LiveClassURL:   it.LiveClassURL,
+					MeetingNumber: it.MeetingNumber,
+					Title:         it.Title,
+					DetailText:    it.DetailText,
+					PdfURL:        it.PdfURL,
+					PptURL:        it.PptURL,
+					PrTitle:       it.PrTitle,
+					PrDescription: it.PrDescription,
+					LiveClassURL:  it.LiveClassURL,
 				})
 			}
 			if err := deps.CourseProgramService.SaveProgram(r.Context(), created.ID, track, meetings, req.PretestTryoutSessionID); err != nil {
@@ -1103,9 +1182,9 @@ func AdminIssueCertificate(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":        created.ID,
-			"userId":    created.UserID,
-			"issuedAt":  created.IssuedAt.Format(time.RFC3339),
+			"id":       created.ID,
+			"userId":   created.UserID,
+			"issuedAt": created.IssuedAt.Format(time.RFC3339),
 		})
 	}
 }
@@ -1244,14 +1323,14 @@ func AdminListPayments(deps *Deps) http.HandlerFunc {
 				paidAt = &s
 			}
 			out[i] = dto.PaymentResponse{
-				ID:     list[i].ID,
-				UserID: list[i].UserID,
-				Amount: list[i].Amount,
-				Currency:    list[i].Currency,
-				Status:      list[i].Status,
-				Type:        list[i].Type,
-				PaidAt:      paidAt,
-				CreatedAt:   list[i].CreatedAt.Format(time.RFC3339),
+				ID:        list[i].ID,
+				UserID:    list[i].UserID,
+				Amount:    list[i].Amount,
+				Currency:  list[i].Currency,
+				Status:    list[i].Status,
+				Type:      list[i].Type,
+				PaidAt:    paidAt,
+				CreatedAt: list[i].CreatedAt.Format(time.RFC3339),
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -1467,20 +1546,20 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 				confirmedAt = &s
 			}
 			paymentOut = map[string]any{
-				"id":              p.ID,
-				"amount":          p.Amount,
-				"currency":        p.Currency,
-				"status":          p.Status,
-				"type":            p.Type,
-				"gateway":         p.Gateway,
-				"transactionId":   p.TransactionID,
-				"proofUrl":        p.ProofURL,
-				"confirmedBy":     p.ConfirmedBy,
-				"confirmedAt":     confirmedAt,
-				"rejectionNote":   p.RejectionNote,
-				"paidAt":          paidAt,
-				"createdAt":       p.CreatedAt.Format(time.RFC3339),
-				"updatedAt":       p.UpdatedAt.Format(time.RFC3339),
+				"id":            p.ID,
+				"amount":        p.Amount,
+				"currency":      p.Currency,
+				"status":        p.Status,
+				"type":          p.Type,
+				"gateway":       p.Gateway,
+				"transactionId": p.TransactionID,
+				"proofUrl":      p.ProofURL,
+				"confirmedBy":   p.ConfirmedBy,
+				"confirmedAt":   confirmedAt,
+				"rejectionNote": p.RejectionNote,
+				"paidAt":        paidAt,
+				"createdAt":     p.CreatedAt.Format(time.RFC3339),
+				"updatedAt":     p.UpdatedAt.Format(time.RFC3339),
 			}
 		}
 
@@ -1491,24 +1570,24 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"order": map[string]any{
-				"id":                 order.ID,
-				"status":             order.Status,
-				"totalPrice":         order.TotalPrice,
-				"normalPrice":        order.NormalPrice,
-				"discount":           order.Discount,
-				"discountPercent":    discountPercent,
-				"promoCode":          order.PromoCode,
-				"confirmationCode":   order.ConfirmationCode,
-				"paymentMethod":      order.PaymentMethod,
-				"paymentReference":   order.PaymentReference,
-				"paymentProofUrl":    order.PaymentProofURL,
-				"paymentProofAt":     order.PaymentProofAt,
-				"senderAccountNo":    order.SenderAccountNo,
-				"senderName":         order.SenderName,
-				"roleHint":           order.RoleHint,
-				"buyerEmail":         order.BuyerEmail,
-				"createdAt":          order.CreatedAt.Format(time.RFC3339),
-				"updatedAt":          order.UpdatedAt.Format(time.RFC3339),
+				"id":               order.ID,
+				"status":           order.Status,
+				"totalPrice":       order.TotalPrice,
+				"normalPrice":      order.NormalPrice,
+				"discount":         order.Discount,
+				"discountPercent":  discountPercent,
+				"promoCode":        order.PromoCode,
+				"confirmationCode": order.ConfirmationCode,
+				"paymentMethod":    order.PaymentMethod,
+				"paymentReference": order.PaymentReference,
+				"paymentProofUrl":  order.PaymentProofURL,
+				"paymentProofAt":   order.PaymentProofAt,
+				"senderAccountNo":  order.SenderAccountNo,
+				"senderName":       order.SenderName,
+				"roleHint":         order.RoleHint,
+				"buyerEmail":       order.BuyerEmail,
+				"createdAt":        order.CreatedAt.Format(time.RFC3339),
+				"updatedAt":        order.UpdatedAt.Format(time.RFC3339),
 			},
 			"buyer": map[string]any{
 				"id":    user.ID,
@@ -1575,11 +1654,11 @@ func AdminReportMonthly(deps *Deps) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dto.MonthlyReportResponse{
-			Year:              report.Year,
-			Month:             report.Month,
-			NewEnrollments:    report.NewEnrollments,
-			PaymentsCount:     report.PaymentsCount,
-			TotalRevenue: report.TotalRevenue,
+			Year:           report.Year,
+			Month:          report.Month,
+			NewEnrollments: report.NewEnrollments,
+			PaymentsCount:  report.PaymentsCount,
+			TotalRevenue:   report.TotalRevenue,
 		})
 	}
 }

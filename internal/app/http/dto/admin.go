@@ -11,19 +11,21 @@ type AdminOverviewResponse struct {
 }
 
 type UserListResponse struct {
-	ID          string  `json:"id"`
-	Email       string  `json:"email"`
-	Name        string  `json:"name"`
-	Role        string  `json:"role"`
-	AvatarURL   *string `json:"avatarUrl,omitempty"`
-	SchoolID    *string `json:"schoolId"`
-	SchoolName  *string `json:"schoolName"`
-	LevelID     *string `json:"levelId"`
-	LevelName   *string `json:"levelName"`  // jenjang (mis. SMA, SMP)
-	ClassLevel  *string `json:"classLevel"` // kelas/spesifik (mis. X IPA)
-	SubjectID   *string `json:"subjectId"`
-	SubjectName *string `json:"subjectName"` // bidang / mata pelajaran utama
-	CreatedAt   string  `json:"createdAt"`
+	ID          string           `json:"id"`
+	Email       string           `json:"email"`
+	Name        string           `json:"name"`
+	Role        string           `json:"role"`
+	AvatarURL   *string          `json:"avatarUrl,omitempty"`
+	SchoolID    *string          `json:"schoolId"`
+	SchoolName  *string          `json:"schoolName"`
+	LevelID     *string          `json:"levelId"`
+	LevelName   *string          `json:"levelName"`  // jenjang (mis. SMA, SMP)
+	ClassLevel  *string          `json:"classLevel"` // kelas/spesifik (mis. X IPA)
+	SubjectID   *string          `json:"subjectId"`
+	SubjectName *string          `json:"subjectName"` // bidang / mata pelajaran utama
+	Level       *LevelResponse   `json:"level,omitempty"`
+	Subject     *SubjectResponse `json:"subject,omitempty"`
+	CreatedAt   string           `json:"createdAt"`
 }
 
 type UserDetailResponse struct {
@@ -44,27 +46,27 @@ type UserDetailResponse struct {
 }
 
 type UserCreateRequest struct {
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
-	Name      string  `json:"name"`
-	Role      string  `json:"role"`
-	AvatarURL *string `json:"avatarUrl,omitempty"`
-	SchoolID  *string `json:"schoolId,omitempty"`
-	LevelID   *string `json:"levelId,omitempty"`
+	Email      string  `json:"email"`
+	Password   string  `json:"password"`
+	Name       string  `json:"name"`
+	Role       string  `json:"role"`
+	AvatarURL  *string `json:"avatarUrl,omitempty"`
+	SchoolID   *string `json:"schoolId,omitempty"`
+	LevelID    *string `json:"levelId,omitempty"`
 	ClassLevel *string `json:"classLevel,omitempty"`
-	SubjectID *string `json:"subjectId,omitempty"`
+	SubjectID  *string `json:"subjectId,omitempty"`
 }
 
 type UserUpdateRequest struct {
-	Email     *string `json:"email,omitempty"`
-	Name      *string `json:"name,omitempty"`
-	Role      *string `json:"role,omitempty"`
-	AvatarURL *string `json:"avatarUrl,omitempty"`
-	SchoolID  *string `json:"schoolId,omitempty"`
-	LevelID   *string `json:"levelId,omitempty"`
+	Email      *string `json:"email,omitempty"`
+	Name       *string `json:"name,omitempty"`
+	Role       *string `json:"role,omitempty"`
+	AvatarURL  *string `json:"avatarUrl,omitempty"`
+	SchoolID   *string `json:"schoolId,omitempty"`
+	LevelID    *string `json:"levelId,omitempty"`
 	ClassLevel *string `json:"classLevel,omitempty"`
-	SubjectID *string `json:"subjectId,omitempty"`
-	Password  *string `json:"password,omitempty"`
+	SubjectID  *string `json:"subjectId,omitempty"`
+	Password   *string `json:"password,omitempty"`
 }
 
 type QuestionCreateRequest struct {
@@ -85,19 +87,19 @@ type QuestionCreateRequest struct {
 }
 
 type QuestionUpdateRequest struct {
-	SortOrder     *int           `json:"sortOrder,omitempty"`
-	Type          *string        `json:"type,omitempty"`
-	Body          *string        `json:"body,omitempty"`
-	ImageURL      *string        `json:"imageUrl,omitempty"`
-	ImageURLs     *[]string      `json:"imageUrls,omitempty"`
-	Options       *interface{}   `json:"options,omitempty"`
-	MaxScore      *float64       `json:"maxScore,omitempty"`
-	ModuleID      *string        `json:"moduleId,omitempty"`
-	ModuleTitle   *string        `json:"moduleTitle,omitempty"`
-	Bidang        *string        `json:"bidang,omitempty"`
-	Tags          *[]string      `json:"tags,omitempty"`
-	CorrectOption *string        `json:"correctOption,omitempty"`
-	CorrectText   *string        `json:"correctText,omitempty"`
+	SortOrder     *int         `json:"sortOrder,omitempty"`
+	Type          *string      `json:"type,omitempty"`
+	Body          *string      `json:"body,omitempty"`
+	ImageURL      *string      `json:"imageUrl,omitempty"`
+	ImageURLs     *[]string    `json:"imageUrls,omitempty"`
+	Options       *interface{} `json:"options,omitempty"`
+	MaxScore      *float64     `json:"maxScore,omitempty"`
+	ModuleID      *string      `json:"moduleId,omitempty"`
+	ModuleTitle   *string      `json:"moduleTitle,omitempty"`
+	Bidang        *string      `json:"bidang,omitempty"`
+	Tags          *[]string    `json:"tags,omitempty"`
+	CorrectOption *string      `json:"correctOption,omitempty"`
+	CorrectText   *string      `json:"correctText,omitempty"`
 }
 
 type CourseCreateRequest struct {
@@ -108,10 +110,10 @@ type CourseCreateRequest struct {
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
 	// Opsional: format kelas sekaligus saat create (sama konsep dengan PUT .../program + linked-tryouts).
-	TrackType               *string                         `json:"trackType,omitempty"`
-	Meetings                []AdminCourseProgramMeetingItem   `json:"meetings,omitempty"`
-	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
-	LinkedTryoutIds         []string                        `json:"linkedTryoutIds,omitempty"`
+	TrackType              *string                         `json:"trackType,omitempty"`
+	Meetings               []AdminCourseProgramMeetingItem `json:"meetings,omitempty"`
+	PretestTryoutSessionID *string                         `json:"pretestTryoutSessionId,omitempty"`
+	LinkedTryoutIds        []string                        `json:"linkedTryoutIds,omitempty"`
 }
 
 // CourseUpdateRequest body PUT /api/v1/admin/courses/{courseId} — hanya metadata kelas.
@@ -159,20 +161,20 @@ type AdminVoucherUpdateRequest struct {
 }
 
 type AdminVoucherResponse struct {
-	ID                 string  `json:"id"`
-	Code               string  `json:"code"`
-	DiscountType       string  `json:"discountType"`
-	DiscountValue      int     `json:"discountValue"`
-	ValidFrom          string  `json:"validFrom"`
-	ValidUntil         *string `json:"validUntil,omitempty"`
-	MaxUses            *int    `json:"maxUses,omitempty"`
-	UsedCount          int     `json:"usedCount"`
-	IsActive           bool    `json:"isActive"`
-	RequiresClaim      bool    `json:"requiresClaim"`
-	AppliesToCourses   bool    `json:"appliesToCourses"`
-	AppliesToPackages  bool    `json:"appliesToPackages"`
-	CreatedAt          string  `json:"createdAt"`
-	UpdatedAt          string  `json:"updatedAt"`
+	ID                string  `json:"id"`
+	Code              string  `json:"code"`
+	DiscountType      string  `json:"discountType"`
+	DiscountValue     int     `json:"discountValue"`
+	ValidFrom         string  `json:"validFrom"`
+	ValidUntil        *string `json:"validUntil,omitempty"`
+	MaxUses           *int    `json:"maxUses,omitempty"`
+	UsedCount         int     `json:"usedCount"`
+	IsActive          bool    `json:"isActive"`
+	RequiresClaim     bool    `json:"requiresClaim"`
+	AppliesToCourses  bool    `json:"appliesToCourses"`
+	AppliesToPackages bool    `json:"appliesToPackages"`
+	CreatedAt         string  `json:"createdAt"`
+	UpdatedAt         string  `json:"updatedAt"`
 }
 
 type CourseContentRequest struct {
@@ -223,13 +225,13 @@ type AdminCourseManageResponse struct {
 
 // RelatedCourseAdminEndpoints dokumentasi URL relatif base /api/v1/admin untuk FE.
 type RelatedCourseAdminEndpoints struct {
-	ListContents    string `json:"listContents"`
-	CreateContent   string `json:"createContent"`
-	UpdateContent   string `json:"updateContent"`
-	DeleteContent   string `json:"deleteContent"`
-	ListEnrollments string `json:"listEnrollments"`
-	TryoutQuestions string `json:"tryoutQuestions"`
-	PackageManage   string `json:"packageManageNote"`
+	ListContents         string `json:"listContents"`
+	CreateContent        string `json:"createContent"`
+	UpdateContent        string `json:"updateContent"`
+	DeleteContent        string `json:"deleteContent"`
+	ListEnrollments      string `json:"listEnrollments"`
+	TryoutQuestions      string `json:"tryoutQuestions"`
+	PackageManage        string `json:"packageManageNote"`
 	GetProgram           string `json:"getProgram"`
 	PutProgram           string `json:"putProgram"`
 	UploadCourseMaterial string `json:"uploadCourseMaterial"`
@@ -237,28 +239,28 @@ type RelatedCourseAdminEndpoints struct {
 
 // AdminCourseProgramMeetingItem satu pertemuan (1–8): judul, detail, PDF, PPT, PR, link live.
 type AdminCourseProgramMeetingItem struct {
-	MeetingNumber  int     `json:"meetingNumber"`
-	Title          string  `json:"title"`
-	DetailText     *string `json:"detailText,omitempty"`
-	PdfURL         *string `json:"pdfUrl,omitempty"`
-	PptURL         *string `json:"pptUrl,omitempty"`
-	PrTitle        *string `json:"prTitle,omitempty"`
-	PrDescription  *string `json:"prDescription,omitempty"`
-	LiveClassURL   *string `json:"liveClassUrl,omitempty"`
+	MeetingNumber int     `json:"meetingNumber"`
+	Title         string  `json:"title"`
+	DetailText    *string `json:"detailText,omitempty"`
+	PdfURL        *string `json:"pdfUrl,omitempty"`
+	PptURL        *string `json:"pptUrl,omitempty"`
+	PrTitle       *string `json:"prTitle,omitempty"`
+	PrDescription *string `json:"prDescription,omitempty"`
+	LiveClassURL  *string `json:"liveClassUrl,omitempty"`
 }
 
 // AdminCourseProgramResponse GET .../courses/{courseId}/program
 type AdminCourseProgramResponse struct {
-	TrackType               string                          `json:"trackType"`
-	Meetings                []AdminCourseProgramMeetingItem `json:"meetings"`
-	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
+	TrackType              string                          `json:"trackType"`
+	Meetings               []AdminCourseProgramMeetingItem `json:"meetings"`
+	PretestTryoutSessionID *string                         `json:"pretestTryoutSessionId,omitempty"`
 }
 
 // AdminCourseProgramPutRequest PUT .../courses/{courseId}/program — setelah simpan, learning journey di-rebuild dari data ini.
 type AdminCourseProgramPutRequest struct {
-	TrackType               string                          `json:"trackType"`
-	Meetings                []AdminCourseProgramMeetingItem `json:"meetings"`
-	PretestTryoutSessionID  *string                         `json:"pretestTryoutSessionId,omitempty"`
+	TrackType              string                          `json:"trackType"`
+	Meetings               []AdminCourseProgramMeetingItem `json:"meetings"`
+	PretestTryoutSessionID *string                         `json:"pretestTryoutSessionId,omitempty"`
 }
 
 // AdminCourseLinkedPackagesPutRequest body PUT .../linked-packages
@@ -482,14 +484,14 @@ type CourseReportCourseInfo struct {
 }
 
 type CourseReportStudentRow struct {
-	StudentID         string                   `json:"studentId"`
-	StudentName       string                   `json:"studentName"`
-	StudentEmail      string                   `json:"studentEmail"`
-	EnrolledAt        string                   `json:"enrolledAt"`
-	EnrollmentStatus  string                   `json:"enrollmentStatus"`
-	Progress          CourseReportProgress     `json:"progress"`
-	TryoutScores      []CourseReportTryoutScore `json:"tryoutScores"`
-	Attendance        CourseReportAttendance   `json:"attendance"`
+	StudentID        string                    `json:"studentId"`
+	StudentName      string                    `json:"studentName"`
+	StudentEmail     string                    `json:"studentEmail"`
+	EnrolledAt       string                    `json:"enrolledAt"`
+	EnrollmentStatus string                    `json:"enrollmentStatus"`
+	Progress         CourseReportProgress      `json:"progress"`
+	TryoutScores     []CourseReportTryoutScore `json:"tryoutScores"`
+	Attendance       CourseReportAttendance    `json:"attendance"`
 }
 
 type CourseReportProgress struct {
