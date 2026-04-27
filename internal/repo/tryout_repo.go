@@ -114,7 +114,7 @@ func (r *tryoutRepo) ListOpenForStudent(ctx context.Context, now time.Time, subj
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, level_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status = 'open' AND closes_at >= $1
-		AND (subject_id IS NULL OR ($2::text IS NOT NULL AND subject_id = $2::uuid))
+		AND ($2::text IS NULL OR subject_id IS NULL OR subject_id = $2::uuid)
 		AND (
 			(level_id IS NULL AND NULLIF(BTRIM(COALESCE(school_level, '')), '') IS NULL)
 			OR ($3::text IS NOT NULL AND level_id = $3::uuid)
@@ -159,7 +159,7 @@ func (r *tryoutRepo) ListForStudent(ctx context.Context, subjectID *string, leve
 		SELECT id, title, short_title, description, duration_minutes, questions_count, level, subject, school_level, subject_id, level_id, opens_at, closes_at, max_participants, status, grading_mode::text, created_by, created_at, updated_at
 		FROM tryout_sessions
 		WHERE status != 'draft'
-		AND (subject_id IS NULL OR ($1::text IS NOT NULL AND subject_id = $1::uuid))
+		AND ($1::text IS NULL OR subject_id IS NULL OR subject_id = $1::uuid)
 		AND (
 			(level_id IS NULL AND NULLIF(BTRIM(COALESCE(school_level, '')), '') IS NULL)
 			OR ($2::text IS NOT NULL AND level_id = $2::uuid)

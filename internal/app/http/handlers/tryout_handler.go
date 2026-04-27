@@ -59,31 +59,53 @@ func TryoutList(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func studentCanAccessTryout(ctx context.Context, deps *Deps, userID string, t domain.TryoutSession) (bool, error) {
+func resolveStudentTryoutFilters(ctx context.Context, deps *Deps, userID string) (*string, *string, string, error) {
 	u, err := deps.UserRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	subjectID := u.SubjectID
+	var levelID *string
+	levelSlug := ""
+	if u.LevelID != nil && strings.TrimSpace(*u.LevelID) != "" {
+		levelID = u.LevelID
+		if lv, err := deps.LevelRepo.GetByID(ctx, *u.LevelID); err == nil {
+			levelSlug = strings.TrimSpace(strings.ToLower(lv.Slug))
+		}
+	} else {
+		slug := strings.TrimSpace(strings.ToLower(inferLevelSlugFromClassLevel(u.ClassLevel)))
+		if slug != "" {
+			levelSlug = slug
+			if lv, err := deps.LevelRepo.GetBySlug(ctx, slug); err == nil {
+				id := lv.ID
+				levelID = &id
+			}
+		}
+	}
+	return subjectID, levelID, levelSlug, nil
+}
+
+func studentCanAccessTryout(ctx context.Context, deps *Deps, userID string, t domain.TryoutSession) (bool, error) {
+	subjectID, levelID, levelSlug, err := resolveStudentTryoutFilters(ctx, deps, userID)
 	if err != nil {
 		return false, err
 	}
 	if t.SubjectID != nil && *t.SubjectID != "" {
-		if u.SubjectID == nil || *u.SubjectID != *t.SubjectID {
+		if subjectID == nil || *subjectID != *t.SubjectID {
 			return false, nil
 		}
 	}
 	if t.LevelID != nil && *t.LevelID != "" {
-		if u.LevelID == nil || *u.LevelID != *t.LevelID {
+		if levelID == nil || *levelID != *t.LevelID {
 			return false, nil
 		}
 		return true, nil
 	}
 	if t.SchoolLevel != nil && strings.TrimSpace(*t.SchoolLevel) != "" {
-		if u.LevelID == nil || *u.LevelID == "" {
+		if levelSlug == "" {
 			return false, nil
 		}
-		lv, err := deps.LevelRepo.GetByID(ctx, *u.LevelID)
-		if err != nil {
-			return false, err
-		}
-		if !strings.EqualFold(strings.TrimSpace(lv.Slug), strings.TrimSpace(*t.SchoolLevel)) {
+		if !strings.EqualFold(levelSlug, strings.TrimSpace(*t.SchoolLevel)) {
 			return false, nil
 		}
 	}
@@ -427,9 +449,12 @@ func StudentTryoutList(deps *Deps) http.HandlerFunc {
 		}
 		var subjectID *string
 		var levelID *string
-		if u, err := deps.UserRepo.FindByID(r.Context(), userID); err == nil {
-			subjectID = u.SubjectID
-			levelID = u.LevelID
+		if sID, lID, _, err := resolveStudentTryoutFilters(r.Context(), deps, userID); err == nil {
+			subjectID = sID
+			levelID = lID
+		} else {
+			writeInternalError(w, r, err)
+			return
 		}
 		list, err := deps.TryoutService.ListForStudent(r.Context(), subjectID, levelID)
 		if err != nil {
@@ -458,9 +483,12 @@ func StudentTryoutListOpen(deps *Deps) http.HandlerFunc {
 		}
 		var subjectID *string
 		var levelID *string
-		if u, err := deps.UserRepo.FindByID(r.Context(), userID); err == nil {
-			subjectID = u.SubjectID
-			levelID = u.LevelID
+		if sID, lID, _, err := resolveStudentTryoutFilters(r.Context(), deps, userID); err == nil {
+			subjectID = sID
+			levelID = lID
+		} else {
+			writeInternalError(w, r, err)
+			return
 		}
 		list, err := deps.TryoutService.ListOpenForStudent(r.Context(), subjectID, levelID)
 		if err != nil {

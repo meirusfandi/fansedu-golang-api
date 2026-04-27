@@ -17,6 +17,10 @@ func NewTryoutService(tryoutRepo repo.TryoutRepo, registration repo.TryoutRegist
 	return &tryoutService{tryoutRepo: tryoutRepo, registration: registration}
 }
 
+func (s *tryoutService) List(ctx context.Context) ([]domain.TryoutSession, error) {
+	return s.tryoutRepo.List(ctx)
+}
+
 func (s *tryoutService) ListOpen(ctx context.Context) ([]domain.TryoutSession, error) {
 	return s.tryoutRepo.ListOpen(ctx, time.Now())
 }

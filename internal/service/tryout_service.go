@@ -7,6 +7,7 @@ import (
 )
 
 type TryoutService interface {
+	List(ctx context.Context) ([]domain.TryoutSession, error)
 	ListOpen(ctx context.Context) ([]domain.TryoutSession, error)
 	ListOpenForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
 	ListForStudent(ctx context.Context, subjectID *string, levelID *string) ([]domain.TryoutSession, error)
