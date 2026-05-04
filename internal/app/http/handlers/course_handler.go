@@ -19,26 +19,31 @@ func CourseList(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		out := make([]dto.CourseResponse, len(list))
+		filtered := make([]dto.CourseResponse, 0, len(list))
 		for i := range list {
+			status := normalizeCourseStatus(list[i].Status)
+			if status == domain.CourseStatusDraft {
+				continue
+			}
 			tt := list[i].TrackType
 			if tt == "" {
 				tt = domain.CourseTrackMeetings
 			}
-			out[i] = dto.CourseResponse{
+			filtered = append(filtered, dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
 				Slug:        list[i].Slug,
 				Description: list[i].Description,
+				Status:      status,
 				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
 				CreatedBy:   list[i].CreatedBy,
 				TrackType:   tt,
-			}
+			})
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(filtered)
 	}
 }
 
@@ -55,6 +60,10 @@ func CourseGetBySlug(deps *Deps) http.HandlerFunc {
 			http.Error(w, "course not found", http.StatusNotFound)
 			return
 		}
+		if normalizeCourseStatus(c.Status) == domain.CourseStatusDraft {
+			http.Error(w, "course not found", http.StatusNotFound)
+			return
+		}
 		tt := c.TrackType
 		if tt == "" {
 			tt = domain.CourseTrackMeetings
@@ -65,6 +74,7 @@ func CourseGetBySlug(deps *Deps) http.HandlerFunc {
 			Title:       c.Title,
 			Slug:        c.Slug,
 			Description: c.Description,
+			Status:      normalizeCourseStatus(c.Status),
 			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
@@ -118,7 +128,7 @@ func CertificateList(deps *Deps) http.HandlerFunc {
 		out := make([]map[string]interface{}, len(list))
 		for i := range list {
 			out[i] = map[string]interface{}{
-				"id":         list[i].ID,
+				"id":       list[i].ID,
 				"userId":   list[i].UserID,
 				"issuedAt": list[i].IssuedAt.Format("2006-01-02T15:04:05Z07:00"),
 			}

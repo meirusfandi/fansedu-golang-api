@@ -5,12 +5,13 @@ type CourseResponse struct {
 	Title       string  `json:"title"`
 	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Status      string  `json:"status"`
 	Price       int     `json:"price"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
 	CreatedBy   *string `json:"createdBy,omitempty"`
 	// TrackType: "meetings" | "tryout" — alur pertemuan vs latihan tryout terhubung.
-	TrackType   string  `json:"trackType"`
+	TrackType string `json:"trackType"`
 }
 
 type EnrollmentResponse struct {

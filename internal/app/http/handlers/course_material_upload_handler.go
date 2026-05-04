@@ -16,15 +16,23 @@ const courseMaterialUploadDir = "uploads/course-materials"
 const maxCourseMaterialBytes = 40 << 20 // 40 MiB
 
 var allowedCourseMaterialContentTypes = map[string]struct{}{
-	"application/vnd.ms-powerpoint": {},
+	"application/pdf":    {},
+	"application/msword": {},
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   {},
+	"application/vnd.ms-powerpoint":                                             {},
 	"application/vnd.openxmlformats-officedocument.presentationml.presentation": {},
-	"application/octet-stream": {},
-	"application/zip": {}, // beberapa klien mengirim .pptx sebagai zip
+	"application/octet-stream":                                                  {},
+	"application/zip":                                                           {}, // beberapa klien mengirim .pptx sebagai zip
 }
 
-func isAllowedPPTFilename(name string) bool {
+func isAllowedCourseMaterialFilename(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
-	return ext == ".ppt" || ext == ".pptx"
+	switch ext {
+	case ".pdf", ".doc", ".docx", ".ppt", ".pptx":
+		return true
+	default:
+		return false
+	}
 }
 
 // saveCourseMaterialFile menyimpan multipart field "file", mengembalikan path publik "/uploads/course-materials/..."
@@ -48,14 +56,14 @@ func saveCourseMaterialFile(w http.ResponseWriter, r *http.Request) (publicPath 
 		return "", false
 	}
 	safeName := strings.ReplaceAll(filepath.Base(fh.Filename), "..", "")
-	if safeName == "" || !isAllowedPPTFilename(safeName) {
-		writeError(w, http.StatusBadRequest, "invalid_file_type", "only .ppt and .pptx allowed")
+	if safeName == "" || !isAllowedCourseMaterialFilename(safeName) {
+		writeError(w, http.StatusBadRequest, "invalid_file_type", "only .pdf, .doc, .docx, .ppt, and .pptx allowed")
 		return "", false
 	}
 	ct := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
 	if ct != "" {
 		if _, ok := allowedCourseMaterialContentTypes[ct]; !ok {
-			writeError(w, http.StatusBadRequest, "invalid_file_type", "content-type not allowed for PPT upload")
+			writeError(w, http.StatusBadRequest, "invalid_file_type", "content-type not allowed for course material upload")
 			return "", false
 		}
 	}
@@ -79,7 +87,7 @@ func saveCourseMaterialFile(w http.ResponseWriter, r *http.Request) (publicPath 
 	return "/" + filepath.ToSlash(filepath.Join(courseMaterialUploadDir, stored)), true
 }
 
-// AdminCourseMaterialUpload POST /api/v1/admin/upload/course-material — multipart file (PPT/PPTX).
+// AdminCourseMaterialUpload POST /api/v1/admin/upload/course-material — multipart file (PDF/DOC/DOCX/PPT/PPTX).
 func AdminCourseMaterialUpload(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_ = deps
@@ -97,7 +105,7 @@ func AdminCourseMaterialUpload(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// TrainerCourseMaterialUpload POST /api/v1/trainer/upload/course-material — sama seperti admin upload.
+// TrainerCourseMaterialUpload POST /api/v1/trainer/upload/course-material — sama seperti admin upload (PDF/DOC/DOCX/PPT/PPTX).
 func TrainerCourseMaterialUpload(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_ = deps

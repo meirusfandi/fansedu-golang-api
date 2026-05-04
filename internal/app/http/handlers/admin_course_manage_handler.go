@@ -21,6 +21,7 @@ func adminCourseToDTO(c domain.Course) dto.CourseResponse {
 		Title:       c.Title,
 		Slug:        c.Slug,
 		Description: c.Description,
+		Status:      normalizeCourseStatus(c.Status),
 		Price:       c.Price,
 		Thumbnail:   c.Thumbnail,
 		SubjectID:   c.SubjectID,
@@ -30,7 +31,7 @@ func adminCourseToDTO(c domain.Course) dto.CourseResponse {
 }
 
 // AdminCourseManageGet GET /api/v1/admin/courses/{courseId}/manage
-// Satu respons: data kelas, semua konten (module/quiz/test), paket landing yang memuat kelas, tryout terhubung.
+// Satu respons: data kelas, semua konten (module/article/quiz/zoom/recording/test), paket landing yang memuat kelas, tryout terhubung.
 func AdminCourseManageGet(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		courseID := chi.URLParam(r, "courseId")
@@ -60,13 +61,13 @@ func AdminCourseManageGet(deps *Deps) http.HandlerFunc {
 			Contents:       outContents,
 			ContentsByType: byType,
 			RelatedEndpoints: dto.RelatedCourseAdminEndpoints{
-				ListContents:    "/api/v1/admin/courses/" + courseID + "/contents",
-				CreateContent:   "/api/v1/admin/courses/" + courseID + "/contents",
-				UpdateContent:   "/api/v1/admin/courses/" + courseID + "/contents/{contentId}",
-				DeleteContent:   "/api/v1/admin/courses/" + courseID + "/contents/{contentId}",
-				ListEnrollments: "/api/v1/admin/courses/" + courseID + "/enrollments",
-				TryoutQuestions: "/api/v1/admin/tryouts/{tryoutId}/questions",
-				PackageManage:   "PUT /api/v1/admin/landing/packages/{id} body linked_course_ids, atau PUT .../courses/{id}/linked-packages",
+				ListContents:         "/api/v1/admin/courses/" + courseID + "/contents",
+				CreateContent:        "/api/v1/admin/courses/" + courseID + "/contents",
+				UpdateContent:        "/api/v1/admin/courses/" + courseID + "/contents/{contentId}",
+				DeleteContent:        "/api/v1/admin/courses/" + courseID + "/contents/{contentId}",
+				ListEnrollments:      "/api/v1/admin/courses/" + courseID + "/enrollments",
+				TryoutQuestions:      "/api/v1/admin/tryouts/{tryoutId}/questions",
+				PackageManage:        "PUT /api/v1/admin/landing/packages/{id} body linked_course_ids, atau PUT .../courses/{id}/linked-packages",
 				GetProgram:           "/api/v1/admin/courses/" + courseID + "/program",
 				PutProgram:           "PUT /api/v1/admin/courses/" + courseID + "/program",
 				UploadCourseMaterial: "POST /api/v1/admin/upload/course-material (multipart field: file)",

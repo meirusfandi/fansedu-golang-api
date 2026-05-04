@@ -106,6 +106,7 @@ type CourseCreateRequest struct {
 	Title       string  `json:"title"`
 	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Status      *string `json:"status,omitempty"`
 	Price       *int    `json:"price,omitempty"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
@@ -119,9 +120,10 @@ type CourseCreateRequest struct {
 // CourseUpdateRequest body PUT /api/v1/admin/courses/{courseId} — hanya metadata kelas.
 // Format program hanya lewat PUT .../courses/{id}/program (field tambahan di JSON body update diabaikan oleh decoder).
 type CourseUpdateRequest struct {
-	Title       string  `json:"title"`
+	Title       *string `json:"title,omitempty"`
 	Slug        *string `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Status      *string `json:"status,omitempty"`
 	Price       *int    `json:"price,omitempty"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
 	SubjectID   *string `json:"subjectId,omitempty"`
@@ -247,6 +249,7 @@ type AdminCourseProgramMeetingItem struct {
 	PrTitle       *string `json:"prTitle,omitempty"`
 	PrDescription *string `json:"prDescription,omitempty"`
 	LiveClassURL  *string `json:"liveClassUrl,omitempty"`
+	RecordingURL  *string `json:"recordingUrl,omitempty"`
 }
 
 // AdminCourseProgramResponse GET .../courses/{courseId}/program

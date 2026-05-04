@@ -6,9 +6,12 @@ import (
 )
 
 const (
-	CourseContentTypeModule = "module"
-	CourseContentTypeQuiz   = "quiz"
-	CourseContentTypeTest   = "test"
+	CourseContentTypeModule    = "module"
+	CourseContentTypeArticle   = "article"
+	CourseContentTypeQuiz      = "quiz"
+	CourseContentTypeZoom      = "zoom"
+	CourseContentTypeRecording = "recording"
+	CourseContentTypeTest      = "test"
 )
 
 type CourseContent struct {

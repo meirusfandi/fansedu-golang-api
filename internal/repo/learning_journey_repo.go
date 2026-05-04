@@ -25,16 +25,17 @@ type LearningSectionRow struct {
 }
 
 type LearningLessonRow struct {
-	ID               string
-	SectionID        string
-	Type             string
-	Title            string
-	SortOrder        int
-	Content          *string
-	PdfURL           *string
-	PptURL           *string
-	LiveClassURL     *string
-	TryoutSessionID  *string
+	ID              string
+	SectionID       string
+	Type            string
+	Title           string
+	SortOrder       int
+	Content         *string
+	PdfURL          *string
+	PptURL          *string
+	LiveClassURL    *string
+	RecordingURL    *string
+	TryoutSessionID *string
 }
 
 type LearningJourneyRepo interface {
@@ -114,7 +115,7 @@ func (r *learningJourneyRepo) ListSectionsForCourse(ctx context.Context, courseI
 
 func (r *learningJourneyRepo) ListLessonsForSection(ctx context.Context, sectionID string) ([]LearningLessonRow, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id::text, section_id::text, type::text, title, sort_order, content, pdf_url, ppt_url, live_class_url, tryout_session_id::text
+		SELECT id::text, section_id::text, type::text, title, sort_order, content, pdf_url, ppt_url, live_class_url, recording_url, tryout_session_id::text
 		FROM learning_lessons WHERE section_id = $1::uuid
 		ORDER BY sort_order ASC, id ASC
 	`, sectionID)
@@ -127,7 +128,7 @@ func (r *learningJourneyRepo) ListLessonsForSection(ctx context.Context, section
 
 func (r *learningJourneyRepo) ListLessonRowsForCourse(ctx context.Context, courseID string) ([]LearningLessonRow, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT l.id::text, l.section_id::text, l.type::text, l.title, l.sort_order, l.content, l.pdf_url, l.ppt_url, l.live_class_url, l.tryout_session_id::text
+		SELECT l.id::text, l.section_id::text, l.type::text, l.title, l.sort_order, l.content, l.pdf_url, l.ppt_url, l.live_class_url, l.recording_url, l.tryout_session_id::text
 		FROM learning_lessons l
 		INNER JOIN course_sections s ON s.id = l.section_id
 		WHERE s.course_id = $1::uuid
@@ -144,7 +145,7 @@ func scanLearningLessonRows(rows pgx.Rows) ([]LearningLessonRow, error) {
 	var list []LearningLessonRow
 	for rows.Next() {
 		var l LearningLessonRow
-		if err := rows.Scan(&l.ID, &l.SectionID, &l.Type, &l.Title, &l.SortOrder, &l.Content, &l.PdfURL, &l.PptURL, &l.LiveClassURL, &l.TryoutSessionID); err != nil {
+		if err := rows.Scan(&l.ID, &l.SectionID, &l.Type, &l.Title, &l.SortOrder, &l.Content, &l.PdfURL, &l.PptURL, &l.LiveClassURL, &l.RecordingURL, &l.TryoutSessionID); err != nil {
 			return nil, err
 		}
 		list = append(list, l)
@@ -156,13 +157,13 @@ func (r *learningJourneyRepo) GetLessonByID(ctx context.Context, lessonID string
 	var l LearningLessonRow
 	var courseID string
 	err := r.pool.QueryRow(ctx, `
-		SELECT l.id::text, l.section_id::text, l.type::text, l.title, l.sort_order, l.content, l.pdf_url, l.ppt_url, l.live_class_url, l.tryout_session_id::text,
+		SELECT l.id::text, l.section_id::text, l.type::text, l.title, l.sort_order, l.content, l.pdf_url, l.ppt_url, l.live_class_url, l.recording_url, l.tryout_session_id::text,
 		       s.course_id::text
 		FROM learning_lessons l
 		INNER JOIN course_sections s ON s.id = l.section_id
 		WHERE l.id = $1::uuid
 	`, lessonID).Scan(
-		&l.ID, &l.SectionID, &l.Type, &l.Title, &l.SortOrder, &l.Content, &l.PdfURL, &l.PptURL, &l.LiveClassURL, &l.TryoutSessionID,
+		&l.ID, &l.SectionID, &l.Type, &l.Title, &l.SortOrder, &l.Content, &l.PdfURL, &l.PptURL, &l.LiveClassURL, &l.RecordingURL, &l.TryoutSessionID,
 		&courseID,
 	)
 	return l, courseID, l.SectionID, err

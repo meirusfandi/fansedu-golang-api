@@ -19,4 +19,3 @@ type CreateSubscriptionRequest struct {
 	StartAt  *string `json:"startAt,omitempty"` // RFC3339
 	EndAt    *string `json:"endAt,omitempty"`   // RFC3339
 }
-

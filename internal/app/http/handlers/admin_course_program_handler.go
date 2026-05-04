@@ -43,22 +43,23 @@ func AdminCourseProgramGet(deps *Deps) http.HandlerFunc {
 		items := make([]dto.AdminCourseProgramMeetingItem, 0, len(meetings))
 		for _, m := range meetings {
 			items = append(items, dto.AdminCourseProgramMeetingItem{
-				MeetingNumber:  m.MeetingNumber,
-				Title:          m.Title,
-				DetailText:     m.DetailText,
-				PdfURL:         m.PdfURL,
-				PptURL:         m.PptURL,
-				PrTitle:        m.PrTitle,
-				PrDescription:  m.PrDescription,
-				LiveClassURL:   m.LiveClassURL,
+				MeetingNumber: m.MeetingNumber,
+				Title:         m.Title,
+				DetailText:    m.DetailText,
+				PdfURL:        m.PdfURL,
+				PptURL:        m.PptURL,
+				PrTitle:       m.PrTitle,
+				PrDescription: m.PrDescription,
+				LiveClassURL:  m.LiveClassURL,
+				RecordingURL:  m.RecordingURL,
 			})
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data": dto.AdminCourseProgramResponse{
-				TrackType:               track,
-				Meetings:                items,
-				PretestTryoutSessionID:  pre,
+				TrackType:              track,
+				Meetings:               items,
+				PretestTryoutSessionID: pre,
 			},
 		})
 	}
@@ -89,14 +90,15 @@ func AdminCourseProgramPut(deps *Deps) http.HandlerFunc {
 		meetings := make([]domain.CourseProgramMeeting, 0, len(req.Meetings))
 		for _, it := range req.Meetings {
 			meetings = append(meetings, domain.CourseProgramMeeting{
-				MeetingNumber:  it.MeetingNumber,
-				Title:          it.Title,
-				DetailText:     it.DetailText,
-				PdfURL:         it.PdfURL,
-				PptURL:         it.PptURL,
-				PrTitle:        it.PrTitle,
-				PrDescription:  it.PrDescription,
-				LiveClassURL:   it.LiveClassURL,
+				MeetingNumber: it.MeetingNumber,
+				Title:         it.Title,
+				DetailText:    it.DetailText,
+				PdfURL:        it.PdfURL,
+				PptURL:        it.PptURL,
+				PrTitle:       it.PrTitle,
+				PrDescription: it.PrDescription,
+				LiveClassURL:  it.LiveClassURL,
+				RecordingURL:  it.RecordingURL,
 			})
 		}
 		track := strings.TrimSpace(strings.ToLower(req.TrackType))

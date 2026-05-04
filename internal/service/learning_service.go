@@ -29,11 +29,11 @@ type LearningCourseListDTO struct {
 
 // LearningCourseJourneyDTO root GET /api/v1/courses/{ref}/journey.
 type LearningCourseJourneyDTO struct {
-	Course             LearningCourseMetaDTO     `json:"course"`
-	ProgressPercent    float64                   `json:"progressPercent"`
-	CompletedLessons   int                       `json:"completedLessons"`
-	TotalLessons       int                       `json:"totalLessons"`
-	Sections           []LearningSectionJourneyDTO `json:"sections"`
+	Course           LearningCourseMetaDTO       `json:"course"`
+	ProgressPercent  float64                     `json:"progressPercent"`
+	CompletedLessons int                         `json:"completedLessons"`
+	TotalLessons     int                         `json:"totalLessons"`
+	Sections         []LearningSectionJourneyDTO `json:"sections"`
 }
 
 type LearningCourseMetaDTO struct {
@@ -44,48 +44,50 @@ type LearningCourseMetaDTO struct {
 }
 
 type LearningSectionJourneyDTO struct {
-	ID              string                  `json:"id"`
-	CourseID        string                  `json:"courseId"`
-	Title           string                  `json:"title"`
-	SortOrder       int                     `json:"sortOrder"`
-	ProgressPercent float64                 `json:"progressPercent"`
+	ID              string                   `json:"id"`
+	CourseID        string                   `json:"courseId"`
+	Title           string                   `json:"title"`
+	SortOrder       int                      `json:"sortOrder"`
+	ProgressPercent float64                  `json:"progressPercent"`
 	Lessons         []LearningLessonBriefDTO `json:"lessons"`
 }
 
 type LearningLessonBriefDTO struct {
-	ID               string  `json:"id"`
-	SectionID        string  `json:"sectionId"`
-	Type             string  `json:"type"`
-	Title            string  `json:"title"`
-	SortOrder        int     `json:"sortOrder"`
-	TryoutSessionID  *string `json:"tryoutSessionId,omitempty"`
-	PptURL           *string `json:"pptUrl,omitempty"`
-	Completed        bool    `json:"completed"`
-	Locked           bool    `json:"locked"`
-	ProgressPercent  float64 `json:"progressPercent"`
+	ID              string  `json:"id"`
+	SectionID       string  `json:"sectionId"`
+	Type            string  `json:"type"`
+	Title           string  `json:"title"`
+	SortOrder       int     `json:"sortOrder"`
+	TryoutSessionID *string `json:"tryoutSessionId,omitempty"`
+	PptURL          *string `json:"pptUrl,omitempty"`
+	RecordingURL    *string `json:"recordingUrl,omitempty"`
+	Completed       bool    `json:"completed"`
+	Locked          bool    `json:"locked"`
+	ProgressPercent float64 `json:"progressPercent"`
 }
 
 // LearningLessonDetailDTO GET /api/v1/courses/lessons/:id.
 type LearningLessonDetailDTO struct {
-	ID               string  `json:"id"`
-	SectionID        string  `json:"sectionId"`
-	CourseID         string  `json:"courseId"`
-	Type             string  `json:"type"`
-	Title            string  `json:"title"`
-	Content          *string `json:"content,omitempty"`
-	PdfURL           *string `json:"pdfUrl,omitempty"`
-	PptURL           *string `json:"pptUrl,omitempty"`
-	LiveClassURL     *string `json:"liveClassUrl,omitempty"`
-	TryoutSessionID  *string `json:"tryoutSessionId,omitempty"`
-	Locked           bool    `json:"locked"`
-	Completed        bool    `json:"completed"`
+	ID              string  `json:"id"`
+	SectionID       string  `json:"sectionId"`
+	CourseID        string  `json:"courseId"`
+	Type            string  `json:"type"`
+	Title           string  `json:"title"`
+	Content         *string `json:"content,omitempty"`
+	PdfURL          *string `json:"pdfUrl,omitempty"`
+	PptURL          *string `json:"pptUrl,omitempty"`
+	LiveClassURL    *string `json:"liveClassUrl,omitempty"`
+	RecordingURL    *string `json:"recordingUrl,omitempty"`
+	TryoutSessionID *string `json:"tryoutSessionId,omitempty"`
+	Locked          bool    `json:"locked"`
+	Completed       bool    `json:"completed"`
 }
 
 // LearningLessonCompleteDTO POST .../complete.
 type LearningLessonCompleteDTO struct {
-	LessonID      string  `json:"lessonId"`
-	CompletedAt   string  `json:"completedAt"`
-	NextLessonID  *string `json:"nextLessonId,omitempty"`
+	LessonID     string  `json:"lessonId"`
+	CompletedAt  string  `json:"completedAt"`
+	NextLessonID *string `json:"nextLessonId,omitempty"`
 }
 
 type LearningService interface {
@@ -182,7 +184,7 @@ func (s *learningService) GetCourseJourney(ctx context.Context, userID, courseRe
 	}
 	var courseProgress float64
 	if total > 0 {
-		courseProgress = math.Round(float64(completedN) / float64(total) * 10000) / 100
+		courseProgress = math.Round(float64(completedN)/float64(total)*10000) / 100
 	}
 
 	// locked by global order: first lesson unlocked; lesson i locked iff previous not completed
@@ -228,16 +230,17 @@ func (s *learningService) GetCourseJourney(ctx context.Context, userID, courseRe
 				lp = 100
 			}
 			lessBrief = append(lessBrief, LearningLessonBriefDTO{
-				ID:               l.ID,
-				SectionID:        l.SectionID,
-				Type:             l.Type,
-				Title:            l.Title,
-				SortOrder:        l.SortOrder,
-				TryoutSessionID:  l.TryoutSessionID,
-				PptURL:           l.PptURL,
-				Completed:        comp,
-				Locked:           lockedByID[l.ID],
-				ProgressPercent:  lp,
+				ID:              l.ID,
+				SectionID:       l.SectionID,
+				Type:            l.Type,
+				Title:           l.Title,
+				SortOrder:       l.SortOrder,
+				TryoutSessionID: l.TryoutSessionID,
+				PptURL:          l.PptURL,
+				RecordingURL:    l.RecordingURL,
+				Completed:       comp,
+				Locked:          lockedByID[l.ID],
+				ProgressPercent: lp,
 			})
 		}
 		secDTOs = append(secDTOs, LearningSectionJourneyDTO{
@@ -300,18 +303,19 @@ func (s *learningService) GetLesson(ctx context.Context, userID, lessonID string
 	}
 	_, comp := done[lessonID]
 	return &LearningLessonDetailDTO{
-		ID:               row.ID,
-		SectionID:        row.SectionID,
-		CourseID:         courseID,
-		Type:             row.Type,
-		Title:            row.Title,
-		Content:          row.Content,
-		PdfURL:           row.PdfURL,
-		PptURL:           row.PptURL,
-		LiveClassURL:     row.LiveClassURL,
-		TryoutSessionID:  row.TryoutSessionID,
-		Locked:           locked,
-		Completed:        comp,
+		ID:              row.ID,
+		SectionID:       row.SectionID,
+		CourseID:        courseID,
+		Type:            row.Type,
+		Title:           row.Title,
+		Content:         row.Content,
+		PdfURL:          row.PdfURL,
+		PptURL:          row.PptURL,
+		LiveClassURL:    row.LiveClassURL,
+		RecordingURL:    row.RecordingURL,
+		TryoutSessionID: row.TryoutSessionID,
+		Locked:          locked,
+		Completed:       comp,
 	}, nil
 }
 

@@ -41,7 +41,7 @@ func (r *courseProgramRepo) GetProgram(ctx context.Context, courseID string) (st
 	}
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT meeting_number, title, detail_text, pdf_url, ppt_url, pr_title, pr_description, live_class_url
+		SELECT meeting_number, title, detail_text, pdf_url, ppt_url, pr_title, pr_description, live_class_url, recording_url
 		FROM course_meetings WHERE course_id = $1::uuid ORDER BY meeting_number ASC
 	`, courseID)
 	if err != nil {
@@ -51,7 +51,7 @@ func (r *courseProgramRepo) GetProgram(ctx context.Context, courseID string) (st
 	var meetings []domain.CourseProgramMeeting
 	for rows.Next() {
 		var m domain.CourseProgramMeeting
-		if err := rows.Scan(&m.MeetingNumber, &m.Title, &m.DetailText, &m.PdfURL, &m.PptURL, &m.PrTitle, &m.PrDescription, &m.LiveClassURL); err != nil {
+		if err := rows.Scan(&m.MeetingNumber, &m.Title, &m.DetailText, &m.PdfURL, &m.PptURL, &m.PrTitle, &m.PrDescription, &m.LiveClassURL, &m.RecordingURL); err != nil {
 			return "", nil, nil, err
 		}
 		meetings = append(meetings, m)
@@ -127,9 +127,9 @@ func (r *courseProgramRepo) SaveProgram(ctx context.Context, courseID string, tr
 	}
 	for _, m := range meetings {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO course_meetings (course_id, meeting_number, title, detail_text, pdf_url, ppt_url, pr_title, pr_description, live_class_url, sort_order)
-			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $2)
-		`, courseID, m.MeetingNumber, m.Title, m.DetailText, m.PdfURL, m.PptURL, m.PrTitle, m.PrDescription, m.LiveClassURL); err != nil {
+			INSERT INTO course_meetings (course_id, meeting_number, title, detail_text, pdf_url, ppt_url, pr_title, pr_description, live_class_url, recording_url, sort_order)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $2)
+		`, courseID, m.MeetingNumber, m.Title, m.DetailText, m.PdfURL, m.PptURL, m.PrTitle, m.PrDescription, m.LiveClassURL, m.RecordingURL); err != nil {
 			return err
 		}
 	}
@@ -173,7 +173,7 @@ func (r *courseProgramRepo) rebuildJourneyMeetings(ctx context.Context, tx pgx.T
 			return err
 		}
 		secOrder++
-		if err := insertLessonTx(ctx, tx, sid, "quiz", "Pre-test", 0, nil, nil, nil, nil, pretest); err != nil {
+		if err := insertLessonTx(ctx, tx, sid, "quiz", "Pre-test", 0, nil, nil, nil, nil, nil, pretest); err != nil {
 			return err
 		}
 	}
@@ -194,14 +194,14 @@ func (r *courseProgramRepo) rebuildJourneyMeetings(ctx context.Context, tx pgx.T
 		if lessonTitle == "" {
 			lessonTitle = fmt.Sprintf("Pertemuan %d", m.MeetingNumber)
 		}
-		if err := insertLessonTx(ctx, tx, sid, "text", lessonTitle, lo, m.DetailText, nil, nil, nil, nil); err != nil {
+		if err := insertLessonTx(ctx, tx, sid, "text", lessonTitle, lo, m.DetailText, nil, nil, nil, nil, nil); err != nil {
 			return err
 		}
 		lo++
 
 		if m.PdfURL != nil && strings.TrimSpace(*m.PdfURL) != "" {
 			pdf := strings.TrimSpace(*m.PdfURL)
-			if err := insertLessonTx(ctx, tx, sid, "text", "Modul PDF", lo, nil, &pdf, nil, nil, nil); err != nil {
+			if err := insertLessonTx(ctx, tx, sid, "text", "Modul PDF", lo, nil, &pdf, nil, nil, nil, nil); err != nil {
 				return err
 			}
 			lo++
@@ -209,7 +209,7 @@ func (r *courseProgramRepo) rebuildJourneyMeetings(ctx context.Context, tx pgx.T
 
 		if m.PptURL != nil && strings.TrimSpace(*m.PptURL) != "" {
 			ppt := strings.TrimSpace(*m.PptURL)
-			if err := insertLessonTx(ctx, tx, sid, "text", "Materi PPT", lo, nil, nil, &ppt, nil, nil); err != nil {
+			if err := insertLessonTx(ctx, tx, sid, "text", "Materi PPT", lo, nil, nil, &ppt, nil, nil, nil); err != nil {
 				return err
 			}
 			lo++
@@ -225,7 +225,7 @@ func (r *courseProgramRepo) rebuildJourneyMeetings(ctx context.Context, tx pgx.T
 			if pt == "" {
 				pt = "Tugas (PR)"
 			}
-			if err := insertLessonTx(ctx, tx, sid, "assignment", pt, lo, m.PrDescription, nil, nil, nil, nil); err != nil {
+			if err := insertLessonTx(ctx, tx, sid, "assignment", pt, lo, m.PrDescription, nil, nil, nil, nil, nil); err != nil {
 				return err
 			}
 			lo++
@@ -233,7 +233,15 @@ func (r *courseProgramRepo) rebuildJourneyMeetings(ctx context.Context, tx pgx.T
 
 		if m.LiveClassURL != nil && strings.TrimSpace(*m.LiveClassURL) != "" {
 			live := strings.TrimSpace(*m.LiveClassURL)
-			if err := insertLessonTx(ctx, tx, sid, "text", "Kelas live", lo, nil, nil, nil, &live, nil); err != nil {
+			if err := insertLessonTx(ctx, tx, sid, "text", "Kelas live", lo, nil, nil, nil, &live, nil, nil); err != nil {
+				return err
+			}
+			lo++
+		}
+
+		if m.RecordingURL != nil && strings.TrimSpace(*m.RecordingURL) != "" {
+			rec := strings.TrimSpace(*m.RecordingURL)
+			if err := insertLessonTx(ctx, tx, sid, "text", "Rekaman kelas", lo, nil, nil, nil, nil, &rec, nil); err != nil {
 				return err
 			}
 		}
@@ -249,7 +257,7 @@ func (r *courseProgramRepo) rebuildJourneyTryout(ctx context.Context, tx pgx.Tx,
 			return err
 		}
 		secOrder++
-		if err := insertLessonTx(ctx, tx, sid, "quiz", "Pre-test", 0, nil, nil, nil, nil, pretest); err != nil {
+		if err := insertLessonTx(ctx, tx, sid, "quiz", "Pre-test", 0, nil, nil, nil, nil, nil, pretest); err != nil {
 			return err
 		}
 	}
@@ -280,7 +288,7 @@ func (r *courseProgramRepo) rebuildJourneyTryout(ctx context.Context, tx pgx.Tx,
 		}
 		secOrder++
 		tid := sessionID
-		if err := insertLessonTx(ctx, tx, sid, "quiz", secTitle, 0, nil, nil, nil, nil, &tid); err != nil {
+		if err := insertLessonTx(ctx, tx, sid, "quiz", secTitle, 0, nil, nil, nil, nil, nil, &tid); err != nil {
 			return err
 		}
 	}
@@ -295,10 +303,10 @@ func insertSectionTx(ctx context.Context, tx pgx.Tx, courseID, title string, sor
 	return id, err
 }
 
-func insertLessonTx(ctx context.Context, tx pgx.Tx, sectionID, lessonType, title string, sortOrder int, content, pdfURL, pptURL, liveURL, tryoutSessionID *string) error {
+func insertLessonTx(ctx context.Context, tx pgx.Tx, sectionID, lessonType, title string, sortOrder int, content, pdfURL, pptURL, liveURL, recordingURL, tryoutSessionID *string) error {
 	_, err := tx.Exec(ctx, `
-		INSERT INTO learning_lessons (section_id, type, title, sort_order, content, pdf_url, ppt_url, live_class_url, tryout_session_id)
-		VALUES ($1::uuid, $2::learning_lesson_type, $3, $4, $5, $6, $7, $8, $9::uuid)
-	`, sectionID, lessonType, title, sortOrder, content, pdfURL, pptURL, liveURL, tryoutSessionID)
+		INSERT INTO learning_lessons (section_id, type, title, sort_order, content, pdf_url, ppt_url, live_class_url, recording_url, tryout_session_id)
+		VALUES ($1::uuid, $2::learning_lesson_type, $3, $4, $5, $6, $7, $8, $9, $10::uuid)
+	`, sectionID, lessonType, title, sortOrder, content, pdfURL, pptURL, liveURL, recordingURL, tryoutSessionID)
 	return err
 }

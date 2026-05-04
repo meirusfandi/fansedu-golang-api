@@ -941,11 +941,13 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 			if tt == "" {
 				tt = domain.CourseTrackMeetings
 			}
+			status := normalizeCourseStatus(list[i].Status)
 			out[i] = dto.CourseResponse{
 				ID:          list[i].ID,
 				Title:       list[i].Title,
 				Slug:        list[i].Slug,
 				Description: list[i].Description,
+				Status:      status,
 				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
@@ -976,6 +978,7 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 			Title:       c.Title,
 			Slug:        c.Slug,
 			Description: c.Description,
+			Status:      normalizeCourseStatus(c.Status),
 			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
@@ -1015,6 +1018,16 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			CreatedBy:   createdByPtr,
 			TrackType:   track,
 		}
+		if req.Status != nil {
+			status, ok := parseCourseStatus(*req.Status)
+			if !ok {
+				writeError(w, http.StatusBadRequest, "validation_error", "status must be \"draft\", \"publish\", or \"active\"")
+				return
+			}
+			c.Status = status
+		} else {
+			c.Status = domain.CourseStatusDraft
+		}
 		if req.Price != nil {
 			c.Price = *req.Price
 		}
@@ -1051,6 +1064,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 					PrTitle:       it.PrTitle,
 					PrDescription: it.PrDescription,
 					LiveClassURL:  it.LiveClassURL,
+					RecordingURL:  it.RecordingURL,
 				})
 			}
 			if err := deps.CourseProgramService.SaveProgram(r.Context(), created.ID, track, meetings, req.PretestTryoutSessionID); err != nil {
@@ -1081,6 +1095,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Title:       created.Title,
 			Slug:        created.Slug,
 			Description: created.Description,
+			Status:      normalizeCourseStatus(created.Status),
 			Price:       created.Price,
 			Thumbnail:   created.Thumbnail,
 			SubjectID:   created.SubjectID,
@@ -1117,13 +1132,30 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
 			return
 		}
-		c.Title = req.Title
-		c.Description = req.Description
+		if req.Title != nil {
+			title := strings.TrimSpace(*req.Title)
+			if title == "" {
+				writeError(w, http.StatusBadRequest, "validation_error", "title cannot be empty")
+				return
+			}
+			c.Title = title
+		}
+		if req.Description != nil {
+			c.Description = req.Description
+		}
 		if req.SubjectID != nil {
 			c.SubjectID = req.SubjectID
 		}
 		if req.Slug != nil {
 			c.Slug = req.Slug
+		}
+		if req.Status != nil {
+			status, ok := parseCourseStatus(*req.Status)
+			if !ok {
+				writeError(w, http.StatusBadRequest, "validation_error", "status must be \"draft\", \"publish\", or \"active\"")
+				return
+			}
+			c.Status = status
 		}
 		if req.Price != nil {
 			c.Price = *req.Price
@@ -1135,8 +1167,50 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
+		updated, err := deps.AdminService.GetCourseByID(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		tt := updated.TrackType
+		if tt == "" {
+			tt = domain.CourseTrackMeetings
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(dto.CourseResponse{
+			ID:          updated.ID,
+			Title:       updated.Title,
+			Slug:        updated.Slug,
+			Description: updated.Description,
+			Status:      normalizeCourseStatus(updated.Status),
+			Price:       updated.Price,
+			Thumbnail:   updated.Thumbnail,
+			SubjectID:   updated.SubjectID,
+			CreatedBy:   updated.CreatedBy,
+			TrackType:   tt,
+		})
 	}
+}
+
+func parseCourseStatus(raw string) (string, bool) {
+	status := normalizeCourseStatus(raw)
+	switch status {
+	case domain.CourseStatusDraft, domain.CourseStatusPublish, domain.CourseStatusActive:
+		return status, true
+	default:
+		return "", false
+	}
+}
+
+func normalizeCourseStatus(raw string) string {
+	status := strings.ToLower(strings.TrimSpace(raw))
+	if status == "" {
+		return domain.CourseStatusDraft
+	}
+	if status == "published" {
+		return domain.CourseStatusPublish
+	}
+	return status
 }
 
 func AdminListEnrollments(deps *Deps) http.HandlerFunc {
@@ -1206,6 +1280,24 @@ func courseContentToDTO(c domain.CourseContent) dto.CourseContentResponse {
 	}
 }
 
+func normalizeCourseContentType(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func isAllowedCourseContentType(raw string) bool {
+	switch normalizeCourseContentType(raw) {
+	case domain.CourseContentTypeModule,
+		domain.CourseContentTypeArticle,
+		domain.CourseContentTypeQuiz,
+		domain.CourseContentTypeZoom,
+		domain.CourseContentTypeRecording,
+		domain.CourseContentTypeTest:
+		return true
+	default:
+		return false
+	}
+}
+
 func AdminListCourseContents(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		courseID := chi.URLParam(r, "courseId")
@@ -1235,13 +1327,17 @@ func AdminCreateCourseContent(deps *Deps) http.HandlerFunc {
 			http.Error(w, "title and type required", http.StatusBadRequest)
 			return
 		}
+		if !isAllowedCourseContentType(req.Type) {
+			http.Error(w, "invalid content type: use module, article, quiz, zoom, recording, or test", http.StatusBadRequest)
+			return
+		}
 		content, _ := json.Marshal(req.Content)
 		c := domain.CourseContent{
 			CourseID:    courseID,
 			Title:       req.Title,
 			Description: req.Description,
 			SortOrder:   req.SortOrder,
-			Type:        req.Type,
+			Type:        normalizeCourseContentType(req.Type),
 			Content:     content,
 		}
 		created, err := deps.AdminService.CreateCourseContent(r.Context(), c)
@@ -1277,7 +1373,11 @@ func AdminUpdateCourseContent(deps *Deps) http.HandlerFunc {
 		// allow 0
 		c.SortOrder = req.SortOrder
 		if req.Type != "" {
-			c.Type = req.Type
+			if !isAllowedCourseContentType(req.Type) {
+				http.Error(w, "invalid content type: use module, article, quiz, zoom, recording, or test", http.StatusBadRequest)
+				return
+			}
+			c.Type = normalizeCourseContentType(req.Type)
 		}
 		if req.Content != nil {
 			content, _ := json.Marshal(req.Content)
