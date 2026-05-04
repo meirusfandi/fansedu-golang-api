@@ -709,13 +709,13 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 	if err != nil {
 		return ErrOrderNotFound
 	}
-	if order.Status != domain.OrderStatusPending && order.Status != domain.OrderStatusAwaitingVerification {
+	if order.Status != domain.OrderStatusPending && order.Status != domain.OrderStatusAwaitingVerification && order.Status != domain.OrderStatusFailed {
 		return ErrOrderNotPending
 	}
 	if err := s.orderRepo.UpdatePaymentProof(ctx, orderID, proofURL, senderAccountNo, senderName, proofAt); err != nil {
 		return err
 	}
-	if order.Status == domain.OrderStatusPending {
+	if order.Status == domain.OrderStatusPending || order.Status == domain.OrderStatusFailed {
 		if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusAwaitingVerification); err != nil {
 			return err
 		}
@@ -727,6 +727,8 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 			gw := "bank_transfer"
 			p.Gateway = &gw
 		}
+		p.Status = domain.PaymentStatusPending
+		p.RejectionNote = nil
 		if err := s.paymentRepo.Update(ctx, p); err != nil {
 			return err
 		}

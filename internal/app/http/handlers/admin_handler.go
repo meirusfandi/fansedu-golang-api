@@ -1578,11 +1578,9 @@ func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		if req.Confirmed {
-			if err := syncPaymentOrderEnrollment(r.Context(), deps, paymentID); err != nil {
-				http.Error(w, "payment approved but failed to sync enrollment: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
+		if err := syncPaymentOrderState(r.Context(), deps, paymentID, req.Confirmed); err != nil {
+			http.Error(w, "payment updated but failed to sync order state: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment updated"})
@@ -1602,7 +1600,7 @@ func AdminConfirmPaymentByAction(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		if err := syncPaymentOrderEnrollment(r.Context(), deps, paymentID); err != nil {
+		if err := syncPaymentOrderState(r.Context(), deps, paymentID, true); err != nil {
 			http.Error(w, "payment approved but failed to sync enrollment: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -1611,8 +1609,8 @@ func AdminConfirmPaymentByAction(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func syncPaymentOrderEnrollment(ctx context.Context, deps *Deps, paymentID string) error {
-	if deps.PaymentRepo == nil || deps.CheckoutService == nil {
+func syncPaymentOrderState(ctx context.Context, deps *Deps, paymentID string, confirmed bool) error {
+	if deps.PaymentRepo == nil {
 		return nil
 	}
 	p, err := deps.PaymentRepo.GetByID(ctx, paymentID)
@@ -1622,7 +1620,18 @@ func syncPaymentOrderEnrollment(ctx context.Context, deps *Deps, paymentID strin
 	if p.OrderID == nil || strings.TrimSpace(*p.OrderID) == "" {
 		return nil
 	}
-	return deps.CheckoutService.VerifyOrder(ctx, *p.OrderID, nil)
+	if confirmed {
+		if deps.CheckoutService == nil {
+			return nil
+		}
+		return deps.CheckoutService.VerifyOrder(ctx, *p.OrderID, nil)
+	}
+	if deps.OrderRepo != nil {
+		if err := deps.OrderRepo.UpdateStatus(ctx, *p.OrderID, domain.OrderStatusFailed); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AdminRejectPaymentByAction: POST /api/v1/admin/payments/:paymentId/reject
@@ -1641,6 +1650,10 @@ func AdminRejectPaymentByAction(deps *Deps) http.HandlerFunc {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		if err := deps.AdminService.ConfirmPayment(r.Context(), paymentID, false, adminID, req.Reason); err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if err := syncPaymentOrderState(r.Context(), deps, paymentID, false); err != nil {
+			http.Error(w, "payment rejected but failed to sync order state: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
