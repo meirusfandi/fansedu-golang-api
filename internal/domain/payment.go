@@ -4,8 +4,8 @@ import "time"
 
 const (
 	PaymentStatusPending  = "pending"
-	PaymentStatusPaid    = "paid"
-	PaymentStatusFailed  = "failed"
+	PaymentStatusPaid     = "paid"
+	PaymentStatusFailed   = "failed"
 	PaymentStatusRefunded = "refunded"
 
 	PaymentTypeCoursePurchase = "course_purchase"
@@ -15,22 +15,25 @@ const (
 )
 
 type Payment struct {
-	ID             string
-	UserID         string
-	OrderID        *string
-	Amount int // rupiah
-	Currency       string
-	Status         string
-	Type           string
-	Gateway        *string
-	TransactionID  *string
-	ReferenceID    *string
-	Description    *string
-	ProofURL       *string
-	ConfirmedBy    *string
-	ConfirmedAt    *time.Time
-	RejectionNote  *string
-	PaidAt         *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID            string
+	UserID        string
+	PayerName     *string
+	PayerEmail    *string
+	PayerPhone    *string
+	OrderID       *string
+	Amount        int // rupiah
+	Currency      string
+	Status        string
+	Type          string
+	Gateway       *string
+	TransactionID *string
+	ReferenceID   *string
+	Description   *string
+	ProofURL      *string
+	ConfirmedBy   *string
+	ConfirmedAt   *time.Time
+	RejectionNote *string
+	PaidAt        *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }

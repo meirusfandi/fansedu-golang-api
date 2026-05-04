@@ -320,14 +320,28 @@ type AdminPatchEnrollmentRequest struct {
 }
 
 type PaymentResponse struct {
-	ID        string  `json:"id"`
-	UserID    string  `json:"userId"`
-	Amount    int     `json:"amount"`
-	Currency  string  `json:"currency"`
-	Status    string  `json:"status"`
-	Type      string  `json:"type"`
-	PaidAt    *string `json:"paidAt,omitempty"`
-	CreatedAt string  `json:"createdAt"`
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	PayerName     *string `json:"payerName,omitempty"`
+	PayerEmail    *string `json:"payerEmail,omitempty"`
+	PayerPhone    *string `json:"payerPhone,omitempty"`
+	OrderID       *string `json:"orderId,omitempty"`
+	ReferenceID   *string `json:"referenceId,omitempty"`
+	Amount        int     `json:"amount"`
+	Currency      string  `json:"currency"`
+	Status        string  `json:"status"`
+	Type          string  `json:"type"`
+	TypeLabel     string  `json:"typeLabel"`
+	Gateway       *string `json:"gateway,omitempty"`
+	TransactionID *string `json:"transactionId,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	ProofURL      *string `json:"proofUrl,omitempty"`
+	ConfirmedBy   *string `json:"confirmedBy,omitempty"`
+	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
+	RejectionNote *string `json:"rejectionNote,omitempty"`
+	PaidAt        *string `json:"paidAt,omitempty"`
+	CreatedAt     string  `json:"createdAt"`
+	UpdatedAt     string  `json:"updatedAt"`
 }
 
 type MonthlyReportResponse struct {

@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	cryptorand "crypto/rand"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -20,30 +20,30 @@ import (
 )
 
 var (
-	ErrCourseNotFound  = errors.New("course not found")
-	ErrOrderNotFound   = errors.New("order not found")
-	ErrOrderNotPending = errors.New("order is not pending")
-	ErrPromoInvalid    = errors.New("kode promo tidak valid")
-	ErrPromoExpired    = errors.New("kode promo sudah kadaluarsa")
-	ErrPromoMaxUses    = errors.New("kode promo sudah mencapai batas penggunaan")
-	ErrPackageNoLinkedCourses = errors.New("paket belum dihubungkan ke kelas manapun")
-	ErrManualOrderNoCourses     = errors.New("minimal satu courseId diperlukan")
-	ErrManualOrderUserNotFound  = errors.New("pengguna tidak ditemukan")
+	ErrCourseNotFound          = errors.New("course not found")
+	ErrOrderNotFound           = errors.New("order not found")
+	ErrOrderNotPending         = errors.New("order is not pending")
+	ErrPromoInvalid            = errors.New("kode promo tidak valid")
+	ErrPromoExpired            = errors.New("kode promo sudah kadaluarsa")
+	ErrPromoMaxUses            = errors.New("kode promo sudah mencapai batas penggunaan")
+	ErrPackageNoLinkedCourses  = errors.New("paket belum dihubungkan ke kelas manapun")
+	ErrManualOrderNoCourses    = errors.New("minimal satu courseId diperlukan")
+	ErrManualOrderUserNotFound = errors.New("pengguna tidak ditemukan")
 )
 
 type CheckoutInitiateResult struct {
 	OrderID          string
 	UserID           string
-	TotalPrice       int    // rupiah
-	NormalPrice      int    // rupiah
+	TotalPrice       int // rupiah
+	NormalPrice      int // rupiah
 	PromoCode        string
-	Discount         int    // rupiah
+	Discount         int // rupiah
 	DiscountPercent  float64
-	FinalPrice       int    // rupiah
+	FinalPrice       int // rupiah
 	ConfirmationCode string
 	IsNewUser        bool
 	CourseTitle      string
-	Price            int    // rupiah (harga course)
+	Price            int // rupiah (harga course)
 	IsCollective     bool
 	Quantity         int
 	UnitPrice        int
@@ -128,6 +128,7 @@ type paymentRepoForCheckout interface {
 	Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 	GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
 	Update(ctx context.Context, p domain.Payment) error
+	MarkPaidByOrderID(ctx context.Context, orderID string, paidAt time.Time) error
 	BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error
 }
 
@@ -310,9 +311,9 @@ func (s *checkoutService) Initiate(ctx context.Context, courseSlug, email, name,
 	}
 
 	_, err = s.orderItemRepo.Create(ctx, domain.OrderItem{
-		OrderID:   order.ID,
-		CourseID:  course.ID,
-		Price:     normalRupiah,
+		OrderID:  order.ID,
+		CourseID: course.ID,
+		Price:    normalRupiah,
 	})
 	if err != nil {
 		return nil, err
@@ -641,14 +642,14 @@ func (s *checkoutService) CreatePaymentSession(ctx context.Context, orderID, pay
 
 	ref := orderID
 	_, err = s.paymentRepo.Create(ctx, domain.Payment{
-		UserID:   order.UserID,
-		OrderID:  &orderID,
-		Amount:   order.TotalPrice,
-		Currency: "IDR",
-		Status:        domain.PaymentStatusPending,
-		Type:          domain.PaymentTypeCoursePurchase,
-		Gateway:       &paymentMethod,
-		ReferenceID:   &ref,
+		UserID:      order.UserID,
+		OrderID:     &orderID,
+		Amount:      order.TotalPrice,
+		Currency:    "IDR",
+		Status:      domain.PaymentStatusPending,
+		Type:        domain.PaymentTypeCoursePurchase,
+		Gateway:     &paymentMethod,
+		ReferenceID: &ref,
 	})
 	if err != nil {
 		return "", err
@@ -677,16 +678,18 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 	if err != nil {
 		return err
 	}
-	if order.Status == domain.OrderStatusPaid {
-		return nil
-	}
-
-	if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusPaid); err != nil {
+	if err := s.paymentRepo.MarkPaidByOrderID(ctx, orderID, time.Now()); err != nil {
 		return err
 	}
 
-	order.Status = domain.OrderStatusPaid
-	s.finalizePromoAfterPayment(ctx, order)
+	if order.Status != domain.OrderStatusPaid {
+		if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusPaid); err != nil {
+			return err
+		}
+
+		order.Status = domain.OrderStatusPaid
+		s.finalizePromoAfterPayment(ctx, order)
+	}
 
 	items, err := s.orderItemRepo.ListByOrderID(ctx, orderID)
 	if err != nil {
@@ -729,14 +732,18 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string, purch
 	if err != nil {
 		return ErrOrderNotFound
 	}
-	if order.Status == domain.OrderStatusPaid {
-		return nil
-	}
-	if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusPaid); err != nil {
+	if err := s.paymentRepo.MarkPaidByOrderID(ctx, orderID, time.Now()); err != nil {
 		return err
 	}
-	order.Status = domain.OrderStatusPaid
-	s.finalizePromoAfterPayment(ctx, order)
+	newlyPaid := false
+	if order.Status != domain.OrderStatusPaid {
+		if err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusPaid); err != nil {
+			return err
+		}
+		order.Status = domain.OrderStatusPaid
+		s.finalizePromoAfterPayment(ctx, order)
+		newlyPaid = true
+	}
 
 	items, err := s.orderItemRepo.ListByOrderID(ctx, orderID)
 	if err != nil {
@@ -753,18 +760,20 @@ func (s *checkoutService) VerifyOrder(ctx context.Context, orderID string, purch
 		_ = s.orderRepo.UpdateOrderCreatedAt(ctx, orderID, *purchasedAt)
 		_ = s.paymentRepo.BackdateByOrderID(ctx, orderID, *purchasedAt)
 	}
-	programName := s.orderProgramTitle(ctx, order, items)
-	user, _ := s.userRepo.FindByID(ctx, order.UserID)
-	registerLink := ""
-	if s.inviteRepo != nil && user.Email != "" {
-		inv, err := s.inviteRepo.GetByOrderID(ctx, orderID)
-		if err == nil && inv.UsedAt == nil {
-			registerLink = s.appURL + "/#/register?token=" + inv.Token + "&email=" + url.QueryEscape(user.Email)
+	if newlyPaid {
+		programName := s.orderProgramTitle(ctx, order, items)
+		user, _ := s.userRepo.FindByID(ctx, order.UserID)
+		registerLink := ""
+		if s.inviteRepo != nil && user.Email != "" {
+			inv, err := s.inviteRepo.GetByOrderID(ctx, orderID)
+			if err == nil && inv.UsedAt == nil {
+				registerLink = s.appURL + "/#/register?token=" + inv.Token + "&email=" + url.QueryEscape(user.Email)
+			}
 		}
-	}
-	if s.mailer != nil && user.Email != "" {
-		body := mail.PaymentVerifiedBody(programName, registerLink)
-		_ = s.mailer.Send(user.Email, "Pembayaran Terverifikasi - "+programName, body)
+		if s.mailer != nil && user.Email != "" {
+			body := mail.PaymentVerifiedBody(programName, registerLink)
+			_ = s.mailer.Send(user.Email, "Pembayaran Terverifikasi - "+programName, body)
+		}
 	}
 	return nil
 }

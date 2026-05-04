@@ -1422,19 +1422,51 @@ func AdminListPayments(deps *Deps) http.HandlerFunc {
 				s := list[i].PaidAt.Format(time.RFC3339)
 				paidAt = &s
 			}
+			var confirmedAt *string
+			if list[i].ConfirmedAt != nil {
+				s := list[i].ConfirmedAt.Format(time.RFC3339)
+				confirmedAt = &s
+			}
 			out[i] = dto.PaymentResponse{
-				ID:        list[i].ID,
-				UserID:    list[i].UserID,
-				Amount:    list[i].Amount,
-				Currency:  list[i].Currency,
-				Status:    list[i].Status,
-				Type:      list[i].Type,
-				PaidAt:    paidAt,
-				CreatedAt: list[i].CreatedAt.Format(time.RFC3339),
+				ID:            list[i].ID,
+				UserID:        list[i].UserID,
+				PayerName:     list[i].PayerName,
+				PayerEmail:    list[i].PayerEmail,
+				PayerPhone:    list[i].PayerPhone,
+				OrderID:       list[i].OrderID,
+				ReferenceID:   list[i].ReferenceID,
+				Amount:        list[i].Amount,
+				Currency:      list[i].Currency,
+				Status:        list[i].Status,
+				Type:          list[i].Type,
+				TypeLabel:     paymentTypeLabel(list[i].Type),
+				Gateway:       list[i].Gateway,
+				TransactionID: list[i].TransactionID,
+				Description:   list[i].Description,
+				ProofURL:      list[i].ProofURL,
+				ConfirmedBy:   list[i].ConfirmedBy,
+				ConfirmedAt:   confirmedAt,
+				RejectionNote: list[i].RejectionNote,
+				PaidAt:        paidAt,
+				CreatedAt:     list[i].CreatedAt.Format(time.RFC3339),
+				UpdatedAt:     list[i].UpdatedAt.Format(time.RFC3339),
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+func paymentTypeLabel(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case domain.PaymentTypeCoursePurchase:
+		return "Pembelian Kelas"
+	case domain.PaymentTypeSubscription:
+		return "Langganan"
+	case domain.PaymentTypeTryout:
+		return "Tryout"
+	default:
+		return "Lainnya"
 	}
 }
 
@@ -1504,14 +1536,24 @@ func AdminCreatePayment(deps *Deps) http.HandlerFunc {
 			paidAtStr = &s
 		}
 		_ = json.NewEncoder(w).Encode(dto.PaymentResponse{
-			ID:        created.ID,
-			UserID:    created.UserID,
-			Amount:    created.Amount,
-			Currency:  created.Currency,
-			Status:    created.Status,
-			Type:      created.Type,
-			PaidAt:    paidAtStr,
-			CreatedAt: created.CreatedAt.Format(time.RFC3339),
+			ID:            created.ID,
+			UserID:        created.UserID,
+			OrderID:       created.OrderID,
+			ReferenceID:   created.ReferenceID,
+			Amount:        created.Amount,
+			Currency:      created.Currency,
+			Status:        created.Status,
+			Type:          created.Type,
+			TypeLabel:     paymentTypeLabel(created.Type),
+			Gateway:       created.Gateway,
+			TransactionID: created.TransactionID,
+			Description:   created.Description,
+			ProofURL:      created.ProofURL,
+			ConfirmedBy:   created.ConfirmedBy,
+			RejectionNote: created.RejectionNote,
+			PaidAt:        paidAtStr,
+			CreatedAt:     created.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:     created.UpdatedAt.Format(time.RFC3339),
 		})
 	}
 }
@@ -1536,6 +1578,12 @@ func AdminConfirmPayment(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if req.Confirmed {
+			if err := syncPaymentOrderEnrollment(r.Context(), deps, paymentID); err != nil {
+				http.Error(w, "payment approved but failed to sync enrollment: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment updated"})
 	}
@@ -1554,9 +1602,27 @@ func AdminConfirmPaymentByAction(deps *Deps) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		if err := syncPaymentOrderEnrollment(r.Context(), deps, paymentID); err != nil {
+			http.Error(w, "payment approved but failed to sync enrollment: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "payment confirmed"})
 	}
+}
+
+func syncPaymentOrderEnrollment(ctx context.Context, deps *Deps, paymentID string) error {
+	if deps.PaymentRepo == nil || deps.CheckoutService == nil {
+		return nil
+	}
+	p, err := deps.PaymentRepo.GetByID(ctx, paymentID)
+	if err != nil {
+		return err
+	}
+	if p.OrderID == nil || strings.TrimSpace(*p.OrderID) == "" {
+		return nil
+	}
+	return deps.CheckoutService.VerifyOrder(ctx, *p.OrderID, nil)
 }
 
 // AdminRejectPaymentByAction: POST /api/v1/admin/payments/:paymentId/reject
@@ -1647,12 +1713,19 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 			}
 			paymentOut = map[string]any{
 				"id":            p.ID,
+				"orderId":       p.OrderID,
+				"referenceId":   p.ReferenceID,
+				"payerName":     user.Name,
+				"payerEmail":    user.Email,
+				"payerPhone":    user.Phone,
 				"amount":        p.Amount,
 				"currency":      p.Currency,
 				"status":        p.Status,
 				"type":          p.Type,
+				"typeLabel":     paymentTypeLabel(p.Type),
 				"gateway":       p.Gateway,
 				"transactionId": p.TransactionID,
+				"description":   p.Description,
 				"proofUrl":      p.ProofURL,
 				"confirmedBy":   p.ConfirmedBy,
 				"confirmedAt":   confirmedAt,

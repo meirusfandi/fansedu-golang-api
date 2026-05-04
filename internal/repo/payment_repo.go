@@ -18,6 +18,7 @@ type PaymentRepo interface {
 	ListByUserID(ctx context.Context, userID string, limit int) ([]domain.Payment, error)
 	GetByID(ctx context.Context, id string) (domain.Payment, error)
 	Update(ctx context.Context, p domain.Payment) error
+	MarkPaidByOrderID(ctx context.Context, orderID string, paidAt time.Time) error
 	BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error
 	CountPaidInMonth(ctx context.Context, year, month int) (int, error)
 	TotalAmountPaidInMonth(ctx context.Context, year, month int) (int64, error)
@@ -107,8 +108,15 @@ func (r *paymentRepo) List(ctx context.Context, limit int) ([]domain.Payment, er
 		limit = 50
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, amount, currency, status, type, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
-		FROM payments ORDER BY created_at DESC LIMIT $1
+		SELECT p.id, p.user_id, p.order_id, p.amount, p.currency, p.status, p.type,
+			p.gateway, p.transaction_id,
+			p.reference_id, p.description, p.proof_url, p.paid_at,
+			p.confirmed_by, p.confirmed_at, p.rejection_note, p.created_at, p.updated_at,
+			u.name, u.email, u.phone
+		FROM payments p
+		LEFT JOIN users u ON u.id = p.user_id
+		ORDER BY p.created_at DESC
+		LIMIT $1
 	`, limit)
 	if err != nil {
 		return nil, err
@@ -117,10 +125,28 @@ func (r *paymentRepo) List(ctx context.Context, limit int) ([]domain.Payment, er
 	var list []domain.Payment
 	for rows.Next() {
 		var p domain.Payment
-		var refID, confirmedBy pgtype.UUID
+		var refID, confirmedBy, ordID pgtype.UUID
 		var proofURL, rejectionNote pgtype.Text
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Amount, &p.Currency, &p.Status, &p.Type, &refID, &p.Description, &proofURL, &p.PaidAt, &confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var gateway, transactionID pgtype.Text
+		var payerName, payerEmail, payerPhone pgtype.Text
+		if err := rows.Scan(
+			&p.ID, &p.UserID, &ordID, &p.Amount, &p.Currency, &p.Status, &p.Type,
+			&gateway, &transactionID,
+			&refID, &p.Description, &proofURL, &p.PaidAt,
+			&confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt,
+			&payerName, &payerEmail, &payerPhone,
+		); err != nil {
 			return nil, err
+		}
+		if ordID.Valid {
+			s := uuid.UUID(ordID.Bytes).String()
+			p.OrderID = &s
+		}
+		if gateway.Valid {
+			p.Gateway = &gateway.String
+		}
+		if transactionID.Valid {
+			p.TransactionID = &transactionID.String
 		}
 		if refID.Valid {
 			s := uuid.UUID(refID.Bytes).String()
@@ -135,6 +161,15 @@ func (r *paymentRepo) List(ctx context.Context, limit int) ([]domain.Payment, er
 		}
 		if rejectionNote.Valid {
 			p.RejectionNote = &rejectionNote.String
+		}
+		if payerName.Valid {
+			p.PayerName = &payerName.String
+		}
+		if payerEmail.Valid {
+			p.PayerEmail = &payerEmail.String
+		}
+		if payerPhone.Valid {
+			p.PayerPhone = &payerPhone.String
 		}
 		list = append(list, p)
 	}
@@ -182,15 +217,19 @@ func (r *paymentRepo) ListByUserID(ctx context.Context, userID string, limit int
 
 func (r *paymentRepo) GetByID(ctx context.Context, id string) (domain.Payment, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, amount, currency, status, type, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
+		SELECT id, user_id, order_id, amount, currency, status, type, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
 		FROM payments WHERE id = $1::uuid
 	`, id)
 	var p domain.Payment
-	var refID, confirmedBy pgtype.UUID
+	var refID, confirmedBy, ordID pgtype.UUID
 	var proofURL, rejectionNote pgtype.Text
-	err := row.Scan(&p.ID, &p.UserID, &p.Amount, &p.Currency, &p.Status, &p.Type, &refID, &p.Description, &proofURL, &p.PaidAt, &confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt)
+	err := row.Scan(&p.ID, &p.UserID, &ordID, &p.Amount, &p.Currency, &p.Status, &p.Type, &refID, &p.Description, &proofURL, &p.PaidAt, &confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return domain.Payment{}, err
+	}
+	if ordID.Valid {
+		s := uuid.UUID(ordID.Bytes).String()
+		p.OrderID = &s
 	}
 	if refID.Valid {
 		s := uuid.UUID(refID.Bytes).String()
@@ -214,6 +253,18 @@ func (r *paymentRepo) BackdateByOrderID(ctx context.Context, orderID string, t t
 	_, err := r.pool.Exec(ctx, `
 		UPDATE payments SET paid_at = $2, created_at = $2, updated_at = NOW() WHERE order_id = $1::uuid
 	`, orderID, t)
+	return err
+}
+
+// MarkPaidByOrderID menyelaraskan payment row terkait order menjadi paid (untuk webhook/verify flow).
+func (r *paymentRepo) MarkPaidByOrderID(ctx context.Context, orderID string, paidAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE payments
+		SET status = 'paid'::payment_status,
+		    paid_at = COALESCE(paid_at, $2),
+		    updated_at = NOW()
+		WHERE order_id = $1::uuid
+	`, orderID, paidAt)
 	return err
 }
 
