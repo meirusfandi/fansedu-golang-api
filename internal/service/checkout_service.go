@@ -715,6 +715,34 @@ func (s *checkoutService) SubmitPaymentProof(ctx context.Context, orderID, proof
 	if err := s.orderRepo.UpdatePaymentProof(ctx, orderID, proofURL, senderAccountNo, senderName, proofAt); err != nil {
 		return err
 	}
+	if p, err := s.paymentRepo.GetByOrderID(ctx, orderID); err == nil {
+		p.ProofURL = &proofURL
+		if p.Gateway == nil {
+			gw := "bank_transfer"
+			p.Gateway = &gw
+		}
+		if err := s.paymentRepo.Update(ctx, p); err != nil {
+			return err
+		}
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		ref := orderID
+		gw := "bank_transfer"
+		if _, err := s.paymentRepo.Create(ctx, domain.Payment{
+			UserID:      order.UserID,
+			OrderID:     &orderID,
+			Amount:      order.TotalPrice,
+			Currency:    "IDR",
+			Status:      domain.PaymentStatusPending,
+			Type:        domain.PaymentTypeCoursePurchase,
+			Gateway:     &gw,
+			ReferenceID: &ref,
+			ProofURL:    &proofURL,
+		}); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
 	items, _ := s.orderItemRepo.ListByOrderID(ctx, orderID)
 	programName := s.orderProgramTitle(ctx, order, items)
 	user, _ := s.userRepo.FindByID(ctx, order.UserID)

@@ -1701,6 +1701,10 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 
 		var paymentOut any
 		if p, err := deps.PaymentRepo.GetByOrderID(r.Context(), orderID); err == nil {
+			proofURL := p.ProofURL
+			if proofURL == nil {
+				proofURL = order.PaymentProofURL
+			}
 			var paidAt *string
 			if p.PaidAt != nil {
 				s := p.PaidAt.Format(time.RFC3339)
@@ -1726,7 +1730,7 @@ func AdminTransactionDetail(deps *Deps) http.HandlerFunc {
 				"gateway":       p.Gateway,
 				"transactionId": p.TransactionID,
 				"description":   p.Description,
-				"proofUrl":      p.ProofURL,
+				"proofUrl":      proofURL,
 				"confirmedBy":   p.ConfirmedBy,
 				"confirmedAt":   confirmedAt,
 				"rejectionNote": p.RejectionNote,

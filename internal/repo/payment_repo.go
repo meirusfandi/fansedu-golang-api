@@ -65,8 +65,15 @@ func (r *paymentRepo) Create(ctx context.Context, p domain.Payment) (domain.Paym
 
 func (r *paymentRepo) GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, order_id, amount, currency, status, type, gateway, transaction_id, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
-		FROM payments WHERE order_id = $1::uuid ORDER BY created_at DESC LIMIT 1
+		SELECT p.id, p.user_id, p.order_id, p.amount, p.currency, p.status, p.type,
+			p.gateway, p.transaction_id, p.reference_id, p.description,
+			COALESCE(p.proof_url, o.payment_proof_url) AS proof_url,
+			p.paid_at, p.confirmed_by, p.confirmed_at, p.rejection_note, p.created_at, p.updated_at
+		FROM payments p
+		LEFT JOIN orders o ON o.id = p.order_id
+		WHERE p.order_id = $1::uuid
+		ORDER BY p.created_at DESC
+		LIMIT 1
 	`, orderID)
 	var p domain.Payment
 	var refID, confirmedBy, ordID pgtype.UUID
@@ -110,11 +117,12 @@ func (r *paymentRepo) List(ctx context.Context, limit int) ([]domain.Payment, er
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.user_id, p.order_id, p.amount, p.currency, p.status, p.type,
 			p.gateway, p.transaction_id,
-			p.reference_id, p.description, p.proof_url, p.paid_at,
+			p.reference_id, p.description, COALESCE(p.proof_url, o.payment_proof_url) AS proof_url, p.paid_at,
 			p.confirmed_by, p.confirmed_at, p.rejection_note, p.created_at, p.updated_at,
 			u.name, u.email, u.phone
 		FROM payments p
 		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN orders o ON o.id = p.order_id
 		ORDER BY p.created_at DESC
 		LIMIT $1
 	`, limit)
@@ -217,8 +225,12 @@ func (r *paymentRepo) ListByUserID(ctx context.Context, userID string, limit int
 
 func (r *paymentRepo) GetByID(ctx context.Context, id string) (domain.Payment, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, user_id, order_id, amount, currency, status, type, reference_id, description, proof_url, paid_at, confirmed_by, confirmed_at, rejection_note, created_at, updated_at
-		FROM payments WHERE id = $1::uuid
+		SELECT p.id, p.user_id, p.order_id, p.amount, p.currency, p.status, p.type,
+			p.reference_id, p.description, COALESCE(p.proof_url, o.payment_proof_url) AS proof_url,
+			p.paid_at, p.confirmed_by, p.confirmed_at, p.rejection_note, p.created_at, p.updated_at
+		FROM payments p
+		LEFT JOIN orders o ON o.id = p.order_id
+		WHERE p.id = $1::uuid
 	`, id)
 	var p domain.Payment
 	var refID, confirmedBy, ordID pgtype.UUID
