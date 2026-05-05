@@ -13,7 +13,6 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/dto"
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
-	"github.com/meirusfandi/fansedu-golang-api/internal/repo"
 )
 
 func trainerOwnsCourse(c domain.Course, trainerUserID string) bool {
@@ -125,42 +124,6 @@ func TrainerCourseProgramPut(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusForbidden, "forbidden", "you can only manage your own courses")
 			return
 		}
-		var req dto.AdminCourseProgramPutRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "invalid body")
-			return
-		}
-		meetings := make([]domain.CourseProgramMeeting, 0, len(req.Meetings))
-		for _, it := range req.Meetings {
-			meetings = append(meetings, domain.CourseProgramMeeting{
-				MeetingNumber: it.MeetingNumber,
-				Title:         it.Title,
-				DetailText:    it.DetailText,
-				PdfURL:        it.PdfURL,
-				PptURL:        it.PptURL,
-				PrTitle:       it.PrTitle,
-				PrDescription: it.PrDescription,
-				LiveClassURL:  it.LiveClassURL,
-				RecordingURL:  it.RecordingURL,
-			})
-		}
-		track := strings.TrimSpace(strings.ToLower(req.TrackType))
-		if track == "" {
-			track = domain.CourseTrackMeetings
-		} else if track != domain.CourseTrackMeetings && track != domain.CourseTrackTryout {
-			writeError(w, http.StatusBadRequest, "validation_error", "trackType must be \"meetings\" or \"tryout\"")
-			return
-		}
-		err = deps.CourseProgramService.SaveProgram(r.Context(), courseID, track, meetings, req.PretestTryoutSessionID)
-		if err != nil {
-			if errors.Is(err, repo.ErrCourseProgramValidation) {
-				writeError(w, http.StatusBadRequest, "validation_error", err.Error())
-				return
-			}
-			writeInternalError(w, r, err)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "course program saved; learning journey rebuilt"})
+		writeError(w, http.StatusForbidden, "forbidden", "program and learning journey can only be saved via admin LMS (PUT /api/v1/admin/courses/{courseId}/program)")
 	}
 }

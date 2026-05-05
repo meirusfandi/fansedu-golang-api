@@ -65,4 +65,4 @@ function regencies(provinceId):
 
 ## Frontend
 
-Setelah backend siap, FE bisa memakai `VITE_GEO_SOURCE=internal` dan memanggil `{VITE_API_URL}/api/v1/geo/...` (bukan emsifa langsung). Cache browser (localStorage) di FE tetap opsional untuk mengurangi request ke API.
+Setelah backend siap, FE memakai `VITE_GEO_SOURCE=internal` dan memanggil `{VITE_API_URL}/api/v1/geo/...` (bukan emsifa langsung). Sumber data wilayah harus dari API ini; jangan menyimpan daftar provinsi/kabupaten di `localStorage` atau cache browser—backend sudah memakai Redis sehingga request ke API aman dan konsisten.

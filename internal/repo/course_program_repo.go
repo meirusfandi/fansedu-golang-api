@@ -82,6 +82,10 @@ func (r *courseProgramRepo) SaveProgram(ctx context.Context, courseID string, tr
 		return fmt.Errorf("%w: invalid track_type", ErrCourseProgramValidation)
 	}
 
+	if track == domain.CourseTrackMeetings && len(meetings) == 0 {
+		return fmt.Errorf("%w: at least one meeting is required when trackType is \"meetings\"", ErrCourseProgramValidation)
+	}
+
 	seen := map[int]struct{}{}
 	for _, m := range meetings {
 		if m.MeetingNumber < 1 || m.MeetingNumber > 8 {

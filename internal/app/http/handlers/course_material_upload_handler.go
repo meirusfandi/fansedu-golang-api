@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +25,38 @@ var allowedCourseMaterialContentTypes = map[string]struct{}{
 	"application/vnd.openxmlformats-officedocument.presentationml.presentation": {},
 	"application/octet-stream":                                                  {},
 	"application/zip":                                                           {}, // beberapa klien mengirim .pptx sebagai zip
+	"application/x-zip-compressed":                                              {},
+}
+
+func isAllowedCourseMaterialContentType(raw string) bool {
+	ct := strings.ToLower(strings.TrimSpace(raw))
+	if ct == "" {
+		return true
+	}
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err == nil {
+		ct = strings.ToLower(strings.TrimSpace(mediaType))
+	} else if i := strings.Index(ct, ";"); i >= 0 {
+		ct = strings.TrimSpace(ct[:i])
+	}
+	if _, ok := allowedCourseMaterialContentTypes[ct]; ok {
+		return true
+	}
+	// Beberapa browser/proxy mengubah mime OpenXML menjadi generic vendor type.
+	if strings.HasPrefix(ct, "application/vnd.openxmlformats-officedocument") {
+		return true
+	}
+	return false
+}
+
+func openCourseMaterialFormFile(r *http.Request) (multipartFile multipart.File, fh *multipart.FileHeader, err error) {
+	for _, field := range []string{"file", "attachment", "material"} {
+		f, h, e := r.FormFile(field)
+		if e == nil {
+			return f, h, nil
+		}
+	}
+	return nil, nil, http.ErrMissingFile
 }
 
 func isAllowedCourseMaterialFilename(name string) bool {
@@ -41,9 +75,9 @@ func saveCourseMaterialFile(w http.ResponseWriter, r *http.Request) (publicPath 
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid multipart form")
 		return "", false
 	}
-	file, fh, err := r.FormFile("file")
+	file, fh, err := openCourseMaterialFormFile(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "file required (form field: file)")
+		writeError(w, http.StatusBadRequest, "bad_request", "file required (form field: file/attachment/material)")
 		return "", false
 	}
 	defer file.Close()
@@ -60,12 +94,10 @@ func saveCourseMaterialFile(w http.ResponseWriter, r *http.Request) (publicPath 
 		writeError(w, http.StatusBadRequest, "invalid_file_type", "only .pdf, .doc, .docx, .ppt, and .pptx allowed")
 		return "", false
 	}
-	ct := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
-	if ct != "" {
-		if _, ok := allowedCourseMaterialContentTypes[ct]; !ok {
-			writeError(w, http.StatusBadRequest, "invalid_file_type", "content-type not allowed for course material upload")
-			return "", false
-		}
+	ct := fh.Header.Get("Content-Type")
+	if !isAllowedCourseMaterialContentType(ct) {
+		writeError(w, http.StatusBadRequest, "invalid_file_type", "content-type not allowed for course material upload")
+		return "", false
 	}
 	if err := os.MkdirAll(courseMaterialUploadDir, 0755); err != nil {
 		writeInternalError(w, r, err)

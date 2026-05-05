@@ -306,6 +306,10 @@ func (r *landingPackageRepoPg) ReplaceLinkedCourses(ctx context.Context, package
 	if packageID == "" {
 		return nil
 	}
+	// Kosong = jangan hapus baris package_courses (hindari hilangnya tautan kelas dari PUT parsial / bug client).
+	if len(courseIDs) == 0 {
+		return nil
+	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err

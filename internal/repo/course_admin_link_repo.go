@@ -69,6 +69,10 @@ func (r *courseAdminLinkRepo) ListPackagesForCourse(ctx context.Context, courseI
 }
 
 func (r *courseAdminLinkRepo) ReplacePackagesForCourse(ctx context.Context, courseID string, packageIDs []string) error {
+	// Kosong = pertahankan tautan paket landing yang ada (jangan hapus semua dari PUT dengan daftar kosong).
+	if len(packageIDs) == 0 {
+		return nil
+	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
