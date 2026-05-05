@@ -227,7 +227,7 @@ func AttemptSubmit(deps *Deps) http.HandlerFunc {
 					UserID: t.ID,
 					Title:  "Progress Siswa",
 					Body:   body,
-					Type:   "progress_update",
+					Type:   "progressUpdate",
 				})
 			}
 		}

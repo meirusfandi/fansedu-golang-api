@@ -212,7 +212,7 @@ func StudentNextActions(deps *Deps) http.HandlerFunc {
 		if len(pendingOrders) > 0 {
 			actions = append(actions, dto.StudentNextAction{
 				ID:          "action-payment-pending",
-				Type:        "payment_pending",
+				Type:        "paymentPending",
 				Title:       "Pembayaran tertunda",
 				Description: "Silakan lengkapi bukti pembayaran untuk memverifikasi order kamu.",
 				Href:        "#/student/transactions",
@@ -227,7 +227,7 @@ func StudentNextActions(deps *Deps) http.HandlerFunc {
 				row := inProgRows[0]
 				actions = append(actions, dto.StudentNextAction{
 					ID:              "action-continue-course",
-					Type:            "continue_course",
+					Type:            "continueCourse",
 					Title:           "Lanjutkan " + row.CourseTitle,
 					Description:     "Progress kamu " + strconv.Itoa(enrollmentProgressPercent(row.EnrollmentStatus)) + "%",
 					Href:            "#/student/courses/" + row.CourseSlug,
@@ -242,7 +242,7 @@ func StudentNextActions(deps *Deps) http.HandlerFunc {
 					if enrollmentProgressPercent(row.EnrollmentStatus) < 100 {
 						actions = append(actions, dto.StudentNextAction{
 							ID:              "action-continue-course",
-							Type:            "continue_course",
+							Type:            "continueCourse",
 							Title:           "Lanjutkan " + row.CourseTitle,
 							Description:     "Progress kamu " + strconv.Itoa(enrollmentProgressPercent(row.EnrollmentStatus)) + "%",
 							Href:            "#/student/courses/" + row.CourseSlug,
@@ -271,7 +271,7 @@ func StudentNextActions(deps *Deps) http.HandlerFunc {
 				}
 				actions = append(actions, dto.StudentNextAction{
 					ID:          "action-start-tryout-" + t.ID,
-					Type:        "start_tryout",
+					Type:        "startTryout",
 					Title:       "Mulai " + t.Title,
 					Description: "Ujian tryout dimulai sekarang.",
 					Href:        "#/student/tryouts/" + t.ID,

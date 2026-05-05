@@ -11,6 +11,7 @@ type Course struct {
 	Price       int // nominal dalam rupiah
 	Thumbnail   *string
 	SubjectID   *string
+	LevelID     *string
 	CreatedBy   *string
 	// TrackType: "meetings" = alur pertemuan (PDF/PR/live); "tryout" = fokus tryout terhubung.
 	TrackType string

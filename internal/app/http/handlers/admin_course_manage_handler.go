@@ -25,6 +25,7 @@ func adminCourseToDTO(c domain.Course) dto.CourseResponse {
 		Price:       c.Price,
 		Thumbnail:   c.Thumbnail,
 		SubjectID:   c.SubjectID,
+		LevelID:     c.LevelID,
 		CreatedBy:   c.CreatedBy,
 		TrackType:   tt,
 	}

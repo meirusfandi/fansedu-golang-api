@@ -364,12 +364,13 @@ func paymentWebhookSecretOK(r *http.Request, secret string) bool {
 	return false
 }
 
-// PaymentWebhook handles gateway webhook (e.g. Midtrans/Stripe). POST /api/v1/webhook/payment
+// PaymentWebhook handles gateway webhook (e.g. Midtrans). POST /api/v1/webhook/payment
+// Body dari Midtrans mengikuti format resmi mereka (snake_case); verifikasi signature + nominal.
 func PaymentWebhook(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			OrderID string `json:"orderId"`
-			// Midtrans notification (HTTP notification / Snap)
+			// Field Midtrans (nama key sesuai dokumentasi Midtrans, bukan konvensi API kita)
 			MidOrderID        string `json:"order_id"`
 			TransactionStatus string `json:"transaction_status"`
 			FraudStatus       string `json:"fraud_status"`

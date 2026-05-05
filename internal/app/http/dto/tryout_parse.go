@@ -8,13 +8,12 @@ import (
 	"time"
 )
 
-// PickTryoutJSONField returns the raw value for camelCase or snake_case key (admin / docs mix).
-func PickTryoutJSONField(m map[string]json.RawMessage, camel, snake string) (json.RawMessage, bool) {
-	if v, ok := m[camel]; ok {
-		return v, true
-	}
-	if v, ok := m[snake]; ok {
-		return v, true
+// PickTryoutJSONField returns the raw value for the first existing key (API memakai camelCase).
+func PickTryoutJSONField(m map[string]json.RawMessage, keys ...string) (json.RawMessage, bool) {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			return v, true
+		}
 	}
 	return nil, false
 }
@@ -91,7 +90,7 @@ func UnmarshalTryoutFloat64(raw json.RawMessage) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
-// PickQuestionJSONField picks first existing key (camelCase, snake_case, alias).
+// PickQuestionJSONField picks first existing key (camelCase API; aliases seperti "stem" tetap didukung).
 func PickQuestionJSONField(m map[string]json.RawMessage, keys ...string) (json.RawMessage, bool) {
 	for _, k := range keys {
 		if v, ok := m[k]; ok {
@@ -103,29 +102,29 @@ func PickQuestionJSONField(m map[string]json.RawMessage, keys ...string) (json.R
 
 // fillQuestionCreateFromMap mengisi QuestionCreateRequest dari objek JSON (campuran penamaan field).
 func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRequest) error {
-	if raw, ok := PickQuestionJSONField(m, "tryoutSessionId", "tryout_session_id"); ok {
+	if raw, ok := PickQuestionJSONField(m, "tryoutSessionId"); ok {
 		if err := json.Unmarshal(raw, &r.TryoutSessionID); err != nil {
 			return fmt.Errorf("tryoutSessionId: %w", err)
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "sortOrder", "sort_order", "order"); ok {
+	if raw, ok := PickQuestionJSONField(m, "sortOrder", "order"); ok {
 		n, err := UnmarshalTryoutInt(raw)
 		if err != nil {
 			return fmt.Errorf("sortOrder: %w", err)
 		}
 		r.SortOrder = n
 	}
-	if raw, ok := PickQuestionJSONField(m, "type", "questionType", "question_type"); ok {
+	if raw, ok := PickQuestionJSONField(m, "type", "questionType"); ok {
 		if err := json.Unmarshal(raw, &r.Type); err != nil {
 			return fmt.Errorf("type: %w", err)
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "body", "stem", "question", "questionText", "question_text"); ok {
+	if raw, ok := PickQuestionJSONField(m, "body", "stem", "question", "questionText"); ok {
 		if err := json.Unmarshal(raw, &r.Body); err != nil {
 			return fmt.Errorf("body: %w", err)
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "imageUrl", "image_url"); ok {
+	if raw, ok := PickQuestionJSONField(m, "imageUrl"); ok {
 		if string(raw) == "null" {
 			r.ImageURL = nil
 		} else {
@@ -136,7 +135,7 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 			r.ImageURL = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "imageUrls", "image_urls"); ok {
+	if raw, ok := PickQuestionJSONField(m, "imageUrls"); ok {
 		if string(raw) == "null" {
 			r.ImageURLs = nil
 		} else {
@@ -154,14 +153,14 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 		}
 		r.Options = v
 	}
-	if raw, ok := PickQuestionJSONField(m, "maxScore", "max_score", "points"); ok {
+	if raw, ok := PickQuestionJSONField(m, "maxScore", "points"); ok {
 		f, err := UnmarshalTryoutFloat64(raw)
 		if err != nil {
 			return fmt.Errorf("maxScore: %w", err)
 		}
 		r.MaxScore = f
 	}
-	if raw, ok := PickQuestionJSONField(m, "moduleId", "module_id"); ok {
+	if raw, ok := PickQuestionJSONField(m, "moduleId"); ok {
 		if string(raw) == "null" {
 			r.ModuleID = nil
 		} else {
@@ -172,7 +171,7 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 			r.ModuleID = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "moduleTitle", "module_title"); ok {
+	if raw, ok := PickQuestionJSONField(m, "moduleTitle"); ok {
 		if string(raw) == "null" {
 			r.ModuleTitle = nil
 		} else {
@@ -205,7 +204,7 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 			r.Tags = arr
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "correctOption", "correct_option"); ok {
+	if raw, ok := PickQuestionJSONField(m, "correctOption"); ok {
 		if string(raw) == "null" {
 			r.CorrectOption = nil
 		} else {
@@ -216,7 +215,7 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 			r.CorrectOption = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "correctText", "correct_text"); ok {
+	if raw, ok := PickQuestionJSONField(m, "correctText"); ok {
 		if string(raw) == "null" {
 			r.CorrectText = nil
 		} else {
@@ -232,7 +231,7 @@ func fillQuestionCreateFromMap(m map[string]json.RawMessage, r *QuestionCreateRe
 
 // fillQuestionUpdateFromMap mengisi QuestionUpdateRequest hanya untuk key yang ada di JSON.
 func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRequest) error {
-	if raw, ok := PickQuestionJSONField(m, "sortOrder", "sort_order", "order"); ok {
+	if raw, ok := PickQuestionJSONField(m, "sortOrder", "order"); ok {
 		if string(raw) == "null" {
 			r.SortOrder = nil
 		} else {
@@ -243,7 +242,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.SortOrder = &n
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "type", "questionType", "question_type"); ok {
+	if raw, ok := PickQuestionJSONField(m, "type", "questionType"); ok {
 		if string(raw) == "null" {
 			r.Type = nil
 		} else {
@@ -254,7 +253,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.Type = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "body", "stem", "question", "questionText", "question_text"); ok {
+	if raw, ok := PickQuestionJSONField(m, "body", "stem", "question", "questionText"); ok {
 		if string(raw) == "null" {
 			r.Body = nil
 		} else {
@@ -265,7 +264,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.Body = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "imageUrl", "image_url"); ok {
+	if raw, ok := PickQuestionJSONField(m, "imageUrl"); ok {
 		if string(raw) == "null" {
 			r.ImageURL = nil
 		} else {
@@ -276,7 +275,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.ImageURL = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "imageUrls", "image_urls"); ok {
+	if raw, ok := PickQuestionJSONField(m, "imageUrls"); ok {
 		if string(raw) == "null" {
 			r.ImageURLs = nil
 		} else {
@@ -298,7 +297,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.Options = &v
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "maxScore", "max_score", "points"); ok {
+	if raw, ok := PickQuestionJSONField(m, "maxScore", "points"); ok {
 		if string(raw) == "null" {
 			r.MaxScore = nil
 		} else {
@@ -309,7 +308,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.MaxScore = &f
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "moduleId", "module_id"); ok {
+	if raw, ok := PickQuestionJSONField(m, "moduleId"); ok {
 		if string(raw) == "null" {
 			r.ModuleID = nil
 		} else {
@@ -320,7 +319,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.ModuleID = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "moduleTitle", "module_title"); ok {
+	if raw, ok := PickQuestionJSONField(m, "moduleTitle"); ok {
 		if string(raw) == "null" {
 			r.ModuleTitle = nil
 		} else {
@@ -353,7 +352,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.Tags = &arr
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "correctOption", "correct_option"); ok {
+	if raw, ok := PickQuestionJSONField(m, "correctOption"); ok {
 		if string(raw) == "null" {
 			r.CorrectOption = nil
 		} else {
@@ -364,7 +363,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 			r.CorrectOption = &s
 		}
 	}
-	if raw, ok := PickQuestionJSONField(m, "correctText", "correct_text"); ok {
+	if raw, ok := PickQuestionJSONField(m, "correctText"); ok {
 		if string(raw) == "null" {
 			r.CorrectText = nil
 		} else {
@@ -378,7 +377,7 @@ func fillQuestionUpdateFromMap(m map[string]json.RawMessage, r *QuestionUpdateRe
 	return nil
 }
 
-// UnmarshalJSON untuk POST soal admin — terima camelCase dan snake_case.
+// UnmarshalJSON untuk POST soal admin — body JSON camelCase.
 func (r *QuestionCreateRequest) UnmarshalJSON(data []byte) error {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -396,14 +395,14 @@ func (r *QuestionUpdateRequest) UnmarshalJSON(data []byte) error {
 	return fillQuestionUpdateFromMap(m, r)
 }
 
-// fillTryoutCreateFromMap fills TryoutCreateRequest from a JSON object (camelCase and/or snake_case keys).
+// fillTryoutCreateFromMap fills TryoutCreateRequest from a JSON object (camelCase keys).
 func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateRequest) error {
-	if raw, ok := PickTryoutJSONField(m, "title", "title"); ok {
+	if raw, ok := PickTryoutJSONField(m, "title"); ok {
 		if err := json.Unmarshal(raw, &r.Title); err != nil {
 			return fmt.Errorf("title: %w", err)
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "shortTitle", "short_title"); ok {
+	if raw, ok := PickTryoutJSONField(m, "shortTitle"); ok {
 		if string(raw) == "null" {
 			r.ShortTitle = nil
 		} else {
@@ -414,7 +413,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			r.ShortTitle = &s
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "description", "description"); ok {
+	if raw, ok := PickTryoutJSONField(m, "description"); ok {
 		if string(raw) == "null" {
 			r.Description = nil
 		} else {
@@ -425,26 +424,26 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			r.Description = &s
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "durationMinutes", "duration_minutes"); ok {
+	if raw, ok := PickTryoutJSONField(m, "durationMinutes"); ok {
 		n, err := UnmarshalTryoutInt(raw)
 		if err != nil {
 			return fmt.Errorf("durationMinutes: %w", err)
 		}
 		r.DurationMinutes = n
 	}
-	if raw, ok := PickTryoutJSONField(m, "questionsCount", "questions_count"); ok {
+	if raw, ok := PickTryoutJSONField(m, "questionsCount"); ok {
 		n, err := UnmarshalTryoutInt(raw)
 		if err != nil {
 			return fmt.Errorf("questionsCount: %w", err)
 		}
 		r.QuestionsCount = n
 	}
-	if raw, ok := PickTryoutJSONField(m, "level", "level"); ok {
+	if raw, ok := PickTryoutJSONField(m, "level"); ok {
 		if err := json.Unmarshal(raw, &r.Level); err != nil {
 			return fmt.Errorf("level: %w", err)
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "subject", "subject"); ok {
+	if raw, ok := PickTryoutJSONField(m, "subject"); ok {
 		if string(raw) == "null" {
 			r.Subject = nil
 		} else {
@@ -460,7 +459,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			}
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "schoolLevel", "school_level"); ok {
+	if raw, ok := PickTryoutJSONField(m, "schoolLevel"); ok {
 		if string(raw) == "null" {
 			r.SchoolLevel = nil
 		} else {
@@ -476,7 +475,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			}
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "subjectId", "subject_id"); ok {
+	if raw, ok := PickTryoutJSONField(m, "subjectId"); ok {
 		if string(raw) == "null" {
 			r.SubjectID = nil
 		} else {
@@ -492,7 +491,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			}
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "levelId", "level_id"); ok {
+	if raw, ok := PickTryoutJSONField(m, "levelId"); ok {
 		if string(raw) == "null" {
 			r.LevelID = nil
 		} else {
@@ -508,21 +507,21 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			}
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "opensAt", "opens_at"); ok {
+	if raw, ok := PickTryoutJSONField(m, "opensAt"); ok {
 		tt, err := UnmarshalTryoutTimeJSON(raw)
 		if err != nil {
 			return fmt.Errorf("opensAt: %w", err)
 		}
 		r.OpensAt = tt
 	}
-	if raw, ok := PickTryoutJSONField(m, "closesAt", "closes_at"); ok {
+	if raw, ok := PickTryoutJSONField(m, "closesAt"); ok {
 		tt, err := UnmarshalTryoutTimeJSON(raw)
 		if err != nil {
 			return fmt.Errorf("closesAt: %w", err)
 		}
 		r.ClosesAt = tt
 	}
-	if raw, ok := PickTryoutJSONField(m, "maxParticipants", "max_participants"); ok {
+	if raw, ok := PickTryoutJSONField(m, "maxParticipants"); ok {
 		if string(raw) == "null" {
 			r.MaxParticipants = nil
 		} else {
@@ -533,7 +532,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 			r.MaxParticipants = &n
 		}
 	}
-	if raw, ok := PickTryoutJSONField(m, "status", "status"); ok {
+	if raw, ok := PickTryoutJSONField(m, "status"); ok {
 		if err := json.Unmarshal(raw, &r.Status); err != nil {
 			return fmt.Errorf("status: %w", err)
 		}
@@ -541,7 +540,7 @@ func fillTryoutCreateFromMap(m map[string]json.RawMessage, r *TryoutCreateReques
 	return nil
 }
 
-// UnmarshalJSON accepts camelCase (frontend) and snake_case (dokumentasi / tooling lama).
+// UnmarshalJSON accepts camelCase request bodies.
 func (r *TryoutCreateRequest) UnmarshalJSON(data []byte) error {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(data, &m); err != nil {

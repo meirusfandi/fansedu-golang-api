@@ -109,7 +109,8 @@ type CourseCreateRequest struct {
 	Status      *string `json:"status,omitempty"`
 	Price       *int    `json:"price,omitempty"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
-	SubjectID   *string `json:"subjectId,omitempty"`
+	SubjectID *string `json:"subjectId,omitempty"`
+	LevelID   *string `json:"levelId,omitempty"`
 	// Opsional: format kelas sekaligus saat create (sama konsep dengan PUT .../program + linked-tryouts).
 	TrackType              *string                         `json:"trackType,omitempty"`
 	Meetings               []AdminCourseProgramMeetingItem `json:"meetings,omitempty"`
@@ -126,7 +127,8 @@ type CourseUpdateRequest struct {
 	Status      *string `json:"status,omitempty"`
 	Price       *int    `json:"price,omitempty"`
 	Thumbnail   *string `json:"thumbnail,omitempty"`
-	SubjectID   *string `json:"subjectId,omitempty"`
+	SubjectID *string `json:"subjectId,omitempty"`
+	LevelID   *string `json:"levelId,omitempty"`
 }
 
 type CertificateIssueRequest struct {

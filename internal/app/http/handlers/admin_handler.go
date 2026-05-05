@@ -951,6 +951,7 @@ func AdminListCourses(deps *Deps) http.HandlerFunc {
 				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
+				LevelID:     list[i].LevelID,
 				CreatedBy:   list[i].CreatedBy,
 				TrackType:   tt,
 			}
@@ -982,6 +983,7 @@ func AdminGetCourse(deps *Deps) http.HandlerFunc {
 			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
+			LevelID:     c.LevelID,
 			CreatedBy:   c.CreatedBy,
 			TrackType:   tt,
 		})
@@ -1014,10 +1016,10 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Slug:        req.Slug,
 			Description: req.Description,
 			Thumbnail:   req.Thumbnail,
-			SubjectID:   req.SubjectID,
 			CreatedBy:   createdByPtr,
 			TrackType:   track,
 		}
+		applyCourseCreateSubjectLevel(&c, req)
 		if req.Status != nil {
 			status, ok := parseCourseStatus(*req.Status)
 			if !ok {
@@ -1099,6 +1101,7 @@ func AdminCreateCourse(deps *Deps) http.HandlerFunc {
 			Price:       created.Price,
 			Thumbnail:   created.Thumbnail,
 			SubjectID:   created.SubjectID,
+			LevelID:     created.LevelID,
 			CreatedBy:   created.CreatedBy,
 			TrackType:   tt,
 		})
@@ -1143,9 +1146,7 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 		if req.Description != nil {
 			c.Description = req.Description
 		}
-		if req.SubjectID != nil {
-			c.SubjectID = req.SubjectID
-		}
+		applyCourseUpdateSubjectLevel(&c, req)
 		if req.Slug != nil {
 			c.Slug = req.Slug
 		}
@@ -1186,9 +1187,46 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 			Price:       updated.Price,
 			Thumbnail:   updated.Thumbnail,
 			SubjectID:   updated.SubjectID,
+			LevelID:     updated.LevelID,
 			CreatedBy:   updated.CreatedBy,
 			TrackType:   tt,
 		})
+	}
+}
+
+// applyCourseCreateSubjectLevel mengisi subject/level dari body camelCase.
+func applyCourseCreateSubjectLevel(c *domain.Course, req dto.CourseCreateRequest) {
+	if req.SubjectID != nil {
+		s := strings.TrimSpace(*req.SubjectID)
+		if s != "" {
+			c.SubjectID = &s
+		}
+	}
+	if req.LevelID != nil {
+		s := strings.TrimSpace(*req.LevelID)
+		if s != "" {
+			c.LevelID = &s
+		}
+	}
+}
+
+// applyCourseUpdateSubjectLevel memperbarui subject/level hanya jika field dikirim di body.
+func applyCourseUpdateSubjectLevel(c *domain.Course, req dto.CourseUpdateRequest) {
+	if req.SubjectID != nil {
+		s := strings.TrimSpace(*req.SubjectID)
+		if s == "" {
+			c.SubjectID = nil
+		} else {
+			c.SubjectID = &s
+		}
+	}
+	if req.LevelID != nil {
+		s := strings.TrimSpace(*req.LevelID)
+		if s == "" {
+			c.LevelID = nil
+		} else {
+			c.LevelID = &s
+		}
 	}
 }
 

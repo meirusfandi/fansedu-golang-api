@@ -9,19 +9,19 @@ import (
 	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 )
 
-// mergeTryoutSessionFromJSON updates only fields present in the JSON body (camelCase or snake_case).
+// mergeTryoutSessionFromJSON updates only fields present in the JSON body (camelCase).
 // Mencegah PUT partial dari admin UI menimpa data dengan nilai nol.
 func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "title", "title"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "title"); ok {
 		if err := json.Unmarshal(raw, &t.Title); err != nil {
 			return fmt.Errorf("title: %w", err)
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "shortTitle", "short_title"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "shortTitle"); ok {
 		if string(raw) == "null" {
 			t.ShortTitle = nil
 		} else {
@@ -32,7 +32,7 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			t.ShortTitle = &s
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "description", "description"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "description"); ok {
 		if string(raw) == "null" {
 			t.Description = nil
 		} else {
@@ -43,26 +43,26 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			t.Description = &s
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "durationMinutes", "duration_minutes"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "durationMinutes"); ok {
 		n, err := dto.UnmarshalTryoutInt(raw)
 		if err != nil {
 			return fmt.Errorf("durationMinutes: %w", err)
 		}
 		t.DurationMinutes = n
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "questionsCount", "questions_count"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "questionsCount"); ok {
 		n, err := dto.UnmarshalTryoutInt(raw)
 		if err != nil {
 			return fmt.Errorf("questionsCount: %w", err)
 		}
 		t.QuestionsCount = n
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "level", "level"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "level"); ok {
 		if err := json.Unmarshal(raw, &t.Level); err != nil {
 			return fmt.Errorf("level: %w", err)
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "subject", "subject"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "subject"); ok {
 		if string(raw) == "null" {
 			t.Subject = nil
 		} else {
@@ -78,7 +78,7 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			}
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "schoolLevel", "school_level"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "schoolLevel"); ok {
 		if string(raw) == "null" {
 			t.SchoolLevel = nil
 		} else {
@@ -94,7 +94,7 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			}
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "subjectId", "subject_id"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "subjectId"); ok {
 		if string(raw) == "null" {
 			t.SubjectID = nil
 		} else {
@@ -110,7 +110,7 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			}
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "levelId", "level_id"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "levelId"); ok {
 		if string(raw) == "null" {
 			t.LevelID = nil
 		} else {
@@ -126,21 +126,21 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			}
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "opensAt", "opens_at"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "opensAt"); ok {
 		tt, err := dto.UnmarshalTryoutTimeJSON(raw)
 		if err != nil {
 			return fmt.Errorf("opensAt: %w", err)
 		}
 		t.OpensAt = tt
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "closesAt", "closes_at"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "closesAt"); ok {
 		tt, err := dto.UnmarshalTryoutTimeJSON(raw)
 		if err != nil {
 			return fmt.Errorf("closesAt: %w", err)
 		}
 		t.ClosesAt = tt
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "maxParticipants", "max_participants"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "maxParticipants"); ok {
 		if string(raw) == "null" {
 			t.MaxParticipants = nil
 		} else {
@@ -151,12 +151,12 @@ func mergeTryoutSessionFromJSON(data []byte, t *domain.TryoutSession) error {
 			t.MaxParticipants = &n
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "status", "status"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "status"); ok {
 		if err := json.Unmarshal(raw, &t.Status); err != nil {
 			return fmt.Errorf("status: %w", err)
 		}
 	}
-	if raw, ok := dto.PickTryoutJSONField(m, "gradingMode", "grading_mode"); ok {
+	if raw, ok := dto.PickTryoutJSONField(m, "gradingMode"); ok {
 		if err := json.Unmarshal(raw, &t.GradingMode); err != nil {
 			return fmt.Errorf("gradingMode: %w", err)
 		}

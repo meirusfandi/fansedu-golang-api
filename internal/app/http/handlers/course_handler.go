@@ -38,6 +38,7 @@ func CourseList(deps *Deps) http.HandlerFunc {
 				Price:       list[i].Price,
 				Thumbnail:   list[i].Thumbnail,
 				SubjectID:   list[i].SubjectID,
+				LevelID:     list[i].LevelID,
 				CreatedBy:   list[i].CreatedBy,
 				TrackType:   tt,
 			})
@@ -78,6 +79,7 @@ func CourseGetBySlug(deps *Deps) http.HandlerFunc {
 			Price:       c.Price,
 			Thumbnail:   c.Thumbnail,
 			SubjectID:   c.SubjectID,
+			LevelID:     c.LevelID,
 			CreatedBy:   c.CreatedBy,
 			TrackType:   tt,
 		})
