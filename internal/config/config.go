@@ -51,6 +51,9 @@ type Config struct {
 	MidtransServerKey    string
 	MidtransIsProduction bool
 	MidtransSnapBaseURL  string // optional override
+	// PaymentWebhookSecret: wajib untuk notifikasi non-Midtrans ke POST /api/v1/webhook/payment
+	// (body hanya { "orderId": "..." }). Midtrans JSON tidak perlu header ini; verifikasi via signature.
+	PaymentWebhookSecret string
 }
 
 // LoadEnvFile loads .env for production (when ENV=production) or .env.dev for development.
@@ -134,6 +137,7 @@ func Load() Config {
 		MidtransServerKey:          getenv("MIDTRANS_SERVER_KEY", ""),
 		MidtransIsProduction:       strings.EqualFold(getenv("MIDTRANS_IS_PRODUCTION", "false"), "true"),
 		MidtransSnapBaseURL:        getenv("MIDTRANS_SNAP_BASE_URL", ""),
+		PaymentWebhookSecret:       getenv("PAYMENT_WEBHOOK_SECRET", ""),
 	}
 
 	return cfg

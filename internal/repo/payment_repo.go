@@ -14,6 +14,10 @@ import (
 type PaymentRepo interface {
 	Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 	GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
+	// GetPendingByOrderID pembayaran pending terbaru untuk order (untuk hindari duplikat row di payment-session).
+	GetPendingByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
+	// UpdateGatewayForPendingOrder memperbarui gateway pada baris pending order (ganti metode bayar).
+	UpdateGatewayForPendingOrder(ctx context.Context, orderID, gateway string) error
 	List(ctx context.Context, limit int) ([]domain.Payment, error)
 	ListByUserID(ctx context.Context, userID string, limit int) ([]domain.Payment, error)
 	GetByID(ctx context.Context, id string) (domain.Payment, error)
@@ -108,6 +112,61 @@ func (r *paymentRepo) GetByOrderID(ctx context.Context, orderID string) (domain.
 		p.TransactionID = &transactionID.String
 	}
 	return p, nil
+}
+
+func (r *paymentRepo) GetPendingByOrderID(ctx context.Context, orderID string) (domain.Payment, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT p.id, p.user_id, p.order_id, p.amount, p.currency, p.status, p.type,
+			p.gateway, p.transaction_id, p.reference_id, p.description,
+			COALESCE(p.proof_url, o.payment_proof_url) AS proof_url,
+			p.paid_at, p.confirmed_by, p.confirmed_at, p.rejection_note, p.created_at, p.updated_at
+		FROM payments p
+		LEFT JOIN orders o ON o.id = p.order_id
+		WHERE p.order_id = $1::uuid AND p.status = 'pending'::payment_status
+		ORDER BY p.created_at DESC
+		LIMIT 1
+	`, orderID)
+	var p domain.Payment
+	var refID, confirmedBy, ordID pgtype.UUID
+	var proofURL, rejectionNote pgtype.Text
+	var gateway, transactionID pgtype.Text
+	err := row.Scan(&p.ID, &p.UserID, &ordID, &p.Amount, &p.Currency, &p.Status, &p.Type, &gateway, &transactionID, &refID, &p.Description, &proofURL, &p.PaidAt, &confirmedBy, &p.ConfirmedAt, &rejectionNote, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return domain.Payment{}, err
+	}
+	if refID.Valid {
+		s := uuid.UUID(refID.Bytes).String()
+		p.ReferenceID = &s
+	}
+	if ordID.Valid {
+		s := uuid.UUID(ordID.Bytes).String()
+		p.OrderID = &s
+	}
+	if proofURL.Valid {
+		p.ProofURL = &proofURL.String
+	}
+	if confirmedBy.Valid {
+		s := uuid.UUID(confirmedBy.Bytes).String()
+		p.ConfirmedBy = &s
+	}
+	if rejectionNote.Valid {
+		p.RejectionNote = &rejectionNote.String
+	}
+	if gateway.Valid {
+		p.Gateway = &gateway.String
+	}
+	if transactionID.Valid {
+		p.TransactionID = &transactionID.String
+	}
+	return p, nil
+}
+
+func (r *paymentRepo) UpdateGatewayForPendingOrder(ctx context.Context, orderID, gateway string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE payments SET gateway = $2, updated_at = NOW()
+		WHERE order_id = $1::uuid AND status = 'pending'::payment_status
+	`, orderID, gateway)
+	return err
 }
 
 func (r *paymentRepo) List(ctx context.Context, limit int) ([]domain.Payment, error) {

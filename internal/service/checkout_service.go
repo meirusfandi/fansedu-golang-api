@@ -127,6 +127,8 @@ type orderItemRepoForCheckout interface {
 type paymentRepoForCheckout interface {
 	Create(ctx context.Context, p domain.Payment) (domain.Payment, error)
 	GetByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
+	GetPendingByOrderID(ctx context.Context, orderID string) (domain.Payment, error)
+	UpdateGatewayForPendingOrder(ctx context.Context, orderID, gateway string) error
 	Update(ctx context.Context, p domain.Payment) error
 	MarkPaidByOrderID(ctx context.Context, orderID string, paidAt time.Time) error
 	BackdateByOrderID(ctx context.Context, orderID string, t time.Time) error
@@ -641,17 +643,23 @@ func (s *checkoutService) CreatePaymentSession(ctx context.Context, orderID, pay
 	}
 
 	ref := orderID
-	_, err = s.paymentRepo.Create(ctx, domain.Payment{
-		UserID:      order.UserID,
-		OrderID:     &orderID,
-		Amount:      order.TotalPrice,
-		Currency:    "IDR",
-		Status:      domain.PaymentStatusPending,
-		Type:        domain.PaymentTypeCoursePurchase,
-		Gateway:     &paymentMethod,
-		ReferenceID: &ref,
-	})
-	if err != nil {
+	if _, err := s.paymentRepo.GetPendingByOrderID(ctx, orderID); err == nil {
+		_ = s.paymentRepo.UpdateGatewayForPendingOrder(ctx, orderID, paymentMethod)
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		_, err = s.paymentRepo.Create(ctx, domain.Payment{
+			UserID:      order.UserID,
+			OrderID:     &orderID,
+			Amount:      order.TotalPrice,
+			Currency:    "IDR",
+			Status:      domain.PaymentStatusPending,
+			Type:        domain.PaymentTypeCoursePurchase,
+			Gateway:     &paymentMethod,
+			ReferenceID: &ref,
+		})
+		if err != nil {
+			return "", err
+		}
+	} else {
 		return "", err
 	}
 
@@ -678,6 +686,35 @@ func (s *checkoutService) HandlePaymentWebhook(ctx context.Context, orderID stri
 	if err != nil {
 		return err
 	}
+	switch order.Status {
+	case domain.OrderStatusPaid:
+		return nil
+	case domain.OrderStatusAwaitingVerification:
+		return nil
+	case domain.OrderStatusPending, domain.OrderStatusFailed:
+	default:
+		return nil
+	}
+
+	if _, err := s.paymentRepo.GetByOrderID(ctx, orderID); errors.Is(err, pgx.ErrNoRows) {
+		ref := orderID
+		gw := "payment_notification"
+		if _, cerr := s.paymentRepo.Create(ctx, domain.Payment{
+			UserID:      order.UserID,
+			OrderID:     &orderID,
+			Amount:      order.TotalPrice,
+			Currency:    "IDR",
+			Status:      domain.PaymentStatusPending,
+			Type:        domain.PaymentTypeCoursePurchase,
+			Gateway:     &gw,
+			ReferenceID: &ref,
+		}); cerr != nil {
+			return cerr
+		}
+	} else if err != nil {
+		return err
+	}
+
 	if err := s.paymentRepo.MarkPaidByOrderID(ctx, orderID, time.Now()); err != nil {
 		return err
 	}

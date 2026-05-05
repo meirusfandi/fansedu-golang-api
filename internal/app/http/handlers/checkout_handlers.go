@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -330,13 +332,44 @@ func CheckoutPaymentSession(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// parseWebhookGrossAmountIDR mengurai gross_amount Midtrans (mis. "150000.00") ke rupiah integer.
+func parseWebhookGrossAmountIDR(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	var f float64
+	if _, err := fmt.Sscanf(s, "%f", &f); err != nil {
+		return 0, false
+	}
+	return int(f + 0.5), true
+}
+
+func paymentWebhookSecretOK(r *http.Request, secret string) bool {
+	if strings.TrimSpace(secret) == "" {
+		return false
+	}
+	h := strings.TrimSpace(r.Header.Get("X-Payment-Webhook-Secret"))
+	if h != "" && subtle.ConstantTimeCompare([]byte(h), []byte(secret)) == 1 {
+		return true
+	}
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if strings.HasPrefix(auth, prefix) {
+		tok := strings.TrimSpace(auth[len(prefix):])
+		if tok != "" && subtle.ConstantTimeCompare([]byte(tok), []byte(secret)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
 // PaymentWebhook handles gateway webhook (e.g. Midtrans/Stripe). POST /api/v1/webhook/payment
 func PaymentWebhook(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			// Internal simple payload
 			OrderID string `json:"orderId"`
-			// Midtrans payload
+			// Midtrans notification (HTTP notification / Snap)
 			MidOrderID        string `json:"order_id"`
 			TransactionStatus string `json:"transaction_status"`
 			FraudStatus       string `json:"fraud_status"`
@@ -356,22 +389,31 @@ func PaymentWebhook(deps *Deps) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "orderId wajib diisi.")
 			return
 		}
-		if strings.TrimSpace(body.MidOrderID) != "" {
-			// Midtrans signature verification when key configured.
-			if strings.TrimSpace(deps.MidtransServerKey) != "" {
-				ok := paymentgateway.VerifyMidtransSignature(
-					body.MidOrderID,
-					body.StatusCode,
-					body.GrossAmount,
-					body.SignatureKey,
-					deps.MidtransServerKey,
-				)
-				if !ok {
-					writeError(w, http.StatusUnauthorized, "invalid_signature", "signature tidak valid")
-					return
-				}
+
+		isMidtrans := strings.TrimSpace(body.TransactionStatus) != "" ||
+			strings.TrimSpace(body.SignatureKey) != "" ||
+			(strings.TrimSpace(body.MidOrderID) != "" && strings.TrimSpace(body.StatusCode) != "")
+
+		if isMidtrans {
+			if strings.TrimSpace(deps.MidtransServerKey) == "" {
+				writeError(w, http.StatusServiceUnavailable, "payment_gateway_unconfigured", "MIDTRANS_SERVER_KEY belum di-set; tidak bisa memverifikasi notifikasi Midtrans.")
+				return
 			}
-			// Only settle paid status.
+			midOID := strings.TrimSpace(body.MidOrderID)
+			if midOID == "" {
+				midOID = orderID
+			}
+			ok := paymentgateway.VerifyMidtransSignature(
+				midOID,
+				body.StatusCode,
+				body.GrossAmount,
+				body.SignatureKey,
+				deps.MidtransServerKey,
+			)
+			if !ok {
+				writeError(w, http.StatusUnauthorized, "invalid_signature", "signature Midtrans tidak valid")
+				return
+			}
 			tx := strings.ToLower(strings.TrimSpace(body.TransactionStatus))
 			if tx != "settlement" && tx != "capture" {
 				w.WriteHeader(http.StatusOK)
@@ -381,7 +423,27 @@ func PaymentWebhook(deps *Deps) http.HandlerFunc {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
+			amt, okAmt := parseWebhookGrossAmountIDR(body.GrossAmount)
+			if !okAmt {
+				writeError(w, http.StatusBadRequest, "gross_amount_invalid", "gross_amount Midtrans tidak valid atau kosong")
+				return
+			}
+			order, err := deps.OrderRepo.GetByID(r.Context(), orderID)
+			if err != nil {
+				writeError(w, http.StatusNotFound, "order_not_found", "order tidak ditemukan")
+				return
+			}
+			if order.TotalPrice != amt {
+				writeError(w, http.StatusBadRequest, "amount_mismatch", "gross_amount tidak sama dengan total order")
+				return
+			}
+		} else {
+			if !paymentWebhookSecretOK(r, deps.PaymentWebhookSecret) {
+				writeError(w, http.StatusUnauthorized, "unauthorized", "Header X-Payment-Webhook-Secret atau Authorization: Bearer <PAYMENT_WEBHOOK_SECRET> wajib cocok dengan konfigurasi server")
+				return
+			}
 		}
+
 		if err := deps.CheckoutService.HandlePaymentWebhook(r.Context(), orderID); err != nil {
 			writeInternalError(w, r, err)
 			return

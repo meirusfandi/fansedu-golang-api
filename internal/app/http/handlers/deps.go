@@ -20,6 +20,7 @@ type Deps struct {
 	AdminPasswordBypassKey string
 	MigrateBypassKey       string
 	MidtransServerKey      string
+	PaymentWebhookSecret   string // untuk webhook pembayaran selain payload Midtrans
 
 	AuthService      service.AuthService
 	TryoutService    service.TryoutService

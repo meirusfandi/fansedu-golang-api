@@ -121,6 +121,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 			AdminPasswordBypassKey: adminPasswordBypassKey,
 			MigrateBypassKey:       migrateBypassKey,
 			MidtransServerKey:      cfg.MidtransServerKey,
+			PaymentWebhookSecret:   cfg.PaymentWebhookSecret,
 		}
 	}
 
@@ -227,6 +228,7 @@ func buildDeps(pool *pgxpool.Pool, cfg config.Config, rdb *redis.Client) *handle
 		AdminPasswordBypassKey: adminPasswordBypassKey,
 		MigrateBypassKey:       migrateBypassKey,
 		MidtransServerKey:      cfg.MidtransServerKey,
+		PaymentWebhookSecret:   cfg.PaymentWebhookSecret,
 		GeoService:             geoSvc,
 		AuthService:            authService,
 		TryoutService:          tryoutService,
