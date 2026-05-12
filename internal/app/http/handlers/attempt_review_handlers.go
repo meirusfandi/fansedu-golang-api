@@ -46,7 +46,8 @@ func decodeAttemptAnswerReviewPatch(r *http.Request) (service.AttemptAnswerRevie
 	return patch, nil
 }
 
-// AdminGetAttemptReview GET /api/v1/admin/tryouts/{tryoutId}/attempts/{attemptId}/review
+// AdminGetAttemptReview GET atau POST /api/v1/admin/tryouts/{tryoutId}/attempts/{attemptId}/review
+// (POST didukung agar klien yang memuat data dengan POST tidak mendapat 405.)
 func AdminGetAttemptReview(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tryoutID := chi.URLParam(r, "tryoutId")
@@ -126,7 +127,7 @@ func tryoutTrainerSubjectGuard(ctx context.Context, deps *Deps, userID, tryoutID
 	return true
 }
 
-// TrainerGetAttemptReview GET /api/v1/trainer|guru/tryouts/{tryoutId}/attempts/{attemptId}/review
+// TrainerGetAttemptReview GET atau POST /api/v1/trainer|guru/tryouts/{tryoutId}/attempts/{attemptId}/review
 func TrainerGetAttemptReview(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, _ := middleware.GetUserID(r.Context())

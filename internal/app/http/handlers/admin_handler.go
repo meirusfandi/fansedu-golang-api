@@ -1194,6 +1194,26 @@ func AdminUpdateCourse(deps *Deps) http.HandlerFunc {
 	}
 }
 
+func AdminDeleteCourse(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "courseId")
+		_, err := deps.AdminService.GetCourseByID(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "course not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := deps.AdminService.DeleteCourse(r.Context(), id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // applyCourseCreateSubjectLevel mengisi subject/level dari body camelCase.
 func applyCourseCreateSubjectLevel(c *domain.Course, req dto.CourseCreateRequest) {
 	if req.SubjectID != nil {

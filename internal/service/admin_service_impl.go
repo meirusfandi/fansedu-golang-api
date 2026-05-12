@@ -43,6 +43,7 @@ type adminService struct {
 		GetByID(ctx context.Context, id string) (domain.Course, error)
 		List(ctx context.Context) ([]domain.Course, error)
 		Update(ctx context.Context, c domain.Course) error
+		Delete(ctx context.Context, id string) error
 		Count(ctx context.Context) (int, error)
 	}
 	enrollmentRepo interface {
@@ -125,6 +126,7 @@ func NewAdminService(
 		GetByID(ctx context.Context, id string) (domain.Course, error)
 		List(ctx context.Context) ([]domain.Course, error)
 		Update(ctx context.Context, c domain.Course) error
+		Delete(ctx context.Context, id string) error
 		Count(ctx context.Context) (int, error)
 	},
 	enrollmentRepo interface {
@@ -278,6 +280,10 @@ func (s *adminService) GetCourseByID(ctx context.Context, id string) (domain.Cou
 
 func (s *adminService) UpdateCourse(ctx context.Context, c domain.Course) error {
 	return s.courseRepo.Update(ctx, c)
+}
+
+func (s *adminService) DeleteCourse(ctx context.Context, id string) error {
+	return s.courseRepo.Delete(ctx, id)
 }
 
 func (s *adminService) ListTryouts(ctx context.Context) ([]domain.TryoutSession, error) {

@@ -384,7 +384,7 @@ func TrainerTryoutStudents(deps *Deps) http.HandlerFunc {
 }
 
 // TrainerAttemptAIAnalysis exposes AI-based analysis per attempt for trainers/guru.
-// GET /api/v1/trainer/tryouts/{tryoutId}/attempts/{attemptId}/ai-analysis
+// GET atau POST /api/v1/trainer/tryouts/{tryoutId}/attempts/{attemptId}/ai-analysis
 func TrainerAttemptAIAnalysis(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tryoutID := chi.URLParam(r, "tryoutId")
