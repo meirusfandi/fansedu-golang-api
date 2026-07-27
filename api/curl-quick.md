@@ -71,6 +71,12 @@ curl -s http://localhost:8080/api/v1/student/tryouts/TRYOUT_UUID -H "Authorizati
 # Riwayat attempt
 curl -s http://localhost:8080/api/v1/student/attempts -H "Authorization: Bearer $TOKEN"
 
+# Lembar soal attempt siswa (tanpa kunci)
+curl -s http://localhost:8080/api/v1/student/tryouts/TRYOUT_UUID/attempts/ATTEMPT_UUID/paper -H "Authorization: Bearer $TOKEN"
+
+# Detail jawaban siswa setelah submit (soal + opsi + kunci + jawaban siswa + komentar pengajar)
+curl -s http://localhost:8080/api/v1/student/tryouts/TRYOUT_UUID/attempts/ATTEMPT_UUID/review -H "Authorization: Bearer $TOKEN"
+
 # Sertifikat
 curl -s http://localhost:8080/api/v1/student/certificates -H "Authorization: Bearer $TOKEN"
 

@@ -38,6 +38,8 @@ Kode di-normalisasi ke **UPPER_SNAKE**. Detail teknis hanya di log server. Set `
 | GET | `/api/v1/student/tryouts/:tryoutId/status` | `canRegister`, `canStartExam`, `isRegistered`, `hasAttempted`, `opensAt`, `closesAt`, `tryoutStatus`, `startDisabledReason` (kode seperti `NOT_REGISTERED`, `BEFORE_OPENS_AT`, `ALREADY_SUBMITTED`). |
 | POST | `/api/v1/student/tryouts/:tryoutId/register` | Idempoten (`200` / `201`). Setelah sukses, status & leaderboard konsisten untuk user terdaftar. |
 | POST | `/api/v1/student/tryouts/:tryoutId/start` | Ditolak di server jika belum daftar, sebelum `opensAt`, setelah `closesAt`, atau sudah submit (satu attempt per user per tryout). |
+| GET | `/api/v1/student/tryouts/:tryoutId/attempts/:attemptId/paper` | Lembar soal attempt (tanpa kunci jawaban). Hanya pemilik attempt. |
+| GET / POST | `/api/v1/student/tryouts/:tryoutId/attempts/:attemptId/review` | Detail jawaban siswa setelah submit: meta attempt + array `items` per soal (`body`, `options`, `correctOption`/`correctText`, jawaban siswa `answerText`/`selectedOption`, `isMarked`, `autoScore`/`autoIsCorrect`, `scoreGot`/`isCorrect`, `manualScore`, `reviewerComment`, `reviewedAt`, `reviewedByName`). Hanya pemilik attempt, status harus `submitted` (`409 ATTEMPT_NOT_SUBMITTED` jika belum). |
 
 ## Submit tryout (siswa)
 

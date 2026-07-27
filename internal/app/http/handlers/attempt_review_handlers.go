@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/middleware"
+	"github.com/meirusfandi/fansedu-golang-api/internal/domain"
 	"github.com/meirusfandi/fansedu-golang-api/internal/service"
 )
 
@@ -125,6 +126,53 @@ func tryoutTrainerSubjectGuard(ctx context.Context, deps *Deps, userID, tryoutID
 		}
 	}
 	return true
+}
+
+// StudentGetAttemptReview GET atau POST /api/v1/student/tryouts/{tryoutId}/attempts/{attemptId}/review
+// Mengembalikan paket review lengkap untuk siswa: soal + opsi + jawaban siswa + kunci + skor + komentar pengajar.
+// Hanya bisa diakses oleh siswa pemilik attempt dan setelah attempt berstatus submitted.
+func StudentGetAttemptReview(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := middleware.GetUserID(r.Context())
+		if userID == "" {
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
+			return
+		}
+		tryoutID := chi.URLParam(r, "tryoutId")
+		attemptID := chi.URLParam(r, "attemptId")
+		if tryoutID == "" || attemptID == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "tryoutId dan attemptId wajib.")
+			return
+		}
+		attempt, err := deps.AttemptService.GetByID(r.Context(), attemptID, userID)
+		if err != nil {
+			if errors.Is(err, service.ErrAttemptNotFound) || errors.Is(err, service.ErrNotYourAttempt) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak ditemukan.")
+				return
+			}
+			writeInternalError(w, r, err)
+			return
+		}
+		if attempt.TryoutSessionID != tryoutID {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Attempt tidak sesuai tryout ini.")
+			return
+		}
+		if attempt.Status != domain.AttemptStatusSubmitted {
+			writeError(w, http.StatusConflict, "ATTEMPT_NOT_SUBMITTED", "Attempt belum disubmit; review belum tersedia.")
+			return
+		}
+		out, err := deps.AdminService.GetAttemptReview(r.Context(), tryoutID, attemptID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
+				return
+			}
+			writeInternalError(w, r, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(out)
+	}
 }
 
 // TrainerGetAttemptReview GET atau POST /api/v1/trainer|guru/tryouts/{tryoutId}/attempts/{attemptId}/review

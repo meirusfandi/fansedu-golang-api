@@ -164,6 +164,8 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 			r.Get("/tryouts/{tryoutId}/status", handlers.StudentTryoutStatus(deps))
 			r.Get("/tryouts/history", handlers.StudentTryoutHistory(deps))
 			r.Get("/tryouts/{tryoutId}/attempts/{attemptId}/paper", handlers.StudentTryoutAttemptPaper(deps))
+			r.Get("/tryouts/{tryoutId}/attempts/{attemptId}/review", handlers.StudentGetAttemptReview(deps))
+			r.Post("/tryouts/{tryoutId}/attempts/{attemptId}/review", handlers.StudentGetAttemptReview(deps))
 			r.Get("/tryouts/{tryoutId}", handlers.StudentTryoutGetByID(deps))
 			r.Get("/next-actions", handlers.StudentNextActions(deps))
 			r.Post("/tryouts/{tryoutId}/register", handlers.StudentTryoutRegister(deps))
@@ -427,6 +429,9 @@ func NewRouter(deps *handlers.Deps) http.Handler {
 	}
 
 	r.Route("/api/v1", registerV1)
+
+	// Register API Interest Form
+	r.Post("/api/v1/register-interest", deps.RegisterInterestHandler)
 
 	// File statis untuk materi upload (PPT/PDF bukti, dll.). Produksi: sering dialihkan ke nginx/S3.
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
