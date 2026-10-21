@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-
-	"github.com/meirusfandi/fansedu-golang-api/internal/app/http/response"
 )
 
 // Request struct for register interest
