@@ -65,7 +65,9 @@ func LoadEnvFile() {
 		}
 	} else {
 		if err := godotenv.Load(".env.dev"); err != nil {
-			log.Printf("warning: loading .env.dev: %v (using system env)", err)
+			if errEnv := godotenv.Load(".env"); errEnv != nil {
+				log.Printf("warning: loading .env.dev / .env: %v (using system env)", err)
+			}
 		}
 	}
 }
